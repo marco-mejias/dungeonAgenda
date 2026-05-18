@@ -20,10 +20,10 @@ https://github.com/user-attachments/assets/a42db60c-42de-4637-9d8c-c5b1b3250283
 Dungeon Agenda blends tactical grid-based exploration with intense survival management.
 
 ### 1. Tactical Grid Movement & Exploration
-The game relies on a turn-based procedural grid. Characters navigate the dungeon using an action-point system based on their `Speed` stat. The map is covered in a dense **Fog of War**, requiring players to strategically position their characters to reveal paths, avoid traps, and find the exit stairs.
+The game relies on a turn-based procedural grid. Characters navigate the dungeon using an action-point system based on their Speed stat. The map is covered in a dense *Fog of War*, requiring players to strategically position their characters to reveal paths, avoid traps, and find the exit stairs.
 
 ### 2. Deep Survival System
-Time is your worst enemy. As turns pass, characters consume `Food`. If a character starves, they die permanently. Furthermore, characters suffer from **Isolation Sanity Loss**—if a party member ends their turn too far from the rest of the group, their sanity drops drastically, severely halving their stats and making subsequent events much harder to overcome.
+Time is your worst enemy. As turns pass, characters consume Food. If a character starves, they die permanently. Furthermore, characters suffer from Isolation Sanity Loss—if a party member ends their turn too far from the rest of the group, their sanity drops drastically, severely halving their stats and making subsequent events much harder to overcome.
 
 ### 3. Risk/Reward Interactive Events
 Stepping on specific dungeon tiles triggers narrative events. The player must choose an action that relies on a specific character stat (Strength, Magic, Luck...). The system calculates a success probability and performs a visual "Dice Roll". Success grants loot or heals, while failure heavily penalizes the character's sanity or HP.
@@ -59,7 +59,7 @@ While the core exploration and survival loops are fully functional, the game is 
 * **Equipment & Inventory Expansion:** While not very useful, the game features an inventory system, which will be a main mechanic in the feature for equipping specific gear (Weapons, Armor, Accessories). In the future, items will be actually useful and while in the campfire, characters will be able to exchange gear.
 * **Audio Engine Integration:** Connecting an event-driven audio system for UI clicks, dice rolls, footsteps, background music....
 * **MVC Arquitecture: ** While the game feaures a core manager pattern, currently is a bit of spaghetti code...But another build is currently being made in paral·lel featuring a MVC model
-* * **AND MORE OF EVERYTHING:** Actually the game features only 3 types of events and one item. While not very exciting, because the easy making architecture and incorporation, plans are made to add hundreds of them.
+* **AND MORE OF EVERYTHING:** Actually the game features only 3 types of events and one item. While not very exciting, because the easy making architecture and incorporation, plans are made to add hundreds of them.
 
 ---
 
