@@ -49,6 +49,7 @@ Content creation is highly flexible thanks to a data-driven approach using Godot
 
 ### 4. Robust Input & Event Routing
 The engine employs a sophisticated input interception layer to manage the overlap between the World and the User Interface. UI components act as shields: clicks on HUD elements are consumed instantly, preventing the underlying C++ pathfinding algorithms from triggering invalid actions. This guarantees a fluid, bug-free tactical experience.
+
 ---
 
 ## 🚀 Roadmap & Future Improvements
