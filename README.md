@@ -2,8 +2,6 @@
 
 A top-down 2D action and adventure CRPG built in Godot 4.6 utilizing a high-performance C++ backend alongside GDScript. Where every decision counts! Control the 4 members of your party and descend into an (almost) infinite procedural dungeon. But be careful: the dungeon is plagued with monsters, treasures, traps, and hundreds of terrifying creatures. Gather resources, sharpen your weapons, manage your party's sanity, and take a nap from time to time to unravel the mysteries and make your way out.
 
-Developed with a strong focus on memory safety, decoupled architecture, and AAA-standard backend patterns using the Jenova C++ framework for Godot.
-
 ## 🛠️ Technologies 
 
 * **Game Engine:** Godot Engine 4.6
@@ -42,7 +40,7 @@ The core game loop is completely decoupled, dividing responsibilities into highl
 * **HUDManager (UI & Feedback):** A purely reactive visual director. It listens to state changes from the PartyManager and updates the interface smoothly using Godot's Tween engine, maintaining a clean separation between data and presentation.
 
 ### 2. Hybrid Codebase (C++ & GDScript)
-The project utilizes a "best of both worlds" approach. Computationally heavy tasks (like procedural algorithms, visibility checks, and deep state management) are written in **C++** for maximum optimization. Meanwhile, **GDScript** is used exclusively as a lightweight router for handling user input and high-level scene composition, keeping iteration times fast.
+The project utilizes a "best of both worlds" approach. Computationally heavy tasks (like procedural algorithms, visibility checks, and deep state management) are written in **C++** for maximum optimization. Meanwhile, **GDScript** is used exclusively as a lightweight router for handling user input and high-level scene composition, keeping iteration times fast. Although, the decision to use C++ was at first purely for learning purposes.
 
 ### 3. Data-Driven Design
 Content creation is highly flexible thanks to a data-driven approach using Godot's `Resource` system (`.tres` files). Characters, items, and narrative events are defined as external data objects. This allows designers to add new encounters, tweak enemy stats, or create new loot without ever needing to touch or recompile the C++ source code.
@@ -59,7 +57,7 @@ While the core exploration and survival loops are fully functional, the game is 
 * **Advanced Procedural Generation and Movement:** Moving from random placement to structured algorithms (BSP Trees or Cellular Automata) for more organic room and corridor generation, while also improving the movement and vision algorythm.
 * **Equipment & Inventory Expansion:** While not very useful, the game features an inventory system, which will be a main mechanic in the feature for equipping specific gear (Weapons, Armor, Accessories). In the future, items will be actually useful and while in the campfire, characters will be able to exchange gear.
 * **Audio Engine Integration:** Connecting an event-driven audio system for UI clicks, dice rolls, footsteps, background music....
-* **MVC Arquitecture: ** While the game feaures a core manager pattern, currently is a bit of spaghetti code...But another build is currently being made in paral·lel featuring a MVC model
+* **MVC Arquitecture:** While the game feaures a core manager pattern, currently is a bit of spaghetti code...But another build is currently being made in paral·lel featuring a MVC model
 * **AND MORE OF EVERYTHING:** Actually the game features only 3 types of events and one item. While not very exciting, because the easy making architecture and incorporation, plans are made to add hundreds of them.
 
 ---
