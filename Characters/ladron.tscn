@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://dm5dty1342vmm"]
+
+[ext_resource type="Script" uid="uid://cuxially6tpd2" path="res://Scripts/CPP/tokenLogic.cpp" id="1_inmkb"]
+[ext_resource type="Texture2D" uid="uid://bthijxltocjjt" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character.png" id="2_inmkb"]
+
+[sub_resource type="Gradient" id="Gradient_inmkb"]
+offsets = PackedFloat32Array(0.07608695, 0.07789855, 1)
+colors = PackedColorArray(0.98550725, 0.98550725, 0.98550725, 1, 1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_tj8n3"]
+gradient = SubResource("Gradient_inmkb")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+
+[node name="Ladron" type="Node2D" unique_id=1934959846]
+modulate = Color(1.9778739, 1.6052192, 0, 1)
+script = ExtResource("1_inmkb")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=191370809]
+texture_filter = 1
+scale = Vector2(14, 14)
+texture = ExtResource("2_inmkb")
+hframes = 7
+vframes = 4
+frame = 24
+
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=1207141775]
+visible = false
+position = Vector2(-1.9073486e-06, -6)
+scale = Vector2(20, 20)
+color = Color(1, 0.8156863, 0.52156866, 1)
+energy = 0.5
+shadow_enabled = true
+shadow_filter = 1
+texture = SubResource("GradientTexture2D_tj8n3")

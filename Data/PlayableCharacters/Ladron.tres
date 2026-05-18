@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://crhb6huofdd27"]
+
+[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_tqqmb"]
+
+[resource]
+script = ExtResource("1_tqqmb")
+nombre_display = "Nathan Snake"
+retrato_path = "uid://dgcawfionqxmg"
+vida_max = 75
+velocidad = 5
+fuerza = 6
+suerte = 8
+ruta_cuerpo = "res://Characters/ladron.tscn"
+metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

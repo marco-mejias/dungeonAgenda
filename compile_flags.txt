@@ -1,0 +1,3 @@
+-I./
+-I./Jenova/JenovaSDK
+-I./Jenova/Packages//GodotSDK-4.6.2

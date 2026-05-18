@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://uw5varh5ov7c"]
+
+[ext_resource type="Texture2D" uid="uid://cchcy4n5slbap" path="res://Assets/cult.jpg" id="1_7f2yx"]
+[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_cm4am"]
+[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_f36fu"]
+
+[sub_resource type="Resource" id="Resource_7f2yx"]
+script = ExtResource("2_cm4am")
+texto_boton = "Canaliza tu magia!"
+stat_usada = "magia"
+multiplicador_dificultad = 1.4
+texto_exito = "Sacas una chispa de tus manos y quedan anonadados con tu gran poder! Creo que ayudan que sean pequeñitos..."
+texto_fracaso = "Intentas canalizar tu poder pero creo que te da algo de vergüenza. CABRON! Empiezan a pegarte todos en unisono, por suerte, no es que sean muy fuertes tampoco..."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 2
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[sub_resource type="Resource" id="Resource_cm4am"]
+script = ExtResource("2_cm4am")
+texto_boton = "Pegales una patada"
+multiplicador_dificultad = 1.2000000000000002
+texto_exito = "Empiezas a pegarle poco a poco patadas a cada uno de ellos, lograndoles mandar a la mierda. Te vas corriendo por si acaso..."
+texto_fracaso = "Al pegarle una patada al primero, los demas se empiezan a abalanzar encima tuyo, cayendo rápidamente mientras lloras del dolor. Quien diria que algo tan pequeño podia ser tan doloroso..."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 6
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[resource]
+script = ExtResource("3_f36fu")
+titulo = "Culto de Ermitaños"
+descripcion = "Te encuentras unos pequeños ermitaños con sombreros puntiagudos: Demuestranos tu poder! Estan pirados pero...creo que seran peores si no les haces caso..."
+ilustracion = ExtResource("1_7f2yx")
+opciones = Array[ExtResource("2_cm4am")]([SubResource("Resource_7f2yx"), SubResource("Resource_cm4am")])
+metadata/_custom_type_script = "uid://bov68belyjx5p"

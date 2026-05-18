@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "cStandard": "c17",
+            "compilerArgs": [],
+            "compilerPath": "D:/GODOT/Games/cpp-dungeons-4.6/Jenova/Packages/JenovaMSVCCompiler-14.38.33130/Bin/cl.exe",
+            "cppStandard": "c++20",
+            "defines": [
+                "TYPED_METHOD_BIND",
+                "HOT_RELOAD_ENABLED",
+                "_WINDLL"
+            ],
+            "forcedInclude": [
+                "JenovaSDK.h"
+            ],
+            "includePath": [
+                "./",
+                "./Jenova/JenovaSDK",
+                "./Jenova/Packages//GodotSDK-4.6.2"
+            ],
+            "intelliSenseMode": "windows-msvc-x64",
+            "name": "Jenova-Framework"
+        }
+    ],
+    "version": 4
+}

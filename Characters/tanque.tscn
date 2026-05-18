@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://bb453al0v6t1s"]
+
+[ext_resource type="Script" uid="uid://cuxially6tpd2" path="res://Scripts/CPP/tokenLogic.cpp" id="1_km1t6"]
+[ext_resource type="Texture2D" uid="uid://bthijxltocjjt" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character.png" id="2_kbx6j"]
+
+[sub_resource type="Gradient" id="Gradient_kbx6j"]
+offsets = PackedFloat32Array(0.07608695, 0.07789855, 1)
+colors = PackedColorArray(0.98550725, 0.98550725, 0.98550725, 1, 1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_q0oq3"]
+gradient = SubResource("Gradient_kbx6j")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+
+[node name="Tanque" type="Node2D" unique_id=887159196]
+modulate = Color(0.40147895, 0.57935435, 3.85046e-07, 1)
+script = ExtResource("1_km1t6")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=46866361]
+texture_filter = 1
+scale = Vector2(14, 14)
+texture = ExtResource("2_kbx6j")
+hframes = 7
+vframes = 4
+frame = 20
+
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=1994598148]
+visible = false
+position = Vector2(-1.9073486e-06, -6)
+scale = Vector2(20, 20)
+color = Color(1, 0.8156863, 0.52156866, 1)
+energy = 0.5
+shadow_enabled = true
+shadow_filter = 1
+texture = SubResource("GradientTexture2D_q0oq3")

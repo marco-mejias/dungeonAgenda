@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://bo4r77bwmf4bp"]
+
+[ext_resource type="Texture2D" uid="uid://dvrneoj6icvt4" path="res://Assets/icon.svg" id="1_kmbii"]
+[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_csuuj"]
+[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_7448k"]
+
+[sub_resource type="Resource" id="Resource_kmbii"]
+script = ExtResource("2_csuuj")
+texto_boton = "CORRE HA TODA OSTIA"
+stat_usada = "velocidad"
+multiplicador_dificultad = 1.3
+texto_exito = "Echas a correr y...milagrosamente escapas!"
+texto_fracaso = "Te tropiezas con una piedra y...auch"
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 3
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[sub_resource type="Resource" id="Resource_csuuj"]
+script = ExtResource("2_csuuj")
+texto_boton = "Parala con ese pechamen"
+multiplicador_dificultad = 0.7
+texto_exito = "Sorprendentemente le metes una ostia y la paras en seco, genial..."
+texto_fracaso = "Enserio creías que.....joder tio..."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 3
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[sub_resource type="Resource" id="Resource_7448k"]
+script = ExtResource("2_csuuj")
+texto_boton = "Quedarse quieto"
+stat_usada = "ninguna"
+multiplicador_dificultad = 0.2
+texto_exito = "La roca te va a golpear y...PUM! Papel maché con mejunje Art Attack! Casualmente colocado en la mazmorra más peligrosa del mundo!"
+texto_fracaso = "Eh...deberías apreciar más tu vida"
+funcion_fracaso = "Recibir Dano"
+parametro_fracaso = 3
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[resource]
+script = ExtResource("3_7448k")
+titulo = "Roca Rodante"
+descripcion = "Desde arriba del techo, una roca gigante desciende! Yo te recomendaría salir corriendo....a no ser que quieras convertirte en una nueva baldosa de la mazmorra!"
+ilustracion = ExtResource("1_kmbii")
+opciones = Array[ExtResource("2_csuuj")]([SubResource("Resource_kmbii"), SubResource("Resource_csuuj"), SubResource("Resource_7448k")])
+metadata/_custom_type_script = "uid://bov68belyjx5p"

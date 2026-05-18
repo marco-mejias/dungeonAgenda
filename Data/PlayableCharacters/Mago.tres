@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://dpjvahg3x1p0d"]
+
+[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_j0w5w"]
+
+[resource]
+script = ExtResource("1_j0w5w")
+nombre_display = "Vivi Owl-nittier"
+retrato_path = "uid://di2242yca8rwu"
+fuerza = 3
+magia = 8
+ruta_cuerpo = "res://Characters/mago.tscn"
+metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

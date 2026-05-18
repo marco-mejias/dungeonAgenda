@@ -1,0 +1,405 @@
+[gd_scene format=3 uid="uid://bl1k2m0cb3oir"]
+
+[ext_resource type="Script" uid="uid://ccftwsw3jaw5n" path="res://Scripts/GDD/main.gd" id="1_wsu2k"]
+[ext_resource type="Script" uid="uid://la3o4sxf6mh4" path="res://Scripts/CPP/DungeonManager.cpp" id="2_k12tt"]
+[ext_resource type="Texture2D" uid="uid://ciu6t8viq5o13" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_fdnlq"]
+[ext_resource type="Script" uid="uid://dtxk5rqpb7bm1" path="res://Scripts/CPP/partyManager.cpp" id="4_b3802"]
+[ext_resource type="Script" uid="uid://de8lgwkdug0rx" path="res://Scripts/GDD/DatosEquipo.gd" id="5_fevyy"]
+[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="6_hibaj"]
+[ext_resource type="Resource" uid="uid://dpjvahg3x1p0d" path="res://Data/PlayableCharacters/Mago.tres" id="7_pdsj5"]
+[ext_resource type="Resource" uid="uid://cvecxbbwbtevl" path="res://Data/PlayableCharacters/Caballero.tres" id="8_ee4r6"]
+[ext_resource type="Resource" uid="uid://s4i7lq5fxfh1" path="res://Data/PlayableCharacters/Tanque.tres" id="9_gt3je"]
+[ext_resource type="Resource" uid="uid://crhb6huofdd27" path="res://Data/PlayableCharacters/Ladron.tres" id="10_3pmx8"]
+[ext_resource type="Script" uid="uid://dktucv2r4gkux" path="res://Scripts/CPP/uiManager.cpp" id="11_u50mg"]
+[ext_resource type="PackedScene" uid="uid://bxvhm84mm1aa3" path="res://Scenes/ficha_heroe.tscn" id="17_h1bgf"]
+
+[sub_resource type="OccluderPolygon2D" id="OccluderPolygon2D_fdnlq"]
+polygon = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="OccluderPolygon2D" id="OccluderPolygon2D_jkdf5"]
+polygon = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="OccluderPolygon2D" id="OccluderPolygon2D_wsu2k"]
+polygon = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_jkdf5"]
+texture = ExtResource("3_fdnlq")
+0:0/0 = 0
+0:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+1:0/0 = 0
+1:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+2:0/next_alternative_id = 3
+2:0/0 = 0
+2:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+2:0/1 = 1
+3:0/0 = 0
+3:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+4:0/0 = 0
+4:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+5:0/0 = 0
+5:0/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+6:0/next_alternative_id = 2
+6:0/0 = 0
+6:0/1 = 1
+7:0/0 = 0
+8:0/0 = 0
+9:0/0 = 0
+9:1/0 = 0
+8:1/0 = 0
+7:1/0 = 0
+6:1/0 = 0
+5:1/0 = 0
+5:1/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+4:1/0 = 0
+3:1/0 = 0
+2:1/0 = 0
+1:1/0 = 0
+0:1/0 = 0
+0:1/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+0:2/0 = 0
+0:2/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+0:3/0 = 0
+0:3/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+1:3/0 = 0
+2:3/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+4:2/0 = 0
+5:2/0 = 0
+5:2/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+6:2/0 = 0
+7:2/0 = 0
+8:2/0 = 0
+9:2/0 = 0
+9:3/0 = 0
+8:3/next_alternative_id = 2
+8:3/0 = 0
+8:3/1 = 1
+7:3/0 = 0
+7:3/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_wsu2k")
+6:3/0 = 0
+6:3/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_wsu2k")
+5:4/0 = 0
+5:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+4:4/0 = 0
+4:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+3:4/0 = 0
+3:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+2:4/0 = 0
+2:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+3:3/0 = 0
+3:5/0 = 0
+3:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+4:5/0 = 0
+4:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+6:4/0 = 0
+7:4/0 = 0
+5:3/0 = 0
+5:3/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+4:3/0 = 0
+1:4/0 = 0
+1:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+1:5/0 = 0
+1:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+2:5/0 = 0
+2:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+2:6/0 = 0
+3:6/0 = 0
+4:6/0 = 0
+5:5/0 = 0
+5:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+6:5/0 = 0
+0:5/0 = 0
+0:5/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_jkdf5")
+0:6/0 = 0
+0:7/0 = 0
+0:8/0 = 0
+0:9/0 = 0
+1:9/0 = 0
+1:8/0 = 0
+2:8/0 = 0
+3:8/0 = 0
+3:7/0 = 0
+0:4/0 = 0
+0:4/0/occlusion_layer_0/polygon_0/polygon = SubResource("OccluderPolygon2D_fdnlq")
+1:7/0 = 0
+1:6/0 = 0
+1:2/0 = 0
+2:7/0 = 0
+2:9/0 = 0
+3:9/0 = 0
+4:9/0 = 0
+5:9/0 = 0
+6:9/0 = 0
+6:8/0 = 0
+5:8/0 = 0
+4:8/0 = 0
+7:9/0 = 0
+7:8/0 = 0
+7:7/0 = 0
+6:6/0 = 0
+5:6/0 = 0
+4:7/0 = 0
+6:7/0 = 0
+5:7/0 = 0
+8:8/0 = 0
+8:7/0 = 0
+7:6/0 = 0
+8:6/0 = 0
+8:5/0 = 0
+7:5/0 = 0
+8:9/0 = 0
+9:8/0 = 0
+9:7/0 = 0
+9:6/0 = 0
+9:5/0 = 0
+9:9/0 = 0
+9:4/0 = 0
+8:4/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_kek77"]
+occlusion_layer_0/light_mask = 1
+occlusion_layer_1/light_mask = 1
+custom_data_layer_0/name = "evento"
+custom_data_layer_0/type = 1
+sources/1 = SubResource("TileSetAtlasSource_jkdf5")
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fdnlq"]
+blend_mode = 3
+light_mode = 1
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_jkdf5"]
+light_mode = 1
+
+[sub_resource type="Environment" id="Environment_fdnlq"]
+background_mode = 3
+background_energy_multiplier = 1.11
+glow_enabled = true
+glow_intensity = 0.49
+glow_bloom = 0.15
+
+[node name="Main" type="Node2D" unique_id=740303934]
+script = ExtResource("1_wsu2k")
+
+[node name="DungeonManager" type="Node2D" parent="." unique_id=1496626110]
+position = Vector2(650, 100)
+scale = Vector2(2, 2)
+script = ExtResource("2_k12tt")
+
+[node name="Niebla" type="TileMapLayer" parent="DungeonManager" unique_id=582833251]
+visible = false
+z_index = 1
+scale = Vector2(1.0000002, 1.0000002)
+tile_set = SubResource("TileSet_kek77")
+
+[node name="Tablero" type="TileMapLayer" parent="DungeonManager" unique_id=856094185]
+z_index = -1
+texture_filter = 1
+tile_set = SubResource("TileSet_kek77")
+
+[node name="PathLine" type="Line2D" parent="DungeonManager" unique_id=723881103]
+width = 5.0
+default_color = Color(1.8770993e-06, 0.52651983, 0.4475832, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+
+[node name="PartyManager" type="Node" parent="." unique_id=1742771196]
+script = ExtResource("4_b3802")
+
+[node name="DatosEquipo" type="Node" parent="PartyManager" unique_id=2103544411]
+script = ExtResource("5_fevyy")
+lista_heroes = Array[ExtResource("6_hibaj")]([ExtResource("7_pdsj5"), ExtResource("8_ee4r6"), ExtResource("9_gt3je"), ExtResource("10_3pmx8")])
+
+[node name="CanvasLayer3" type="CanvasLayer" parent="." unique_id=1924316897]
+layer = 5
+visible = false
+
+[node name="PantallaFogata" type="Control" parent="CanvasLayer3" unique_id=505483586]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BtnDescansar" type="Button" parent="CanvasLayer3/PantallaFogata" unique_id=401102081]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -154.0
+offset_top = -16.0
+offset_right = 154.0
+offset_bottom = 16.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Descansar y bajar de piso"
+
+[node name="Fondo" type="ColorRect" parent="CanvasLayer3/PantallaFogata" unique_id=488594269]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.26666668, 0.26666668, 0.26666668, 0.78431374)
+
+[node name="Label" type="Label" parent="CanvasLayer3/PantallaFogata" unique_id=218263593]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 24.0
+grow_horizontal = 2
+text = "grupo descansa en la fogata"
+
+[node name="CanvasLayer2" type="CanvasLayer" parent="." unique_id=1672923392]
+layer = 4
+
+[node name="PantallaEvento" type="Panel" parent="CanvasLayer2" unique_id=1922194707]
+visible = false
+self_modulate = Color(0, 0, 0, 1)
+visibility_layer = 31
+z_index = 14
+texture_filter = 2
+anchors_preset = -1
+anchor_left = 0.545
+anchor_top = 0.006
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.15997314
+offset_top = -3.888
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer2/PantallaEvento" unique_id=1836872070]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Titulo" type="Label" parent="CanvasLayer2/PantallaEvento" unique_id=826220811]
+texture_filter = 2
+layout_mode = 0
+offset_left = 58.0
+offset_top = 29.0
+offset_right = 487.0
+offset_bottom = 65.0
+horizontal_alignment = 1
+
+[node name="Foto" type="TextureRect" parent="CanvasLayer2/PantallaEvento" unique_id=1921621906]
+layout_mode = 0
+offset_left = 58.0
+offset_top = 133.0
+offset_right = 435.0
+offset_bottom = 407.0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TextoHistoria" type="RichTextLabel" parent="CanvasLayer2/PantallaEvento" unique_id=1225624541]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 103.0
+offset_right = 468.0
+offset_bottom = 266.0
+bbcode_enabled = true
+
+[node name="CajaBotones" type="VBoxContainer" parent="CanvasLayer2/PantallaEvento" unique_id=1350735244]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 352.0
+offset_right = 468.0
+offset_bottom = 615.0
+theme_override_constants/separation = 15
+alignment = 1
+
+[node name="BtnContinuar" type="Button" parent="CanvasLayer2/PantallaEvento/CajaBotones" unique_id=1527806120]
+layout_mode = 2
+text = "Continuar"
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1245602198]
+script = ExtResource("11_u50mg")
+
+[node name="MarcadorTurnos" type="Label" parent="CanvasLayer" unique_id=744228255]
+offset_left = 754.0
+offset_top = 10.0
+offset_right = 905.0
+offset_bottom = 62.0
+text = "PISO 1 | TURNO 1"
+
+[node name="GridContainer" type="GridContainer" parent="CanvasLayer" unique_id=963860085]
+texture_filter = 2
+offset_left = 53.0
+offset_top = 10.0
+offset_right = 568.0
+offset_bottom = 670.0
+scale = Vector2(0.7, 0.7)
+theme_override_constants/h_separation = 55
+theme_override_constants/v_separation = 70
+columns = 2
+
+[node name="IronCat" parent="CanvasLayer/GridContainer" unique_id=430086645 instance=ExtResource("17_h1bgf")]
+layout_mode = 2
+
+[node name="Nathan Snake" parent="CanvasLayer/GridContainer" unique_id=1458817461 instance=ExtResource("17_h1bgf")]
+layout_mode = 2
+
+[node name="Vivi Owl-nittier" parent="CanvasLayer/GridContainer" unique_id=2110287487 instance=ExtResource("17_h1bgf")]
+layout_mode = 2
+
+[node name="Doom Snailer" parent="CanvasLayer/GridContainer" unique_id=1141587071 instance=ExtResource("17_h1bgf")]
+layout_mode = 2
+
+[node name="BtnSalidaDebug" type="Button" parent="CanvasLayer" unique_id=452735484]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -32.0
+offset_right = 229.0
+grow_vertical = 0
+text = "Debug: bajar todos de piso"
+
+[node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=1357141214]
+visible = false
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=961355005]
+z_index = -20
+material = SubResource("CanvasItemMaterial_fdnlq")
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.4045111, 0.40451115, 0.4045111, 1)
+
+[node name="CPUParticles2D" type="CPUParticles2D" parent="." unique_id=474401237]
+material = SubResource("CanvasItemMaterial_jkdf5")
+position = Vector2(568, 344)
+amount = 50
+randomness = 0.84
+emission_shape = 3
+emission_rect_extents = Vector2(600, 400)
+gravity = Vector2(0, 5)
+initial_velocity_min = 10.0
+initial_velocity_max = 17.01
+angular_velocity_min = -11.8
+angular_velocity_max = -11.8
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=3294809]
+environment = SubResource("Environment_fdnlq")
+
+[node name="ColorRect2" type="ColorRect" parent="." unique_id=2084228734]
+z_index = -20
+material = SubResource("CanvasItemMaterial_fdnlq")
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.4045111, 0.40451115, 0.4045111, 1)

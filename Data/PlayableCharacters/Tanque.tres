@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://s4i7lq5fxfh1"]
+
+[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_suixd"]
+
+[resource]
+script = ExtResource("1_suixd")
+nombre_display = "Doom Snailer"
+retrato_path = "uid://inja7yuwguog"
+vida_max = 150
+velocidad = 2
+fuerza = 8
+suerte = 2
+ruta_cuerpo = "res://Characters/tanque.tscn"
+metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

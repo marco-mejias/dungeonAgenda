@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://cvecxbbwbtevl"]
+
+[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_l4g75"]
+
+[resource]
+script = ExtResource("1_l4g75")
+nombre_display = "IronCat"
+retrato_path = "uid://dbfvxgwybojdm"
+vida_max = 125
+magia = 4
+ruta_cuerpo = "res://Characters/caballero.tscn"
+metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

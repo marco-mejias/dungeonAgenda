@@ -1,0 +1,12 @@
+# Godot
+.godot/
+*.translation
+
+*.obj
+*.pdb
+*.dll
+*.lib
+*.exp
+.vs/
+*.sln
+*.vcxproj*

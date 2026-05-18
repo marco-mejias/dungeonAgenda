@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://dnhp3tijk5dmq"]
+
+[ext_resource type="Texture2D" uid="uid://dvrneoj6icvt4" path="res://Assets/icon.svg" id="1_2t4xr"]
+[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_bv76d"]
+[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_46ncy"]
+
+[sub_resource type="Resource" id="Resource_2t4xr"]
+script = ExtResource("2_bv76d")
+texto_boton = "Hagamos el pulso!"
+multiplicador_dificultad = 1.4
+texto_exito = "3,2,1....PAM! Al que parecía ser un fortachón resulto ser un....Es igual, le ganaste, ahora de vuelta al ruedo!"
+texto_fracaso = "3,2,1....PAM! Al que parecía ser un fortachón resulto ser un....realmente fuerte....Creo que te has roto algo...."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 5
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[sub_resource type="Resource" id="Resource_bv76d"]
+script = ExtResource("2_bv76d")
+texto_boton = "Salir corriendo"
+stat_usada = "velocidad"
+multiplicador_dificultad = 1.2000000000000002
+texto_exito = "Mas vale fuerza que maña....O es al revés? Mmmm...Lo importante es que por suerte parecia que el goblin se saltaba el dia de piernas, bien hecho!"
+texto_fracaso = "A DONDE VAS? Esuchas mientras intentas salir corriendo. Miras para atrás y ves al Goblin volando apunto de hacerte un Súplex. Oh oh."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 10
+metadata/_custom_type_script = "uid://bphprpqb73iny"
+
+[resource]
+script = ExtResource("3_46ncy")
+titulo = "Goblin Fortachon"
+descripcion = "En una esquina ves un stand de 'El Goblin Fortachon TM'. Te mira con una mirada pícara y te llama: No te dejaré pasar por mi barrio a menos que demuestres que eres un verdadero fortachón..."
+ilustracion = ExtResource("1_2t4xr")
+opciones = Array[ExtResource("2_bv76d")]([SubResource("Resource_2t4xr"), SubResource("Resource_bv76d")])
+metadata/_custom_type_script = "uid://bov68belyjx5p"
