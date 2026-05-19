@@ -2,6 +2,8 @@
 
 A top-down 2D action and adventure CRPG built in Godot 4.6 utilizing a high-performance C++ backend alongside GDScript. Where every decision counts! Control the 4 members of your party and descend into an (almost) infinite procedural dungeon. But be careful: the dungeon is plagued with monsters, treasures, traps, and hundreds of terrifying creatures. Gather resources, sharpen your weapons, manage your party's sanity, and take a nap from time to time to unravel the mysteries and make your way out.
 
+The game is based in survival Point and Click games like 60 Seconds or Reigns, while offering a twist inspired in classical RPG games.
+
 ## 🛠️ Technologies 
 
 * **Game Engine:** Godot Engine 4.6
