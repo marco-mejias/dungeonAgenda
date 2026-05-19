@@ -69,7 +69,7 @@ While the core exploration and survival loops are fully functional, the game is 
 **Prerequisites:**
 * Godot Engine 4.x (Tested on 4.6)
 * Visual Studio Community (with Desktop development with C++ workload)
-* [Jenova SDK Plugin](https://github.com/jenova-project/Jenova) installed in your Godot editor.
+* [Jenova SDK Plugin](https://jenova-framework.github.io/docs/pages/Getting-Started/) installed in your Godot editor.
 
 **Setup Steps:**
 1. Clone this repository to your local machine
