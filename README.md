@@ -24,7 +24,7 @@ The game relies on a turn-based procedural grid. Characters navigate the dungeon
 Time is your worst enemy. As turns pass, characters consume Food. If a character starves, they die permanently. Furthermore, characters suffer from Isolation Sanity Loss—if a party member ends their turn too far from the rest of the group, their sanity drops drastically, severely halving their stats and making subsequent events much harder to overcome.
 
 ### 3. Risk/Reward Interactive Events
-Stepping on specific dungeon tiles triggers narrative events. The player must choose an action that relies on a specific character stat (Strength, Magic, Luck...). The system calculates a success probability and performs a visual "Dice Roll". Success grants loot or heals, while failure heavily penalizes the character's sanity or HP.
+Stepping on specific dungeon tiles triggers narrative events. The player must choose an action that relies on a specific character stat (Strength, Magic, Luck...). The system calculates a success probability and performs a visual "Dice Roll". Success grants loot or heals, while failure heavily penalizes the character's sanity or HP. NOTE: The game has visual squares indicating where the events are. This was for debugging purposes, but shall not be included in the final product.
 
 ### 4. The Campfire
 Upon successfully escaping a floor with the surviving party members, players enter the Campfire phase. Here, the party rests, slightly recovers HP, Sanity, and Food, and prepares for the generation of the next, more difficult floor.
