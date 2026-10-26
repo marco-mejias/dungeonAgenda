@@ -177,8 +177,12 @@ void PintarPA(Control* ficha, int pa, int pa_max) {
 	if (!caja) return;
 	int clave = pa * 100 + pa_max;
 	if (caja->has_meta("pintado") && (int)caja->get_meta("pintado") == clave) return;
+	int pa_antes = caja->has_meta("pa_antes") ? (int)caja->get_meta("pa_antes") : pa;
 	caja->set_meta("pintado", clave);
+	caja->set_meta("pa_antes", pa);
 
+	const Color LLENO(0.4, 0.8, 1.0);
+	const Color VACIO(0.16, 0.18, 0.32);
 	TypedArray<Node> viejos = caja->get_children();
 	for (int i = 0; i < viejos.size(); i++) {
 		Node* n = Object::cast_to<Node>(viejos[i]);
@@ -190,9 +194,22 @@ void PintarPA(Control* ficha, int pa, int pa_max) {
 		r->set_custom_minimum_size(Vector2(5, 5));
 		r->set_pivot_offset(Vector2(2.5, 2.5));
 		r->set_rotation((float)Math_PI * 0.25f);
-		r->set_color(i < pa ? Color(0.4, 0.8, 1.0) : Color(0.16, 0.18, 0.32));
 		r->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
 		caja->add_child(r);
+		bool recien_gastado = i >= pa && i < pa_antes;
+		bool recien_ganado = i < pa && i >= pa_antes;
+		if (recien_gastado || recien_ganado) {
+			// Los rombos que cambian destellan y se vacían/llenan uno detrás de otro
+			r->set_color(recien_gastado ? Color(1, 1, 1) : VACIO);
+			Ref<Tween> tw = r->create_tween();
+			float retraso = 0.07f * (recien_gastado ? (pa_antes - 1 - i) : (i - pa_antes));
+			tw->tween_interval(retraso);
+			tw->tween_property(r, "scale", Vector2(1.8, 1.8), 0.08);
+			tw->parallel()->tween_property(r, "color", recien_gastado ? VACIO : LLENO, 0.2);
+			tw->tween_property(r, "scale", Vector2(1, 1), 0.12);
+		} else {
+			r->set_color(i < pa ? LLENO : VACIO);
+		}
 	}
 }
 
@@ -322,7 +339,7 @@ void ActualizarMarcadorTurno(Caller* instance) {
 	
 	Label* turn_marker = Object::cast_to<Label>(self->get_node_or_null("MarcadorTurnos"));
 	if (turn_marker) {
-		turn_marker->set_text("FLOOR " + String::num_int64(floor) + "   -   TURN " + String::num_int64(turn));
+		turn_marker->set_text("PISO " + String::num_int64(floor) + String::utf8("   -   D\xC3\x8D" "A ") + String::num_int64(turn));
 	}
 }
 
@@ -631,7 +648,7 @@ void MostrarNumeroDado(Caller* instance, int roll, bool success) {
 	if (story_text) {
 		
 		String color = success ? "[color=green]" : "[color=red]";
-		String result_txt = "[center]Roll Result:\n\n" + color + "[b][font_size=50]" + String::num_int64(roll) + "[/font_size][/b][/color][/center]";
+		String result_txt = String("[center]Resultado:\n\n") + color + "[b][font_size=50]" + String::num_int64(roll) + "[/font_size][/b][/color][/center]";
 
 		story_text->set_text(result_txt);
 	}
@@ -680,6 +697,14 @@ void ResolverOpcion(Caller* instance, int option_index) {
 		anim_dados = true;
 		tiempo_dados = 1.5f;
 		tick_view = 0.0f;
+
+		// Dado 3D low poly en el hueco de la ilustración
+		Node* dado = m_event_screen->get_node_or_null("Dado");
+		Control* foto = Object::cast_to<Control>(m_event_screen->get_node_or_null("Foto"));
+		if (dado) {
+			if (foto) foto->set_visible(false);
+			dado->call("tirar", roll, success, 1.5);
+		}
 	}
 }
 
@@ -721,6 +746,10 @@ void MostrarEventoVisual(Caller* instance, Resource* event_data) {
 	TextureRect* r_photo     = Object::cast_to<TextureRect>(m_event_screen->get_node_or_null("Foto"));
 
 	if (l_title) l_title->set_text(title);
+	Node* dado = m_event_screen->get_node_or_null("Dado");
+	if (dado) dado->call("ocultar");
+	Control* foto_visible = Object::cast_to<Control>(m_event_screen->get_node_or_null("Foto"));
+	if (foto_visible) foto_visible->set_visible(true);
 	if (l_story) l_story->set_text(desc);
 	if (r_photo && img.is_valid()) r_photo->set_texture(img);
 
@@ -863,8 +892,8 @@ void OnProcess(Caller* instance, double delta) {
 				RichTextLabel* story_text = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
 				if (story_text) {
 					int fake_num = UtilityFunctions::randi_range(1, 100);
-					String txt = "[center]Success Probability: [b]" + String::num_int64(save_prob) + "%[/b]\n\n";
-					txt += "[shake rate=20.0 level=5 connected=1]Rolling dice...[/shake]\n\n";
+					String txt = String::utf8("[center]Probabilidad de \xC3\xA9xito: [b]") + String::num_int64(save_prob) + "%[/b]\n\n";
+					txt += "[shake rate=20.0 level=5 connected=1]Tirando el dado...[/shake]\n\n";
 					txt += "[font_size=60][color=gray]" + String::num_int64(fake_num) + "[/color][/font_size][/center]";
 					story_text->set_text(txt);
 				}

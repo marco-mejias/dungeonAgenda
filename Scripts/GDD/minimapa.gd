@@ -50,6 +50,20 @@ func _ready() -> void:
 	marco.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(marco)
 
+	# Máscara circular: los hijos solo se dibujan donde se dibuja este panel
+	var mascara := Panel.new()
+	mascara.name = "Mascara"
+	var sm := StyleBoxFlat.new()
+	sm.bg_color = Color(1, 1, 1, 1)
+	sm.set_corner_radius_all(int(size.x * 0.5) - 3)
+	sm.corner_detail = 8
+	mascara.add_theme_stylebox_override("panel", sm)
+	mascara.position = Vector2(3, 3)
+	mascara.size = size - Vector2(6, 6)
+	mascara.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	mascara.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(mascara)
+
 	mapa = TextureRect.new()
 	mapa.name = "Mapa"
 	mapa.texture = textura
@@ -58,7 +72,7 @@ func _ready() -> void:
 	mapa.size = Vector2(LADO, LADO) * ZOOM
 	mapa.mouse_filter = Control.MOUSE_FILTER_STOP
 	mapa.gui_input.connect(_on_mapa_input)
-	add_child(mapa)
+	mascara.add_child(mapa)
 
 func _process(delta: float) -> void:
 	var m := Input.is_physical_key_pressed(KEY_M)
@@ -81,7 +95,7 @@ func _process(delta: float) -> void:
 		mapa.rotation = -PI * 0.5 - atan2(-cos(y), -sin(y))
 		var pivote: Vector3 = cam.get_meta("pivote", Vector3(GRID * 0.5, 0, GRID * 0.5))
 		mapa.pivot_offset = Vector2(pivote.x, pivote.z) / GRID * mapa.size
-		mapa.position = size * 0.5 - mapa.pivot_offset
+		mapa.position = mapa.get_parent().size * 0.5 - mapa.pivot_offset
 
 	t_refresco -= delta
 	if t_refresco > 0.0:

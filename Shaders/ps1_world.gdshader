@@ -63,11 +63,12 @@ void vertex() {
 }
 
 void fragment() {
-	if (fog_state < 0.2) {
-		discard;
-	}
 	ivec2 p = ivec2(FRAGCOORD.xy) % 4;
 	float threshold = (BAYER[p.y * 4 + p.x] + 0.5) / 16.0;
+	// 0..0.5: la casilla aparece con un fundido tramado (de oculta a explorada)
+	if (fog_state < 0.5 && threshold > fog_state * 2.0) {
+		discard;
+	}
 	if (cut > 0.5 && threshold < 0.75) {
 		discard;
 	}
@@ -83,10 +84,8 @@ void fragment() {
 	}
 
 	vec3 rgb = col.rgb;
-	if (fog_state < 0.75) {
-		// Explored but not currently seen: dark and desaturated
-		float g = dot(rgb, vec3(0.3, 0.59, 0.11));
-		rgb = mix(vec3(g), rgb, 0.35) * vec3(0.32, 0.32, 0.42);
-	}
-	ALBEDO = rgb;
+	// Explorado pero fuera de la vista: oscuro y desaturado; 0.5..1 mezcla suave hacia "visible"
+	float g = dot(rgb, vec3(0.3, 0.59, 0.11));
+	vec3 apagado = mix(vec3(g), rgb, 0.4) * vec3(0.42, 0.42, 0.55);
+	ALBEDO = mix(apagado, rgb, clamp((fog_state - 0.5) * 2.0, 0.0, 1.0));
 }

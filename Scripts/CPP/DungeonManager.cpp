@@ -960,7 +960,7 @@ void CalcularMapaDeLuces(Caller* instance) { RefrescarVision(); }
 
 void ActualizarVisibilidadEntidades(Caller* instance) { RefrescarVision(); }
 
-int IsCasillaIluminada(Caller* instance, int x, int y) {
+Variant IsCasillaIluminada(Caller* instance, int x, int y) {
 	return InBounds(x, y) && !map_data.empty() && map_data[x][y].is_lit;
 }
 
@@ -995,7 +995,7 @@ PackedByteArray ObtenerMinimapa(Caller* instance) {
 			bool a_la_vista = c.is_visible || debug_mode;
 			uint8_t v = 0;
 			if (visto) {
-				if (c.is_wall) v = 3;
+				if (c.is_wall) v = c.is_explored ? 3 : 0;
 				else if (c.is_door && !c.door_open) v = 4;
 				else if (c.is_brasero) v = 10;
 				else if (c.is_chest && !c.chest_opened) v = 5;
@@ -1013,6 +1013,25 @@ PackedByteArray ObtenerMinimapa(Caller* instance) {
 		out[p.x * GRID_SIZE + p.y] = (h == act) ? 9 : 8;
 	}
 	return out;
+}
+
+// Para el cursor pixel art: 0 = normal, 1 = interactuable, 2 = enemigo, 3 = no se puede ir
+// OJO: devolver int por call() en Jenova llega con basura en los bits altos: devolvemos Variant
+Variant TipoCursor(Caller* instance, int x, int y) {
+	if (!InBounds(x, y) || map_data.empty() || Bloqueado() || MenuAbierto()) return 0;
+	const Cell& c = map_data[x][y];
+	if (!(c.is_explored || debug_mode)) return 0;
+	Node* act = ActiveChar();
+	if (!act || !HeroeEnMapa(act)) return 0;
+	if (Vector2i(x, y) == ActivePos()) return 0;
+	if (HayHeroeEn(Vector2i(x, y), act)) return 1; // clic = seleccionarlo
+	String accion; int coste = 0, tipo = 0;
+	if ((c.is_visible || debug_mode) && DescribirInteraccion(Vector2i(x, y), act, accion, coste, tipo)) {
+		if (Vector2i(x, y) == m_salida) return c.is_highlighted ? 1 : 3;
+		return tipo == 2 ? 2 : 1;
+	}
+	if (c.is_highlighted) return 0;
+	return c.is_wall ? 0 : 3;
 }
 
 // Para tests/depuración: casillas iluminadas ahora mismo (pares x,y)

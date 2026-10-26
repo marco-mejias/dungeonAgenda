@@ -37,6 +37,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 		return;
 	}
 
+	Node* feel = self_node->get_node_or_null("/root/Feel");
 	bool debug_mode = dungeon->has_meta("debug_mode") && (bool)dungeon->get_meta("debug_mode");
 	int coste = (debug_mode || tipo == "TRAMPA") ? 0 : 2;
 
@@ -44,10 +45,12 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 	if (pa < coste) {
 		UtilityFunctions::print("[EventManager] Necesitas ", coste, " PA para interactuar.");
 		if (audio) audio->call("play_ui", "no");
+		if (feel) feel->call("sacudir_ficha", String(act_char->get_name()));
 		return;
 	}
 
 	bool interactuo = false;
+	Vector3 pos_mundo(x + 0.5f, 0.45f, y + 0.5f);
 
 	// === A. COFRES ===
 	if (tipo == "COFRE") {
@@ -56,10 +59,12 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 			int oro = (UtilityFunctions::randi() % 20) + 10;
 			act_char->set_meta("oro", (int)act_char->get_meta("oro", 0) + oro);
 			UtilityFunctions::print("[EventManager] Cofre: +", oro, " de oro.");
+			if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(96, 128, 16, 16), "+" + String::num_int64(oro));
 		} else if (roll == 1) {
 			int comida = (UtilityFunctions::randi() % 2) + 1;
 			act_char->set_meta("comida_bolsa", (int)act_char->get_meta("comida_bolsa", 0) + comida);
 			UtilityFunctions::print("[EventManager] Cofre: +", comida, " de comida.");
+			if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(96, 112, 16, 16), "+" + String::num_int64(comida));
 		} else {
 			TypedArray<Resource> inv = act_char->get_meta("items_lista", TypedArray<Resource>());
 			int max_s = act_char->get_meta("max_slots", 3);
@@ -68,6 +73,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 				if (item.is_valid()) {
 					inv.push_back(item);
 					act_char->set_meta("items_lista", inv);
+					if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(64, 112, 16, 16), String("Espada"));
 					UtilityFunctions::print("[EventManager] Cofre: ¡una espada!");
 				}
 			} else {
@@ -80,6 +86,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 	// === B. PUERTAS ===
 	else if (tipo == "PUERTA") {
 		dungeon->call("AplicarEstadoPuerta", x, y);
+		if (feel) feel->call("sacudir", 0.12);
 		interactuo = true;
 	}
 	// === C. EVENTOS Y TRAMPAS (animación de texto + pantalla de evento) ===
@@ -87,6 +94,10 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 		Ref<Resource> evento = ResourceLoader::get_singleton()->load(res_path);
 		if (evento.is_valid() && ui_manager) {
 			dungeon->set_meta("bloqueo_evento", true);
+			if (tipo == "TRAMPA" && feel) {
+				feel->call("destello_pantalla", Color(1.0, 0.1, 0.08, 0.4), 0.45);
+				feel->call("sacudir", 0.45);
+			}
 			dungeon->call("ApagarLucesMapa");
 
 			Label* texto = memnew(Label);
