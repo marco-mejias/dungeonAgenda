@@ -326,7 +326,8 @@ void ActualizarMarcadorTurno(Caller* instance) {
 	}
 }
 
-void DescansarYContinuar(Caller* instance) {
+// Lo hace la transición a mitad del fundido (con la pantalla en negro)
+void EjecutarCambioDePiso(Caller* instance) {
 	if (!self) return;
 
 	UtilityFunctions::print("[UI] The party has rested. Preparing next floor...");
@@ -373,6 +374,22 @@ void DescansarYContinuar(Caller* instance) {
 	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 	if (dungeon) {
 		dungeon->call("AvanzarAlSiguientePiso");
+	}
+
+	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+	if (audio) audio->call("play_music", "dungeon");
+}
+
+// Botón "Descansar": fundido a negro con el rótulo del piso y, a mitad, el cambio real
+void DescansarYContinuar(Caller* instance) {
+	if (!self) return;
+	Node* transicion = self->get_parent()->get_node_or_null("CapaTransicion");
+	Node* pm = GetPartyManager();
+	int siguiente = (pm ? (int)pm->get_meta("piso_actual", 1) : 1) + 1;
+	if (transicion) {
+		transicion->call("fundido", "PISO " + String::num_int64(siguiente), Callable(self, StringName("EjecutarCambioDePiso")));
+	} else {
+		EjecutarCambioDePiso(instance);
 	}
 }
 

@@ -983,6 +983,38 @@ PackedInt32Array ObtenerObstaculosDinamicos(Caller* instance) {
 	return AParesInt(obst);
 }
 
+// Para el minimapa del HUD: un código por casilla (ver minimapa.gd)
+PackedByteArray ObtenerMinimapa(Caller* instance) {
+	PackedByteArray out;
+	out.resize(GRID_SIZE * GRID_SIZE);
+	if (map_data.empty()) return out;
+	for (int x = 0; x < GRID_SIZE; x++)
+		for (int y = 0; y < GRID_SIZE; y++) {
+			const Cell& c = map_data[x][y];
+			bool visto = c.is_explored || debug_mode;
+			bool a_la_vista = c.is_visible || debug_mode;
+			uint8_t v = 0;
+			if (visto) {
+				if (c.is_wall) v = 3;
+				else if (c.is_door && !c.door_open) v = 4;
+				else if (c.is_brasero) v = 10;
+				else if (c.is_chest && !c.chest_opened) v = 5;
+				else if (Vector2i(x, y) == m_salida) v = 6;
+				else if (c.has_enemy && a_la_vista) v = 7;
+				else if (EventoManualActivo(c) && a_la_vista) v = 11;
+				else v = a_la_vista ? 2 : 1;
+			}
+			out[x * GRID_SIZE + y] = v;
+		}
+	Node* act = ActiveChar();
+	for (Node* h : Heroes()) {
+		if (!HeroeEnMapa(h)) continue;
+		Vector2i p = h->get_meta("grid_pos");
+		out[p.x * GRID_SIZE + p.y] = (h == act) ? 9 : 8;
+	}
+	return out;
+}
+
 // Para tests/depuración: casillas iluminadas ahora mismo (pares x,y)
 PackedInt32Array DebugAlcance(Caller* instance) {
 	std::vector<Vector2i> out;

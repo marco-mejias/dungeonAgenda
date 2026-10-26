@@ -260,14 +260,26 @@ func _definir_pasos():
 				if activo() == null:
 					break
 				dm.call("TeletransporteDebug", salida.x, salida.y)
-			return 0.6,
+			return 1.2,
 		func():
 			check(root.get_node("Main/CanvasLayer3").visible, "al escapar todos aparece la fogata")
+			var sentados := 0
+			for c in root.get_node("Main/CanvasLayer3/PantallaFogata").get_children():
+				if c is TextureRect and c.has_meta("frame"):
+					sentados += 1
+			check(sentados > 0, "en la fogata se sienta el grupo (%d)" % sentados)
 			captura("12_fogata")
 			ui.call("DescansarYContinuar")
 			return 1.0,
 		func():
+			var negro: ColorRect = root.get_node("Main/CapaTransicion/Negro")
+			var rotulo: Label = root.get_node("Main/CapaTransicion/Rotulo")
+			check(negro.color.a > 0.9 and rotulo.text == "PISO 2", "la transición funde a negro con el rótulo '%s'" % rotulo.text)
+			captura("12b_transicion")
+			return 2.4,
+		func():
 			captura("13_piso_2")
+			check(root.get_node("Main/CapaTransicion/Negro").color.a < 0.05, "la transición termina")
 			check(int(pm.get_meta("piso_actual")) == 2, "estamos en el piso 2")
 			check(activo() != null, "hay personaje activo en el piso 2")
 			var inicio: Vector2i = dm.get_meta("casilla_inicio")
@@ -323,7 +335,32 @@ func _definir_pasos():
 			return 0.8,
 		func():
 			check(not dm.get_meta("bloqueo_evento", false), "al cerrar el evento el tablero se desbloquea")
-			return 0.0,
+			# Minimapa: algo explorado tiene que estar pintado
+			var mapa: TextureRect = ui.get_node("Minimapa/Mapa")
+			var img := mapa.texture.get_image()
+			var pintados := 0
+			for x in img.get_width():
+				for y in img.get_height():
+					if img.get_pixel(x, y).a > 0.5:
+						pintados += 1
+			check(pintados > 10, "el minimapa muestra lo explorado (%d casillas)" % pintados)
+			# Opciones visuales del menú de pausa: PS1 baja + CRT
+			var menu := root.get_node("Main/CanvasMenuPausa")
+			memo["ajustes"] = menu.ajustes.duplicate()
+			menu.ajustes["resolucion"] = 3
+			menu.ajustes["crt"] = true
+			menu.ajustes["jitter"] = 3.0
+			menu.call("_aplicar_ajustes")
+			var cont: SubViewportContainer = root.get_node("Main/ContenedorMapa")
+			check(cont.stretch_shrink == 3, "la opción de resolución cambia el viewport")
+			check(cont.material.get_shader_parameter("crt") == true, "la opción CRT llega al shader")
+			return 0.6,
+		func():
+			captura("18_opciones_ps1_crt")
+			var menu := root.get_node("Main/CanvasMenuPausa")
+			menu.ajustes = memo["ajustes"]
+			menu.call("_aplicar_ajustes")
+			return 0.3,
 	]
 
 func _process(_delta):
@@ -331,7 +368,7 @@ func _process(_delta):
 		dm = root.get_node_or_null("Main/ContenedorMapa/SubViewport/DungeonManager")
 		pm = root.get_node_or_null("Main/PartyManager")
 		ui = root.get_node_or_null("Main/CanvasLayer")
-		espera_hasta = ahora() + 1.0
+		espera_hasta = ahora() + 2.2 # fundido de entrada "PISO 1"
 		return false
 	if ahora() < espera_hasta:
 		return false

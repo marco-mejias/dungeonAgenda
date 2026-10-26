@@ -55,3 +55,10 @@ zoom_out={
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+
+[shader_globals]
+
+ps1_jitter={
+"type": "float",
+"value": 1.5
+}

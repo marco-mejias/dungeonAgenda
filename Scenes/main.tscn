@@ -4,6 +4,9 @@
 [ext_resource type="Script" uid="uid://la3o4sxf6mh4" path="res://Scripts/CPP/DungeonManager.cpp" id="2_k12tt"]
 [ext_resource type="Script" uid="uid://dtxk5rqpb7bm1" path="res://Scripts/CPP/partyManager.cpp" id="4_b3802"]
 [ext_resource type="Script" path="res://Scripts/CPP/DungeonRenderer.cpp" id="20_rend"]
+[ext_resource type="Script" path="res://Scripts/GDD/transicion.gd" id="22_trans"]
+[ext_resource type="Script" path="res://Scripts/GDD/fogata.gd" id="23_fogata"]
+[ext_resource type="Script" path="res://Scripts/GDD/minimapa.gd" id="24_minimapa"]
 [ext_resource type="Shader" path="res://Shaders/ps1_post.gdshader" id="21_post"]
 [ext_resource type="Script" uid="uid://de8lgwkdug0rx" path="res://Scripts/GDD/DatosEquipo.gd" id="5_fevyy"]
 [ext_resource type="Script" uid="uid://dnsf46hnyb1lb" path="res://Scenes/CameraManager.cpp" id="5_wsu2k"]
@@ -192,6 +195,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+script = ExtResource("23_fogata")
 
 [node name="BtnDescansar" type="Button" parent="CanvasLayer3/PantallaFogata" unique_id=401102081]
 layout_mode = 1
@@ -331,6 +335,18 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 11
 text = "FICHAS: AUTO"
 
+[node name="Minimapa" type="Control" parent="CanvasLayer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -164.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 164.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("24_minimapa")
+
 [node name="BtnSalidaDebug" type="Button" parent="CanvasLayer" unique_id=452735484]
 anchors_preset = 2
 anchor_top = 1.0
@@ -377,6 +393,32 @@ offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 color = Color(0.4045111, 0.40451115, 0.4045111, 1)
+
+[node name="CapaTransicion" type="CanvasLayer" parent="."]
+layer = 20
+script = ExtResource("22_trans")
+
+[node name="Negro" type="ColorRect" parent="CapaTransicion"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Rotulo" type="Label" parent="CapaTransicion"]
+modulate = Color(1, 1, 1, 0)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.35, 1)
+theme_override_font_sizes/font_size = 48
+text = "PISO 1"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="CanvasMenuPausa" type="CanvasLayer" parent="." unique_id=81272121]
 process_mode = 3
