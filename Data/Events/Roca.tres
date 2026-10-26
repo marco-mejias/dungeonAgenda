@@ -32,7 +32,7 @@ stat_usada = "ninguna"
 multiplicador_dificultad = 0.2
 texto_exito = "La roca te va a golpear y...PUM! Papel maché con mejunje Art Attack! Casualmente colocado en la mazmorra más peligrosa del mundo!"
 texto_fracaso = "Eh...deberías apreciar más tu vida"
-funcion_fracaso = "Recibir Dano"
+funcion_fracaso = "RecibirDano"
 parametro_fracaso = 3
 metadata/_custom_type_script = "uid://bphprpqb73iny"
 

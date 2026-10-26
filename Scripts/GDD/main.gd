@@ -9,6 +9,8 @@ enum GameState {
 
 var current_state: GameState = GameState.EXPLORING_MAP
 
+@onready var contenedor_mapa: Control = $ContenedorMapa
+
 func _ready():
 	print("[Main GDScript] Iniciado. Jefe al mando.")
 
@@ -16,14 +18,15 @@ func _process(_delta):
 	if Input.is_action_just_pressed("clic_izq"):
 		match current_state:
 			GameState.EXPLORING_MAP:
-				# =======================================================
-				# NUEVO: Ahora buscamos al InputManager, el Vigía de los clics
-				# =======================================================
+				# Escudo anti-input bleeding: si el ratón está sobre cualquier control
+				# de la interfaz (botones, fichas, menú táctico...), el clic NO llega al mapa.
+				var bajo_raton := get_viewport().gui_get_hovered_control()
+				if bajo_raton != null and bajo_raton != contenedor_mapa:
+					return
+
 				var input_manager = get_node_or_null("ContenedorMapa/SubViewport/DungeonManager/InputManager")
-				
 				if input_manager:
 					var mouse_pos = get_viewport().get_mouse_position()
-					# Le pasamos el clic al InputManager (el C++ ya se encarga del resto)
 					input_manager.call("HandleMapClick", mouse_pos.x, mouse_pos.y)
 				else:
 					print("[ERROR] No encuentro el InputManager. ¿Lo has colgado como hijo de DungeonManager?")

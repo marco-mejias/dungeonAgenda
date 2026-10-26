@@ -1,155 +1,157 @@
-/* Jenova C++ Node Base Script (Meteora) - CameraManager */
+/* Jenova C++ Node Base Script (Meteora) - CameraManager (3D iso) */
 
-// Godot SDK
+// Cámara "pseudo-isométrica": perspectiva con FOV muy cerrado y lejana, para
+// conservar el temblor de vértices y la deformación de texturas PS1.
+// Q/E rotan 90°, rueda = zoom (distancia), clic derecho = arrastrar.
+
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
-#include <Godot/classes/node2d.hpp>
-#include <Godot/classes/camera2d.hpp>
+#include <Godot/classes/node3d.hpp>
+#include <Godot/classes/camera3d.hpp>
+#include <Godot/classes/control.hpp>
+#include <Godot/classes/viewport.hpp>
 #include <Godot/classes/input.hpp>
-#include <Godot/classes/window.hpp>
-#include <Godot/classes/tile_map_layer.hpp>
 #include <Godot/variant/utility_functions.hpp>
+#include <cmath>
 
-// Namespaces
 using namespace godot;
 using namespace jenova::sdk;
 
-// Usamos un namespace anónimo para evitar LNK2005
 namespace {
-	int map_grid_size = 0; // Guardaremos aquí el tamaño del mapa
+	const float PITCH_DEG = 40.0f;
+	const float FOV = 22.0f;
+	const float DIST_MIN = 9.0f;
+	const float DIST_MAX = 34.0f;
+	const float DIST_REF = 18.0f; // distancia de referencia para escalar la UI anclada
+	const float GRID = 35.0f;
+
+	Vector3 pivote;
+	float yaw = 45.0f, yaw_obj = 45.0f;
+	float dist = 18.0f, dist_obj = 18.0f;
+	bool inicializada = false;
+	bool q_prev = false, e_prev = false;
+	bool auto_centrar = true;
+	bool arrastrando = false;
+	Vector2 raton_prev;
+	// OJO: nada de godot::String globales: se construirían al cargar la DLL, antes que GDExtension
+	uint64_t last_char_id = 0;
+
+	Vector3 Direccion() {
+		float p = PITCH_DEG * (float)Math_PI / 180.0f;
+		float y = yaw * (float)Math_PI / 180.0f;
+		return Vector3(std::sin(y) * std::cos(p), std::sin(p), std::cos(y) * std::cos(p));
+	}
+
+	Node3D* TokenActivo(Camera3D* cam, Node* dungeon, String& nombre) {
+		Node* pm = cam->get_node_or_null("/root/Main/PartyManager");
+		if (!pm) return nullptr;
+		Node* act = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
+		if (!act) return nullptr;
+		nombre = act->get_name();
+		return Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(nombre)));
+	}
+
+	Vector2 RatonEnContenedor(Camera3D* cam) {
+		Node* sub = cam->get_viewport();
+		Control* contenedor = sub ? Object::cast_to<Control>(sub->get_parent()) : nullptr;
+		return contenedor ? contenedor->get_local_mouse_position() : Vector2();
+	}
 }
 
 JENOVA_SCRIPT_BEGIN
 
-// =======================================================
-// 1. CONFIGURACIÓN INICIAL (Lo llama el DungeonManager)
-// =======================================================
-void ConfigurarLimitesMapa(Caller* instance, int grid_size_del_juego) {
-	map_grid_size = grid_size_del_juego;
-	
-	Camera2D* cam = GetSelf<Camera2D>(instance);
-	if (cam) {
-		float tamano_baldosa = 16.0f;
-		float ancho_mapa = map_grid_size * tamano_baldosa;
-		float alto_mapa = map_grid_size * tamano_baldosa;
-		int margen = 100;
-		
-		cam->set_limit(godot::SIDE_LEFT, -margen);
-		cam->set_limit(godot::SIDE_TOP, -margen);
-		cam->set_limit(godot::SIDE_RIGHT, ancho_mapa + margen);
-		cam->set_limit(godot::SIDE_BOTTOM, alto_mapa + margen);
-		
-		godot::UtilityFunctions::print("[CameraManager] Límites configurados para mapa de tamaño: ", map_grid_size);
-	}
-}
+// Lo puede llamar el DungeonManager al crear un piso (compatibilidad con la versión 2D)
+void ConfigurarLimitesMapa(Caller* instance, int grid_size) {}
 
 void OnAwake(Caller* instance) {}
-void OnDestroy(Caller* instance) {}
-void OnReady(Caller* instance) {}
+void OnDestroy(Caller* instance) { inicializada = false; }
 
-// =======================================================
-// 2. EL CEREBRO EN TIEMPO REAL (Tu código original pulido)
-// =======================================================
-void OnProcess(Caller* instance, double _delta) 
-{
-	Camera2D* cam = GetSelf<Camera2D>(instance);
-	godot::Input* input = godot::Input::get_singleton();
+void OnReady(Caller* instance) {
+	Camera3D* cam = GetSelf<Camera3D>(instance);
+	if (!cam) return;
+	cam->set_fov(FOV);
+	cam->set_near(1.0f);
+	cam->set_far(120.0f);
+	cam->set_current(true);
+}
+
+void OnProcess(Caller* instance, double delta) {
+	Camera3D* cam = GetSelf<Camera3D>(instance);
+	Input* input = Input::get_singleton();
 	if (!cam || !input) return;
+	Node* dungeon = cam->get_parent();
+	if (!dungeon) return;
 
-	Node* padre_dungeon = cam->get_parent();
-	if (!padre_dungeon) return;
+	String nombre;
+	Node3D* token = TokenActivo(cam, dungeon, nombre);
 
-	// === MATEMÁTICAS DINÁMICAS AUTÓNOMAS (Límites y Zoom) ===
-	godot::TileMapLayer* board = godot::Object::cast_to<godot::TileMapLayer>(padre_dungeon->get_node_or_null("Tablero"));
-	if (!board) return;
-
-	// Leemos el tamaño real de los tiles dibujados en lugar de una variable manual
-	godot::Rect2i limites = board->get_used_rect();
-	float tamano_baldosa = 16.0f;
-	float ancho_mapa = limites.size.width * tamano_baldosa;
-	float alto_mapa = limites.size.height * tamano_baldosa;
-	int margen = 100;
-
-	Vector2 tamano_pantalla = cam->get_viewport()->get_visible_rect().size;
-	
-	float zoom_minimo = 0.5f;
-	if (ancho_mapa > 0 && alto_mapa > 0) {
-		float zoom_fit_x = tamano_pantalla.x / (ancho_mapa + (margen * 2));
-		float zoom_fit_y = tamano_pantalla.y / (alto_mapa + (margen * 2));
-		
-		// Usar std::max garantiza que la cámara NUNCA muestre el vacío fuera del mapa
-		zoom_minimo = std::max(zoom_fit_x, zoom_fit_y);
-	}
-	
-	float zoom_maximo = 5.0f; 
-	if (zoom_minimo >= zoom_maximo) zoom_minimo = zoom_maximo - 0.5f;
-
-	float factor_zoom = cam->get_zoom().x;
-	float velocidad_zoom = 0.15f;
-	
-	if (input->is_action_just_pressed("zoom_in")) factor_zoom = godot::UtilityFunctions::clamp(factor_zoom + velocidad_zoom, zoom_minimo, zoom_maximo);
-	if (input->is_action_just_pressed("zoom_out")) factor_zoom = godot::UtilityFunctions::clamp(factor_zoom - velocidad_zoom, zoom_minimo, zoom_maximo);
-	
-	cam->set_zoom(Vector2(factor_zoom, factor_zoom));
-
-	// === BUSCAR AL PROTAGONISTA AUTÓNOMAMENTE ===
-	String current_char_name = "";
-	Node2D* active_token = nullptr;
-	
-	// Buscamos el PartyManager asumiendo que está en la raíz de tu escena Main
-	Node* pm = cam->get_node_or_null("/root/Main/PartyManager");
-	if (pm) {
-		Node* act_char = godot::Object::cast_to<Node>(pm->call("GetActiveCharacter"));
-		if (act_char) {
-			current_char_name = act_char->get_name();
-			// El sprite físico es hijo del DungeonManager (nuestro padre)
-			active_token = godot::Object::cast_to<Node2D>(padre_dungeon->get_node_or_null(NodePath(current_char_name)));
-		}
+	if (!inicializada) {
+		pivote = token ? token->get_position() : Vector3(GRID * 0.5f, 0, GRID * 0.5f);
+		inicializada = true;
 	}
 
-	// === LÓGICA DE SEGUIMIENTO (Tuya 100%) ===
-	Vector2 target_pos = cam->get_position();
-	bool is_dragging = input->is_mouse_button_pressed(godot::MOUSE_BUTTON_RIGHT);
+	// === ROTACIÓN Q / E (pasos de 90°) ===
+	bool q = input->is_physical_key_pressed(KEY_Q);
+	bool e = input->is_physical_key_pressed(KEY_E);
+	if (q && !q_prev) yaw_obj -= 90.0f;
+	if (e && !e_prev) yaw_obj += 90.0f;
+	q_prev = q;
+	e_prev = e;
 
-	if (is_dragging) {
-		cam->set_meta("auto_centrar", false);
+	// === ZOOM (rueda) ===
+	if (input->is_action_just_pressed("zoom_in")) dist_obj = UtilityFunctions::clampf(dist_obj - 2.0f, DIST_MIN, DIST_MAX);
+	if (input->is_action_just_pressed("zoom_out")) dist_obj = UtilityFunctions::clampf(dist_obj + 2.0f, DIST_MIN, DIST_MAX);
+
+	float k = (float)UtilityFunctions::minf(1.0, 10.0 * delta);
+	yaw += (yaw_obj - yaw) * k;
+	dist += (dist_obj - dist) * k;
+
+	// === ARRASTRE CON CLIC DERECHO (sobre el plano del suelo) ===
+	Vector2 raton = RatonEnContenedor(cam);
+	bool derecho = input->is_mouse_button_pressed(MOUSE_BUTTON_RIGHT);
+	if (derecho && arrastrando) {
+		Vector2 d = raton - raton_prev;
+		Basis b = cam->get_global_transform().basis;
+		Vector3 right = b.get_column(0); right.y = 0; right = right.normalized();
+		Vector3 fwd = -b.get_column(2); fwd.y = 0; fwd = fwd.normalized();
+		float escala = dist * 0.0025f;
+		pivote -= right * d.x * escala;
+		pivote += fwd * d.y * escala;
+		auto_centrar = false;
+	}
+	arrastrando = derecho;
+	raton_prev = raton;
+
+	// === SEGUIMIENTO DEL HÉROE ACTIVO ===
+	uint64_t char_id = token ? token->get_instance_id() : 0;
+	if (char_id != 0 && char_id != last_char_id) {
+		auto_centrar = true;
+		last_char_id = char_id;
+	}
+	// El DungeonManager puede pedir recentrar (teletransporte, nuevo piso...)
+	if (cam->has_meta("recentrar") && (bool)cam->get_meta("recentrar")) {
+		auto_centrar = true;
+		cam->set_meta("recentrar", false);
+	}
+	bool moviendo = dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving");
+	if (token && !derecho && (moviendo || auto_centrar)) {
+		Vector3 objetivo = token->get_position();
+		pivote = pivote.lerp(objetivo, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
+		if (pivote.distance_to(objetivo) < 0.05f) auto_centrar = false;
 	}
 
-	String last_char = cam->has_meta("last_char") ? (String)cam->get_meta("last_char") : String("");
-	if (current_char_name != "" && current_char_name != last_char) {
-		cam->set_meta("auto_centrar", true);
-		cam->set_meta("last_char", current_char_name);
-	}
+	pivote.x = UtilityFunctions::clampf(pivote.x, 0.0f, GRID);
+	pivote.z = UtilityFunctions::clampf(pivote.z, 0.0f, GRID);
+	pivote.y = 0.0f;
 
-	bool is_moving = padre_dungeon->has_meta("is_moving") && (bool)padre_dungeon->get_meta("is_moving");
+	cam->set_position(pivote + Direccion() * dist);
+	cam->look_at(pivote, Vector3(0, 1, 0));
+	// Desplazamos el encuadre para que el héroe quede a la derecha de las fichas del HUD
+	cam->set_h_offset(-dist * 0.14f);
 
-	if (factor_zoom <= zoom_minimo + 0.02f && map_grid_size > 0) {
-		Vector2 centro_mapa(ancho_mapa / 2.0f, alto_mapa / 2.0f);
-		target_pos = target_pos.lerp(centro_mapa, 10.0f * _delta);
-	} 
-	else if (is_dragging) {
-		Vector2 raton_actual = cam->get_viewport()->get_mouse_position();
-		if (cam->has_meta("raton_anterior")) {
-			Vector2 raton_anterior = (Vector2)cam->get_meta("raton_anterior"); // Cast seguro para C++
-			Vector2 delta = raton_anterior - raton_actual;
-			target_pos = target_pos + (delta / factor_zoom);
-		}
-	}
-	else if (active_token && (is_moving || (cam->has_meta("auto_centrar") && (bool)cam->get_meta("auto_centrar")))) {
-		// Aquí compensamos el espacio de tu UI izquierda como querías (offset)
-		float offset_pantalla_x = 0.0f; // Ajusta este número para dejar espacio a los retratos UI
-		Vector2 offset_mundo = Vector2(offset_pantalla_x / factor_zoom, 0.0f);
-		
-		Vector2 char_pos = active_token->get_position() + offset_mundo;
-		target_pos = target_pos.lerp(char_pos, 8.0f * _delta);
-		
-		if (target_pos.distance_to(char_pos) < 1.0f) {
-			cam->set_meta("auto_centrar", false);
-		}
-	}
-
-	cam->set_meta("raton_anterior", cam->get_viewport()->get_mouse_position());
-	cam->set_position(target_pos);
+	// Datos para la UI anclada (menú táctico) y el renderer
+	cam->set_meta("pivote", pivote);
+	cam->set_meta("zoom_factor", 2.0f * DIST_REF / dist);
 }
 
 JENOVA_SCRIPT_END

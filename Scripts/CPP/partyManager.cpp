@@ -2,9 +2,10 @@
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
-#include <Godot/variant/utility_functions.hpp>
-#include <Godot/classes/node2d.hpp>
+#include <Godot/classes/node3d.hpp>
 #include <Godot/classes/canvas_layer.hpp>
+#include <Godot/variant/utility_functions.hpp>
+#include <vector>
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -12,9 +13,67 @@ using namespace jenova::sdk;
 namespace {
 	Node* self = nullptr;
 	Node* act_char = nullptr;
-	
+
 	Node* m_ui_manager = nullptr;
 	Node* m_dungeon_manager = nullptr;
+
+	bool MetaBool(Node* n, const char* key) { return n && n->has_meta(key) && (bool)n->get_meta(key); }
+
+	std::vector<Node*> Heroes() {
+		std::vector<Node*> out;
+		if (!self) return out;
+		TypedArray<Node> hijos = self->get_children();
+		for (int i = 0; i < hijos.size(); i++) {
+			Node* h = Object::cast_to<Node>(hijos[i]);
+			if (h && h->get_name() != StringName("DatosEquipo")) out.push_back(h);
+		}
+		return out;
+	}
+
+	bool PuedeJugar(Node* h) {
+		return h && !MetaBool(h, "esta_muerto") && !MetaBool(h, "ha_escapado") && !MetaBool(h, "ha_movido") && (int)h->get_meta("pa_actual", 0) > 0;
+	}
+
+	void OcultarFicha(Node* h) {
+		if (!m_dungeon_manager || !h) return;
+		Node3D* ficha = Object::cast_to<Node3D>(m_dungeon_manager->get_node_or_null(NodePath(String(h->get_name()))));
+		if (ficha) ficha->set_visible(false);
+	}
+
+	void Morir(Node* h, const String& causa) {
+		h->set_meta("esta_muerto", true);
+		h->set_meta("pa_actual", 0);
+		UtilityFunctions::print("[PartyManager] ", h->get_name(), " HA MUERTO (", causa, ").");
+		OcultarFicha(h);
+	}
+
+	void SeleccionarSiguiente() {
+		act_char = nullptr;
+		for (Node* h : Heroes()) {
+			if (PuedeJugar(h)) { act_char = h; break; }
+		}
+	}
+
+	void ComprobarFinDelPiso() {
+		bool alguno_escapo = false;
+		for (Node* h : Heroes()) {
+			if (MetaBool(h, "ha_escapado")) { alguno_escapo = true; continue; }
+			if (!MetaBool(h, "esta_muerto")) return; // queda alguien vivo dentro
+		}
+		if (!alguno_escapo) {
+			UtilityFunctions::print("\n[PartyManager] *** TODO EL GRUPO HA CAÍDO ***\n");
+			return;
+		}
+
+		Node* audio = self->get_node_or_null("/root/AudioManager");
+		if (audio) audio->call("play_music", "fireplace");
+		UtilityFunctions::print("\n***********************************");
+		UtilityFunctions::print(" ¡TODOS A SALVO! ENCENDIENDO FOGATA ");
+		UtilityFunctions::print("***********************************\n");
+
+		CanvasLayer* fogata = Object::cast_to<CanvasLayer>(self->get_parent()->get_node_or_null("CanvasLayer3"));
+		if (fogata) fogata->set_visible(true);
+	}
 }
 
 JENOVA_SCRIPT_BEGIN
@@ -24,20 +83,22 @@ JENOVA_SCRIPT_BEGIN
 // ==========================================
 
 Variant GetActiveCharacter(Caller* instance) {
-	return act_char; 
+	return act_char;
 }
 
 void SetActiveCharacter(Caller* instance, Node* new_char) {
 	if (!new_char) return;
-	
-	bool has_moved = new_char->has_meta("ha_movido") ? (bool)new_char->get_meta("ha_movido") : false;
-	
-	if (!has_moved) {
+	if (!MetaBool(new_char, "ha_movido")) {
 		act_char = new_char;
 		UtilityFunctions::print("[PartyManager] Active character: ", new_char->get_meta("nombre_display"));
 	} else {
 		UtilityFunctions::print("[PartyManager] ", new_char->get_meta("nombre_display"), " is exhausted this turn.");
 	}
+}
+
+void SeleccionarPrimerDisponible(Caller* instance) {
+	SeleccionarSiguiente();
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 }
 
 Variant GetCurrentStat(Caller* instance, String stat_name) {
@@ -46,7 +107,7 @@ Variant GetCurrentStat(Caller* instance, String stat_name) {
 }
 
 Vector2i GetActiveGridPos(Caller* instance) {
-	if (!act_char || !act_char->has_meta("grid_pos")) return Vector2i(0, 0);
+	if (!act_char || !act_char->has_meta("grid_pos")) return Vector2i(-1, -1);
 	return act_char->get_meta("grid_pos");
 }
 
@@ -60,157 +121,89 @@ void SetActiveGridPos(Caller* instance, int x, int y) {
 // ==========================================
 
 void TerminarTurnoPersonaje(Caller* instance) {
-	if (!self || !act_char) return;
+	if (!self) return;
 
-	act_char->set_meta("ha_movido", true);
-	UtilityFunctions::print("[PartyManager] Action completed for ", act_char->get_meta("nombre_display"));
-
-	TypedArray<Node> children = self->get_children();
-	bool all_have_moved = true;
-	
-	// 1. CHECK IF THE DAY ENDS
-	for (int i = 0; i < children.size(); i++) {
-		Node* child = Object::cast_to<Node>(children[i]);
-		if (child && child->get_name() != StringName("DatosEquipo")) {
-			int pa_restantes = child->has_meta("pa_actual") ? (int)child->get_meta("pa_actual") : 0;
-			bool escaped  = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
-			bool is_dead  = child->has_meta("esta_muerto") ? (bool)child->get_meta("esta_muerto") : false; 
-			
-			// Si alguien vivo y sin escapar AÚN TIENE PA, el día continúa
-			if (pa_restantes > 0 && !escaped && !is_dead) {
-				all_have_moved = false;
-				break;
-			}
-		}
+	if (act_char) {
+		act_char->set_meta("ha_movido", true);
+		UtilityFunctions::print("[PartyManager] Action completed for ", act_char->get_meta("nombre_display"));
 	}
 
-	// 2. IF EVERYONE HAS MOVED (NIGHT FALLS)
-	if (all_have_moved) {
-		UtilityFunctions::print("[PartyManager] All characters have moved.");
-		
-		// Add turn to memory
-		int current_turn = self->get_meta("turno_actual");
-		current_turn += 1;
-		self->set_meta("turno_actual", current_turn);
-		
-		// SURVIVAL LOGIC
-		for (int i = 0; i < children.size(); i++) {
-			Node* child = Object::cast_to<Node>(children[i]);
-			if (child && child->get_name() != StringName("DatosEquipo")) {
-				bool escaped = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
-				bool is_dead = child->has_meta("esta_muerto") ? (bool)child->get_meta("esta_muerto") : false;
+	// 1. ¿TERMINA EL DÍA? (nadie vivo y dentro del mapa conserva PA)
+	bool dia_terminado = true;
+	for (Node* h : Heroes()) {
+		if (PuedeJugar(h)) { dia_terminado = false; break; }
+	}
 
-				if (!escaped && !is_dead) {
-					// 1. HUNGER: Subtract 1
-					int hunger = (int)child->get_meta("hambre_actual");
-					hunger -= 1;
-					if (hunger <= 0) {
-						hunger = 0;
-						child->set_meta("esta_muerto", true);
-						UtilityFunctions::print("[Survival] ", child->get_name(), " HAS STARVED TO DEATH.");
-						
-						// Hide visual token on the map
-						Node* main_node = self->get_parent();
-						if (main_node) {
-							Node2D* visual_token = Object::cast_to<Node2D>(main_node->get_node_or_null(NodePath("DungeonManager/" + String(child->get_name()))));
-							if (visual_token) visual_token->set_visible(false);
-						}
-					}
-					child->set_meta("hambre_actual", hunger);
+	// 2. CAE LA NOCHE: supervivencia y recarga
+	if (dia_terminado) {
+		int turno = (int)self->get_meta("turno_actual", 1) + 1;
+		self->set_meta("turno_actual", turno);
 
-					// 2. ISOLATION SANITY (If they just survived hunger)
-					if (hunger > 0) {
-						Vector2i my_pos = child->get_meta("grid_pos");
-						int min_dist = 999;
-						
-						for (int j = 0; j < children.size(); j++) {
-							if (i == j) continue; // Don't count oneself
-							Node* companion = Object::cast_to<Node>(children[j]);
-							if (companion && companion->get_name() != StringName("DatosEquipo")) {
-								bool c_escaped = companion->has_meta("ha_escapado") ? (bool)companion->get_meta("ha_escapado") : false;
-								bool c_dead    = companion->has_meta("esta_muerto") ? (bool)companion->get_meta("esta_muerto") : false;
-								
-								if (!c_escaped && !c_dead) {
-									Vector2i c_pos = companion->get_meta("grid_pos");
-									// Calculate distance in tiles (Manhattan)
-									int dist = abs(my_pos.x - c_pos.x) + abs(my_pos.y - c_pos.y);
-									if (dist < min_dist) min_dist = dist;
-								}
-							}
-						}
-						
-						// If the closest companion is more than 3 tiles away, panic ensues
-						if (min_dist > 3 && min_dist != 999) {
-							int sanity = (int)child->get_meta("sanidad_actual");
-							child->set_meta("sanidad_actual", UtilityFunctions::max(0, sanity - 15));
-							UtilityFunctions::print("[Survival] ", child->get_name(), " loses 15 sanity due to isolation.");
-						}
-						
-						// Reset movement ONLY if still alive
-						child->set_meta("ha_movido", false);
-						
-						// --- AÑADE ESTO: RECARGA DE PUNTOS DE ACCIÓN ---
-						int pa_maximo = child->get_meta("pa_max");
-						child->set_meta("pa_actual", pa_maximo);
-						
-					}
-				}
+		std::vector<Node*> heroes = Heroes();
+		for (Node* h : heroes) {
+			if (MetaBool(h, "ha_escapado") || MetaBool(h, "esta_muerto")) continue;
+
+			// HAMBRE: -1 por día. Si queda poca y hay comida en la bolsa, se come sola.
+			int hambre = (int)h->get_meta("hambre_actual", 10) - 1;
+			int comida = h->get_meta("comida_bolsa", 0);
+			if (hambre <= 3 && comida > 0) {
+				hambre = UtilityFunctions::mini((int)h->get_meta("hambre_max", 10), hambre + 5);
+				h->set_meta("comida_bolsa", comida - 1);
+				UtilityFunctions::print("[Survival] ", h->get_name(), " come algo de la bolsa.");
 			}
+			h->set_meta("hambre_actual", UtilityFunctions::maxi(0, hambre));
+			if (hambre <= 0) {
+				Morir(h, "hambre");
+				continue;
+			}
+
+			// CORDURA: perder al grupo de vista asusta
+			Vector2i mi_pos = h->get_meta("grid_pos", Vector2i(0, 0));
+			int min_dist = 999;
+			for (Node* c : heroes) {
+				if (c == h || MetaBool(c, "ha_escapado") || MetaBool(c, "esta_muerto")) continue;
+				Vector2i p = c->get_meta("grid_pos", Vector2i(0, 0));
+				min_dist = UtilityFunctions::mini(min_dist, abs(mi_pos.x - p.x) + abs(mi_pos.y - p.y));
+			}
+			if (min_dist > 3 && min_dist != 999) {
+				int cordura = h->get_meta("sanidad_actual", 100);
+				h->set_meta("sanidad_actual", UtilityFunctions::maxi(0, cordura - 15));
+				UtilityFunctions::print("[Survival] ", h->get_name(), " loses 15 sanity due to isolation.");
+			}
+
+			h->set_meta("ha_movido", false);
+			h->set_meta("pa_actual", h->get_meta("pa_max", 3));
 		}
-		
-		UtilityFunctions::print("[PartyManager] New day. Current turn: ", current_turn);
-		
+
+		UtilityFunctions::print("[PartyManager] New day. Current turn: ", turno);
 		if (m_ui_manager) {
 			m_ui_manager->call("ActualizarMarcadorTurno");
 			m_ui_manager->call("ActualizarStatsUI");
 		}
-	} 
-	
-	// 3. AUTOMATIC SELECTION OF THE NEXT ALIVE CHARACTER
-	act_char = nullptr; 
-	for (int i = 0; i < children.size(); i++) {
-		Node* companion = Object::cast_to<Node>(children[i]);
-		if (companion && companion->get_name() != StringName("DatosEquipo")) {
-			bool c_moved   = companion->has_meta("ha_movido")   ? (bool)companion->get_meta("ha_movido")   : false;
-			bool c_escaped = companion->has_meta("ha_escapado") ? (bool)companion->get_meta("ha_escapado") : false;
-			bool c_dead    = companion->has_meta("esta_muerto") ? (bool)companion->get_meta("esta_muerto") : false;
-
-			if (!c_moved && !c_escaped && !c_dead) {
-				act_char = companion; // Select the first one that can still play
-				break;
-			}
-		}
 	}
 
-	// 4. FINAL UI UPDATE
+	// 3. SIGUIENTE PERSONAJE DISPONIBLE
+	SeleccionarSiguiente();
+
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
 }
 
 void CambiarPersonajeActivo(Caller* instance, String new_name) {
 	if (!self) return;
-	
 	Node* child = self->get_node_or_null(NodePath(new_name));
-	
-	if (child) {
-		bool is_dead = child->has_meta("esta_muerto") ? (bool)child->get_meta("esta_muerto") : false;
-		if (is_dead) return;
-		
-		bool has_escaped = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
-		if (has_escaped) return;
-		
-		// --- NUEVO: COMPROBAR PA EN VEZ DE 'ha_movido' ---
-		int pa_actual = child->has_meta("pa_actual") ? (int)child->get_meta("pa_actual") : 0;
-		if (pa_actual <= 0) {
-			UtilityFunctions::print("[PartyManager] ", new_name, " no tiene PA restantes. Elige otro.");
-			return;
-		}
-		
-		act_char = child;
-		UtilityFunctions::print("[PartyManager] Selección manual: ", act_char->get_meta("nombre_display"));
+	if (!child || MetaBool(child, "esta_muerto") || MetaBool(child, "ha_escapado")) return;
 
-		if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
-		if (m_dungeon_manager) m_dungeon_manager->call("UpdateHighlightForWarrior");
+	if ((int)child->get_meta("pa_actual", 0) <= 0) {
+		UtilityFunctions::print("[PartyManager] ", new_name, " no tiene PA restantes. Elige otro.");
+		return;
 	}
+
+	act_char = child;
+	UtilityFunctions::print("[PartyManager] Selección manual: ", act_char->get_meta("nombre_display"));
+
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	if (m_dungeon_manager) m_dungeon_manager->call("UpdateHighlightForWarrior");
 }
 
 // ==========================================
@@ -218,59 +211,25 @@ void CambiarPersonajeActivo(Caller* instance, String new_name) {
 // ==========================================
 
 void RecibirDano(Caller* instance, int damage_amount, Node* target_hero) {
-	UtilityFunctions::print("Taking damage....");
-	if (!self) return;
+	if (!self || !target_hero) return;
 
-	String name = target_hero->get_meta("nombre_display");
+	int hp = UtilityFunctions::maxi(0, (int)target_hero->get_meta("hp_actual", 0) - damage_amount);
+	target_hero->set_meta("hp_actual", hp);
+	UtilityFunctions::print("[PartyManager] Effect: ", target_hero->get_meta("nombre_display"), " takes ", damage_amount, " damage. Remaining HP: ", hp);
 
-	int current_hp = 0;
-	if (target_hero->has_meta("hp_actual")) {
-		current_hp = (int)target_hero->get_meta("hp_actual");
+	if (hp <= 0 && !MetaBool(target_hero, "esta_muerto")) {
+		Morir(target_hero, "heridas");
+		ComprobarFinDelPiso();
 	}
 
-	current_hp -= damage_amount;
-	if (current_hp < 0) current_hp = 0;
-
-	// Save target HP
-	target_hero->set_meta("hp_actual", current_hp);
-	UtilityFunctions::print("[PartyManager] Effect: ", name, " takes ", damage_amount, " damage. Remaining HP: ", current_hp);
-
-	// Refresh stats
-	Node* ui = self->get_parent()->get_node_or_null("CanvasLayer");
-	if (ui) ui->call("ActualizarStatsUI"); 
+	if (m_ui_manager) m_ui_manager->call("ActualizarStatsUI");
 }
 
 void PersonajeEscapa(Caller* instance, Node* hero) {
 	if (!self || !hero) return;
-	
 	hero->set_meta("ha_escapado", true);
 	UtilityFunctions::print("[PartyManager] ", hero->get_meta("nombre_display"), " has gone down the stairs.");
-
-	// Check if EVERYONE has escaped
-	TypedArray<Node> children = self->get_children();
-	bool everyone_escaped = true;
-	
-	for (int i = 0; i < children.size(); i++) {
-		Node* child = Object::cast_to<Node>(children[i]);
-		if (child && child->get_name() != StringName("DatosEquipo")) {
-			bool escaped = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
-			if (!escaped) {
-				everyone_escaped = false;
-				break;
-			}
-		}
-	}
-
-	if (everyone_escaped) {
-		Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
-		if (audio) audio->call("play_music", "fireplace");
-		UtilityFunctions::print("\n***********************************");
-		UtilityFunctions::print(" EVERYONE SAFE! STARTING CAMPFIRE  ");
-		UtilityFunctions::print("***********************************\n");
-		
-		CanvasLayer* campfire_layer = Object::cast_to<CanvasLayer>(self->get_parent()->get_node_or_null("CanvasLayer3"));
-		if (campfire_layer) campfire_layer->set_visible(true);
-	}
+	ComprobarFinDelPiso();
 }
 
 // ==========================================
@@ -279,13 +238,11 @@ void PersonajeEscapa(Caller* instance, Node* hero) {
 
 void OnAwake(Caller* instance) {
 	self = GetSelf<Node>(instance);
-	
-	if (self) {
-		Node* parent_node = self->get_parent();
-		if (parent_node) {
-			m_ui_manager      = parent_node->get_node_or_null("CanvasLayer");
-			m_dungeon_manager = parent_node->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
-		}
+	act_char = nullptr;
+	Node* parent = self ? self->get_parent() : nullptr;
+	if (parent) {
+		m_ui_manager = parent->get_node_or_null("CanvasLayer");
+		m_dungeon_manager = parent->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 	}
 }
 
@@ -295,69 +252,66 @@ void OnReady(Caller* instance) {
 	Node* team_data = self->get_node_or_null("DatosEquipo");
 	if (!team_data) return;
 
-	TypedArray<Resource> hero_list = team_data->get("lista_heroes");
-	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
+	self->set_meta("piso_actual", 1);
+	self->set_meta("turno_actual", 1);
 
+	TypedArray<Resource> hero_list = team_data->get("lista_heroes");
 	for (int i = 0; i < hero_list.size(); i++) {
 		Ref<Resource> res = hero_list[i];
 		if (res.is_null()) continue;
 
-		String name          = res->get("nombre_display");
-		int hp               = res->get("vida_max");
-		int spd              = res->get("velocidad");
-		int def              = res->get("defensa");
-		int str              = res->get("fuerza");
-		int mag              = res->get("magia");
-		int lck              = res->get("suerte");
-		String portrait_path = res->get("retrato_path"); 
-
+		String name = res->get("nombre_display");
+		int hp = res->get("vida_max");
+		int spd = res->get("velocidad");
 
 		Node* soul = memnew(Node);
 		soul->set_name(name);
-		soul->set_meta("nombre_display", name); 
+		soul->set_meta("nombre_display", name);
 		soul->set_meta("hp_max", hp);
 		soul->set_meta("hp_actual", hp);
 		soul->set_meta("velocidad", spd);
-		soul->set_meta("retrato_path", portrait_path);
+		soul->set_meta("retrato_path", res->get("retrato_path"));
 		soul->set_meta("ha_movido", false);
-		soul->set_meta("defensa", def);
-		soul->set_meta("fuerza", str);
-		soul->set_meta("magia", mag);
-		soul->set_meta("suerte", lck);
+		soul->set_meta("defensa", res->get("defensa"));
+		soul->set_meta("fuerza", res->get("fuerza"));
+		soul->set_meta("magia", res->get("magia"));
+		soul->set_meta("suerte", res->get("suerte"));
 		soul->set_meta("hambre_max", 10);
 		soul->set_meta("hambre_actual", 10);
 		soul->set_meta("sanidad_max", 100);
 		soul->set_meta("sanidad_actual", 100);
 		soul->set_meta("esta_muerto", false);
 		soul->set_meta("ha_escapado", false);
+		soul->set_meta("in_combat", false);
 		soul->set_meta("pa_max", spd);
 		soul->set_meta("pa_actual", spd);
-		
-		// Currency and food variables (Shared or individual, here individual)
+
+		// Radio de visión propio (antes se usaban los PA, y con 0 PA no veías nada)
+		Variant radio = res->get("radio_luz");
+		soul->set_meta("radio_luz", radio.get_type() == Variant::NIL ? 4 : (int)radio);
+
 		soul->set_meta("oro", 0);
 		soul->set_meta("comida_bolsa", 0);
 
-		// SCALABLE SLOT CONFIGURATION
-		int slots = 3; 
-		if (soul->get_name() == StringName("Doom_Snailer")) {
-			slots = 4; // The tank is a pack mule
-		}
-		soul->set_meta("max_slots", slots);
+		// El tanque es una mula de carga
+		soul->set_meta("max_slots", name == "Doom Snailer" ? 4 : 3);
+		soul->set_meta("items_lista", TypedArray<Resource>());
 
-		// The inventory is a Godot Array that will store "ItemData"
-		TypedArray<Resource> inventory;
-		soul->set_meta("items_lista", inventory);
+		self->add_child(soul);
 
-		self->add_child(soul); 
-		
-		// Initialize floor and turn memory
-		self->set_meta("piso_actual", 1);
-		self->set_meta("turno_actual", 1);
-
-		if (dungeon) {
-			dungeon->call("SpawnVisualCharacter", res, i); 
-		}
+		if (m_dungeon_manager) m_dungeon_manager->call("SpawnVisualCharacter", res, i);
 	}
+
+	SeleccionarSiguiente();
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	if (m_dungeon_manager) m_dungeon_manager->call("UpdateHighlightForWarrior");
+}
+
+void OnDestroy(Caller* instance) {
+	self = nullptr;
+	act_char = nullptr;
+	m_ui_manager = nullptr;
+	m_dungeon_manager = nullptr;
 }
 
 JENOVA_SCRIPT_END

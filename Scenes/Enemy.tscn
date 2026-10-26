@@ -1,9 +1,43 @@
 [gd_scene format=3 uid="uid://crb7igljigebl"]
 
-[ext_resource type="Texture2D" uid="uid://caovj8m6rgokw" path="res://Assets/warrior.png" id="1_m1htj"]
+[ext_resource type="Texture2D" uid="uid://biunl621ttqr7" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png" id="1_tex"]
 
-[node name="EnemyBase" type="Node2D" unique_id=1699301883]
+[sub_resource type="Gradient" id="Gradient_sombra"]
+colors = PackedColorArray(0, 0, 0, 0.65, 0, 0, 0, 0)
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1853826581]
-scale = Vector2(0.005, 0.005)
-texture = ExtResource("1_m1htj")
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_sombra"]
+gradient = SubResource("Gradient_sombra")
+width = 16
+height = 16
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.5, 0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sombra"]
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("GradientTexture2D_sombra")
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_sombra"]
+material = SubResource("StandardMaterial3D_sombra")
+size = Vector2(0.75, 0.75)
+orientation = 1
+
+[node name="EnemyBase" type="Node3D"]
+
+[node name="Sombra" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+mesh = SubResource("QuadMesh_sombra")
+
+[node name="Cuerpo" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44, 0)
+modulate = Color(1, 0.85, 0.85, 1)
+pixel_size = 0.055
+billboard = 2
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("1_tex")
+hframes = 7
+vframes = 2
+frame = 11
