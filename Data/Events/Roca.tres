@@ -42,4 +42,7 @@ titulo = "Roca Rodante"
 descripcion = "Desde arriba del techo, una roca gigante desciende! Yo te recomendaría salir corriendo....a no ser que quieras convertirte en una nueva baldosa de la mazmorra!"
 ilustracion = ExtResource("1_kmbii")
 opciones = Array[ExtResource("2_csuuj")]([SubResource("Resource_kmbii"), SubResource("Resource_csuuj"), SubResource("Resource_7448k")])
+gatillo = 2
+stat_objetivo = "sanidad_actual"
+valor_critico = 50
 metadata/_custom_type_script = "uid://bov68belyjx5p"

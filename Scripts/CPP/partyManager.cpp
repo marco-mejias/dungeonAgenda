@@ -72,12 +72,12 @@ void TerminarTurnoPersonaje(Caller* instance) {
 	for (int i = 0; i < children.size(); i++) {
 		Node* child = Object::cast_to<Node>(children[i]);
 		if (child && child->get_name() != StringName("DatosEquipo")) {
-			bool moved    = child->has_meta("ha_movido")   ? (bool)child->get_meta("ha_movido")   : false;
+			int pa_restantes = child->has_meta("pa_actual") ? (int)child->get_meta("pa_actual") : 0;
 			bool escaped  = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
 			bool is_dead  = child->has_meta("esta_muerto") ? (bool)child->get_meta("esta_muerto") : false; 
 			
-			// If anyone hasn't moved, hasn't escaped, and isn't dead... the global turn continues
-			if (!moved && !escaped && !is_dead) {
+			// Si alguien vivo y sin escapar AÚN TIENE PA, el día continúa
+			if (pa_restantes > 0 && !escaped && !is_dead) {
 				all_have_moved = false;
 				break;
 			}
@@ -148,6 +148,11 @@ void TerminarTurnoPersonaje(Caller* instance) {
 						
 						// Reset movement ONLY if still alive
 						child->set_meta("ha_movido", false);
+						
+						// --- AÑADE ESTO: RECARGA DE PUNTOS DE ACCIÓN ---
+						int pa_maximo = child->get_meta("pa_max");
+						child->set_meta("pa_actual", pa_maximo);
+						
 					}
 				}
 			}
@@ -187,33 +192,24 @@ void CambiarPersonajeActivo(Caller* instance, String new_name) {
 	Node* child = self->get_node_or_null(NodePath(new_name));
 	
 	if (child) {
-		
-		bool is_dead = child->has_meta("ha_muerto") ? (bool)child->get_meta("ha_muerto") : false;
-		if (is_dead) {
-			UtilityFunctions::print("[PartyManager] ", new_name, " is dead.");
-			return;
-		}
-		
-		bool has_moved = child->has_meta("ha_movido") ? (bool)child->get_meta("ha_movido") : false;
-		if (has_moved) {
-			UtilityFunctions::print("[PartyManager] ", new_name, " has already moved. Choose another.");
-			return;
-		}
+		bool is_dead = child->has_meta("esta_muerto") ? (bool)child->get_meta("esta_muerto") : false;
+		if (is_dead) return;
 		
 		bool has_escaped = child->has_meta("ha_escapado") ? (bool)child->get_meta("ha_escapado") : false;
-		if (has_escaped) {
-			UtilityFunctions::print("[PartyManager] ", new_name, " is already waiting on the floor below.");
+		if (has_escaped) return;
+		
+		// --- NUEVO: COMPROBAR PA EN VEZ DE 'ha_movido' ---
+		int pa_actual = child->has_meta("pa_actual") ? (int)child->get_meta("pa_actual") : 0;
+		if (pa_actual <= 0) {
+			UtilityFunctions::print("[PartyManager] ", new_name, " no tiene PA restantes. Elige otro.");
 			return;
 		}
 		
 		act_char = child;
-		UtilityFunctions::print("[PartyManager] Manual selection: ", act_char->get_meta("nombre_display"));
+		UtilityFunctions::print("[PartyManager] Selección manual: ", act_char->get_meta("nombre_display"));
 
 		if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
-		
-		if (m_dungeon_manager) {
-			m_dungeon_manager->call("UpdateHighlightForWarrior", act_char);
-		}
+		if (m_dungeon_manager) m_dungeon_manager->call("UpdateHighlightForWarrior");
 	}
 }
 
@@ -266,6 +262,8 @@ void PersonajeEscapa(Caller* instance, Node* hero) {
 	}
 
 	if (everyone_escaped) {
+		Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+		if (audio) audio->call("play_music", "fireplace");
 		UtilityFunctions::print("\n***********************************");
 		UtilityFunctions::print(" EVERYONE SAFE! STARTING CAMPFIRE  ");
 		UtilityFunctions::print("***********************************\n");
@@ -286,7 +284,7 @@ void OnAwake(Caller* instance) {
 		Node* parent_node = self->get_parent();
 		if (parent_node) {
 			m_ui_manager      = parent_node->get_node_or_null("CanvasLayer");
-			m_dungeon_manager = parent_node->get_node_or_null("DungeonManager");
+			m_dungeon_manager = parent_node->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 		}
 	}
 }
@@ -298,7 +296,7 @@ void OnReady(Caller* instance) {
 	if (!team_data) return;
 
 	TypedArray<Resource> hero_list = team_data->get("lista_heroes");
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
+	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 
 	for (int i = 0; i < hero_list.size(); i++) {
 		Ref<Resource> res = hero_list[i];
@@ -326,12 +324,14 @@ void OnReady(Caller* instance) {
 		soul->set_meta("fuerza", str);
 		soul->set_meta("magia", mag);
 		soul->set_meta("suerte", lck);
-		soul->set_meta("hambre_max", 7);
-		soul->set_meta("hambre_actual", 7);
+		soul->set_meta("hambre_max", 10);
+		soul->set_meta("hambre_actual", 10);
 		soul->set_meta("sanidad_max", 100);
 		soul->set_meta("sanidad_actual", 100);
 		soul->set_meta("esta_muerto", false);
 		soul->set_meta("ha_escapado", false);
+		soul->set_meta("pa_max", spd);
+		soul->set_meta("pa_actual", spd);
 		
 		// Currency and food variables (Shared or individual, here individual)
 		soul->set_meta("oro", 0);

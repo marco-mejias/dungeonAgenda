@@ -100,6 +100,10 @@ text = "Oro: 0"
 layout_mode = 2
 text = "Comida: 0"
 
+[node name="PA" type="Label" parent="MarginContainer/VBoxContainer/Inventario/Recursos" unique_id=1324869706]
+layout_mode = 2
+text = "PA: 0"
+
 [node name="SlotsItems" type="HBoxContainer" parent="MarginContainer/VBoxContainer/Inventario" unique_id=289000172]
 layout_mode = 2
 

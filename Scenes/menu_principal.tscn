@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://crfxqnbm5fnvb"]
+
+[ext_resource type="Script" uid="uid://65j48ln2juy3" path="res://Scripts/GDD/menu_principal.gd" id="1_gjtjt"]
+[ext_resource type="Texture2D" uid="uid://bu4dcitcbkn41" path="res://Assets/background.jpg" id="2_crked"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gjtjt"]
+bg_color = Color(0.09803922, 0.09803922, 0.09803922, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_crked"]
+bg_color = Color(0.09803922, 0.09803922, 0.09803922, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_detail = 1
+
+[node name="MenuPrincipal" type="Control" unique_id=319348777]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gjtjt")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1222276820]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_crked")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1884750534]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -174.4925
+offset_top = -56.0
+offset_right = 174.4925
+offset_bottom = 56.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="Label" type="Label" parent="VBoxContainer" unique_id=1328822692]
+layout_mode = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7647059)
+theme_override_constants/shadow_offset_x = 4
+theme_override_constants/shadow_offset_y = 4
+theme_override_font_sizes/font_size = 60
+text = "DUNGEON AGENDA"
+
+[node name="BtnJugar" type="Button" parent="VBoxContainer" unique_id=1627967753]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
+theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
+text = "PLAY"
+
+[node name="BtnOpciones" type="Button" parent="VBoxContainer" unique_id=2059322123]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "OPTIONS"
+
+[node name="BtnSalir" type="Button" parent="VBoxContainer" unique_id=1053048356]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
+theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
+text = "QUIT"
+
+[node name="PanelOpciones" type="Panel" parent="." unique_id=933424563]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelOpciones" unique_id=280088241]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -67.0
+offset_top = -105.5
+offset_right = 67.0
+offset_bottom = 105.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="PanelOpciones/VBoxContainer" unique_id=1362724916]
+layout_mode = 2
+text = "OPTIONS
+"
+horizontal_alignment = 1
+
+[node name="Label2" type="Label" parent="PanelOpciones/VBoxContainer" unique_id=178748272]
+layout_mode = 2
+text = "MUSIC VOLUME"
+
+[node name="SliderMusica" type="HSlider" parent="PanelOpciones/VBoxContainer" unique_id=1740935003]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="Label3" type="Label" parent="PanelOpciones/VBoxContainer" unique_id=676757038]
+layout_mode = 2
+text = "SFX VOLUME"
+
+[node name="SliderSFX" type="HSlider" parent="PanelOpciones/VBoxContainer" unique_id=1575616685]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="BtnVolver" type="Button" parent="PanelOpciones/VBoxContainer" unique_id=1882410007]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
+theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
+text = "RETURN"
+
+[connection signal="mouse_entered" from="VBoxContainer/BtnJugar" to="." method="_on_btn_jugar_mouse_entered"]
+[connection signal="pressed" from="VBoxContainer/BtnJugar" to="." method="_on_btn_jugar_pressed"]
+[connection signal="pressed" from="VBoxContainer/BtnOpciones" to="." method="_on_btn_opciones_pressed"]
+[connection signal="pressed" from="VBoxContainer/BtnOpciones" to="." method="_on_opciones_pressed"]
+[connection signal="mouse_entered" from="VBoxContainer/BtnSalir" to="." method="_on_btn_salir_mouse_entered"]
+[connection signal="pressed" from="VBoxContainer/BtnSalir" to="." method="_on_btn_salir_pressed"]
+[connection signal="value_changed" from="PanelOpciones/VBoxContainer/SliderMusica" to="." method="_on_slider_musica_value_changed"]
+[connection signal="value_changed" from="PanelOpciones/VBoxContainer/SliderSFX" to="." method="_on_slider_sfx_value_changed"]
+[connection signal="pressed" from="PanelOpciones/VBoxContainer/BtnVolver" to="." method="_on_volver_pressed"]
