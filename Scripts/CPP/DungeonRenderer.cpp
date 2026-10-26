@@ -22,6 +22,7 @@
 #include <Godot/classes/omni_light3d.hpp>
 #include <Godot/classes/sprite3d.hpp>
 #include <Godot/classes/camera3d.hpp>
+#include <Godot/classes/viewport.hpp>
 #include <Godot/classes/canvas_layer.hpp>
 #include <Godot/classes/control.hpp>
 #include <Godot/classes/panel_container.hpp>
@@ -353,7 +354,12 @@ namespace {
 
 	float EscalaZoom(Camera3D* cam) {
 		float z = cam && cam->has_meta("zoom_factor") ? (float)cam->get_meta("zoom_factor") : 2.0f;
-		return UtilityFunctions::clampf(z * 0.5f, 0.7f, 1.4f);
+		// Con menos reducción de resolución (opción del menú) el viewport es mayor: compensamos
+		float shrink = 2.0f;
+		Node* sub = cam ? cam->get_viewport() : nullptr;
+		Node* contenedor = sub ? sub->get_parent() : nullptr;
+		if (contenedor && contenedor->has_method("get_stretch_shrink")) shrink = (float)(int)contenedor->call("get_stretch_shrink");
+		return UtilityFunctions::clampf(z * 0.5f, 0.7f, 1.4f) * (2.0f / UtilityFunctions::maxf(1.0f, shrink));
 	}
 
 	// Coloca un elemento 2D sobre un punto 3D; lo oculta si queda detrás de la cámara

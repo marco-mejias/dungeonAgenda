@@ -20,8 +20,8 @@ uniform bool use_cutaway = false;
 uniform vec3 focus_pos = vec3(0.0);
 uniform vec3 cam_pos = vec3(0.0, 10.0, 10.0);
 
-// Vertex snapping strength, in low-res pixels
-uniform float jitter = 1.5;
+// Fuerza del temblor de vértices en píxeles de baja resolución (opción del menú de pausa)
+global uniform float ps1_jitter;
 
 varying vec3 aff_uv;
 varying flat float fog_state;
@@ -56,7 +56,7 @@ void vertex() {
 	inst_tile = INSTANCE_CUSTOM.xy;
 
 	vec4 clip = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
-	vec2 snap = VIEWPORT_SIZE / (2.0 * max(jitter, 0.01));
+	vec2 snap = VIEWPORT_SIZE / (2.0 * max(ps1_jitter, 0.01));
 	clip.xy = floor((clip.xy / clip.w) * snap + 0.5) / snap * clip.w;
 	POSITION = clip;
 	aff_uv = vec3(UV * clip.w, clip.w);

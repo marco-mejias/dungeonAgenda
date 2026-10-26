@@ -7,7 +7,8 @@ render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled, fog_dis
 
 uniform float fill_density = 0.2;
 uniform float border = 0.1;
-uniform float jitter = 1.5;
+// Fuerza del temblor de vértices en píxeles de baja resolución (opción del menú de pausa)
+global uniform float ps1_jitter;
 
 varying flat vec4 data;
 
@@ -16,7 +17,7 @@ const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 
 void vertex() {
 	data = INSTANCE_CUSTOM;
 	vec4 clip = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));
-	vec2 snap = VIEWPORT_SIZE / (2.0 * max(jitter, 0.01));
+	vec2 snap = VIEWPORT_SIZE / (2.0 * max(ps1_jitter, 0.01));
 	clip.xy = floor((clip.xy / clip.w) * snap + 0.5) / snap * clip.w;
 	POSITION = clip;
 }

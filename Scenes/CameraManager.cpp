@@ -35,6 +35,8 @@ namespace {
 	Vector2 raton_prev;
 	// OJO: nada de godot::String globales: se construirían al cargar la DLL, antes que GDExtension
 	uint64_t last_char_id = 0;
+	Vector3 ir_a;
+	bool yendo = false;
 
 	Vector3 Direccion() {
 		float p = PITCH_DEG * (float)Math_PI / 180.0f;
@@ -133,6 +135,17 @@ void OnProcess(Caller* instance, double delta) {
 		auto_centrar = true;
 		cam->set_meta("recentrar", false);
 	}
+	// El minimapa puede pedir ir a un punto concreto
+	if (cam->has_meta("ir_a")) {
+		ir_a = cam->get_meta("ir_a");
+		yendo = true;
+		auto_centrar = false;
+		cam->remove_meta("ir_a");
+	}
+	if (yendo) {
+		pivote = pivote.lerp(ir_a, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
+		if (pivote.distance_to(ir_a) < 0.05f || derecho) yendo = false;
+	}
 	bool moviendo = dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving");
 	if (token && !derecho && (moviendo || auto_centrar)) {
 		Vector3 objetivo = token->get_position();
@@ -152,6 +165,7 @@ void OnProcess(Caller* instance, double delta) {
 	// Datos para la UI anclada (menú táctico) y el renderer
 	cam->set_meta("pivote", pivote);
 	cam->set_meta("zoom_factor", 2.0f * DIST_REF / dist);
+	cam->set_meta("yaw", yaw);
 }
 
 JENOVA_SCRIPT_END
