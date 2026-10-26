@@ -511,6 +511,66 @@ namespace {
 		if (m_renderer) m_renderer->call("LimpiarOverlay");
 	}
 
+	const int COSTE_INTERACCION = 2; // igual que EventManager y CombatManager
+
+	bool EventoManualActivo(const Cell& c) {
+		return c.has_event && c.event_idx >= 0 && m_eventos[c.event_idx].activo && m_eventos[c.event_idx].gatillo == 0;
+	}
+
+	// ¿Hay algo con lo que interactuar en esta casilla? Rellena la acción y su coste en PA.
+	// tipo_overlay: 1 = interactuable, 2 = enemigo
+	bool DescribirInteraccion(Vector2i p, Node* act, String& accion, int& coste, int& tipo_overlay) {
+		if (!InBounds(p.x, p.y)) return false;
+		const Cell& c = map_data[p.x][p.y];
+		coste = debug_mode ? 0 : COSTE_INTERACCION;
+		tipo_overlay = 1;
+		if (c.has_enemy) {
+			Node* e = self->get_node_or_null(NodePath(NombreEnemigo(p)));
+			int dano = 1;
+			if (e && act) dano = std::max(1, (int)act->get_meta("fuerza", 1) - (int)e->get_meta("defensa", 0));
+			// Jenova recodifica el .cpp al preprocesarlo: los caracteres no ASCII van como bytes UTF-8 escapados
+			accion = String("Atacar: ") + String::num_int64(dano) + String::utf8(" de da\xC3\xB1o");
+			tipo_overlay = 2;
+			return true;
+		}
+		if (c.is_chest && !c.chest_opened) { accion = "Abrir cofre"; return true; }
+		if (c.is_door && !c.door_open) { accion = "Abrir puerta"; return true; }
+		if (EventoManualActivo(c)) { accion = "Investigar"; return true; }
+		if (p == m_salida) { accion = "Bajar la escalera"; coste = 0; return true; }
+		return false;
+	}
+
+	String TextoBocadillo(const String& accion, int coste) {
+		return accion + String("\n") + String::num_int64(coste) + String(" PA");
+	}
+
+	void LimpiarBocadillos() {
+		if (!m_renderer) return;
+		m_renderer->call("FijarBocadillos", 0, PackedInt32Array(), PackedStringArray(), PackedInt32Array());
+		m_renderer->call("FijarBocadillos", 1, PackedInt32Array(), PackedStringArray(), PackedInt32Array());
+		m_renderer->call("MostrarCoste", -1, -1, String(""), 0);
+	}
+
+	// Bocadillos sobre los interactuables pegados al héroe activo
+	void ActualizarBocadillos(Node* act, Vector2i pos) {
+		if (!m_renderer) return;
+		PackedInt32Array celdas, estilos;
+		PackedStringArray textos;
+		int pa = act ? (int)act->get_meta("pa_actual", 0) : 0;
+		for (const Vector2i& d : DIRS4) {
+			Vector2i n = pos + d;
+			String accion; int coste = 0, tipo = 0;
+			if (!InBounds(n.x, n.y) || !(map_data[n.x][n.y].is_visible || debug_mode)) continue;
+			if (!DescribirInteraccion(n, act, accion, coste, tipo)) continue;
+			if (n == m_salida) coste = 1; // un paso
+			if (debug_mode) coste = 0;
+			celdas.push_back(n.x); celdas.push_back(n.y);
+			textos.push_back(TextoBocadillo(accion, coste));
+			estilos.push_back(pa < coste ? 1 : 0);
+		}
+		m_renderer->call("FijarBocadillos", 0, celdas, textos, estilos);
+	}
+
 	// Flood fill con PA y LoS. Muros, puertas cerradas, cofres, enemigos y otros héroes
 	// actúan como muro real: se marcan visitados pero NO se iluminan ni se atraviesan.
 	void HighlightReachableCells(Vector2i inicio, int pa) {
@@ -546,7 +606,26 @@ namespace {
 			}
 		}
 
-		if (m_renderer) m_renderer->call("PintarAlcance", AParesInt(iluminadas));
+		// Ternas (x, y, tipo) para el renderer: el área de andar (con el héroe) y, alrededor,
+		// los interactuables (dorado) y enemigos (rojo) que se pueden alcanzar
+		PackedInt32Array ternas;
+		std::vector<std::vector<bool>> marcado(GRID_SIZE, std::vector<bool>(GRID_SIZE, false));
+		iluminadas.push_back(inicio);
+		for (const Vector2i& c : iluminadas) {
+			ternas.push_back(c.x); ternas.push_back(c.y); ternas.push_back(0);
+			marcado[c.x][c.y] = true;
+		}
+		for (const Vector2i& c : iluminadas) {
+			for (const Vector2i& d : DIRS4) {
+				Vector2i n = c + d;
+				if (!InBounds(n.x, n.y) || marcado[n.x][n.y] || !(map_data[n.x][n.y].is_visible || debug_mode)) continue;
+				String accion; int coste = 0, tipo = 0;
+				if (n == m_salida || !DescribirInteraccion(n, act, accion, coste, tipo)) continue;
+				marcado[n.x][n.y] = true;
+				ternas.push_back(n.x); ternas.push_back(n.y); ternas.push_back(tipo);
+			}
+		}
+		if (m_renderer) m_renderer->call("PintarAlcance", ternas);
 	}
 
 	void UpdateHighlight() {
@@ -556,11 +635,17 @@ namespace {
 		Node* act = ActiveChar();
 		if (!act || Bloqueado() || MenuAbierto() || !HeroeEnMapa(act)) {
 			LimpiarAlcance();
+			LimpiarBocadillos();
 			return;
 		}
 		int pa = act->has_meta("pa_actual") ? (int)act->get_meta("pa_actual") : 0;
 		if (debug_mode) pa = std::max(pa, 8);
 		HighlightReachableCells(ActivePos(), pa);
+		ActualizarBocadillos(act, ActivePos());
+
+		// La ruta/coste del hover se calculó desde la posición anterior: que se recalcule
+		Node* input = self->get_node_or_null("InputManager");
+		if (input) input->call("RefrescarHover");
 	}
 
 	// ==========================================
@@ -728,7 +813,7 @@ void ConstruirVisual(Caller* instance) {
 	Ref<PackedScene> escena = ResourceLoader::get_singleton()->load("res://Scenes/Enemy.tscn");
 	if (escena.is_valid()) {
 		int piso = (m_party_manager && m_party_manager->has_meta("piso_actual")) ? (int)m_party_manager->get_meta("piso_actual") : 1;
-		const int frames[] = { 9, 11, 12, 13, 11, 12 };
+		const int frames[] = { 8, 9, 11, 12, 13, 11 };
 		for (int x = 0; x < GRID_SIZE; x++)
 			for (int y = 0; y < GRID_SIZE; y++) {
 				if (!map_data[x][y].has_enemy) continue;
@@ -737,14 +822,16 @@ void ConstruirVisual(Caller* instance) {
 				enemigo->set_name(NombreEnemigo(Vector2i(x, y)));
 				enemigo->set_position(GridToWorld(Vector2i(x, y)));
 				enemigo->set_meta("in_combat", false);
-				enemigo->set_meta("nombre_display", String("Esqueleto"));
+				int frame = frames[UtilityFunctions::randi_range(0, 5)];
+				enemigo->set_meta("nombre_display", String(frame == 8 ? "Fantasma" : (frame <= 10 ? "Zombi" : "Esqueleto")));
+				enemigo->set_meta("frame", frame);
 				enemigo->set_meta("hp_max", 12 + 3 * piso);
 				enemigo->set_meta("hp_actual", 12 + 3 * piso);
 				enemigo->set_meta("fuerza", 5 + piso);
 				enemigo->set_meta("defensa", 2);
 				enemigo->set_visible(false);
 				Sprite3D* cuerpo = Object::cast_to<Sprite3D>(enemigo->get_node_or_null("Cuerpo"));
-				if (cuerpo) cuerpo->set_frame(frames[UtilityFunctions::randi_range(0, 5)]);
+				if (cuerpo) cuerpo->set_frame(frame);
 				self->add_child(enemigo);
 			}
 	} else {
@@ -831,28 +918,61 @@ PackedInt32Array DebugAlcance(Caller* instance) {
 
 void ActualizarHover(Caller* instance, int hover_x, int hover_y) {
 	if (!m_renderer || map_data.empty()) return;
+	self->set_meta("hover_celda", Vector2i(hover_x, hover_y)); // lo lee el HUD (ficha del enemigo bajo el cursor)
 
 	bool dentro = InBounds(hover_x, hover_y) && (map_data[hover_x][hover_y].is_explored || debug_mode);
 	m_renderer->call("PintarCursor", dentro ? hover_x : -1, dentro ? hover_y : -1);
-	m_renderer->call("PintarRuta", PackedInt32Array());
+	m_renderer->call("PintarRuta", PackedInt32Array(), 0);
+	m_renderer->call("MostrarCoste", -1, -1, String(""), 0);
+	m_renderer->call("FijarBocadillos", 1, PackedInt32Array(), PackedStringArray(), PackedInt32Array());
 
 	if (!dentro || Bloqueado() || MenuAbierto() || !m_path_manager) return;
 	Node* act = ActiveChar();
 	if (!act || !HeroeEnMapa(act)) return;
 
-	const Cell& c = map_data[hover_x][hover_y];
-	bool interactuable = (c.is_chest && !c.chest_opened) || (c.is_door && !c.door_open) || c.has_enemy ||
-						 (c.has_event && c.event_idx >= 0 && m_eventos[c.event_idx].gatillo == 0);
-	if (!c.is_highlighted && !(interactuable && (c.is_visible || debug_mode))) return;
-
+	Vector2i destino(hover_x, hover_y);
 	Vector2i origen = ActivePos();
-	Array ruta = m_path_manager->call("CalcularRuta", origen.x, origen.y, hover_x, hover_y);
+	if (destino == origen) return;
 
-	int pa = act->has_meta("pa_actual") ? (int)act->get_meta("pa_actual") : 0;
+	const Cell& c = map_data[hover_x][hover_y];
+	String accion; int coste_accion = 0, tipo = 0;
+	bool interactuable = (c.is_visible || debug_mode) && DescribirInteraccion(destino, act, accion, coste_accion, tipo);
+	if (!c.is_highlighted && !interactuable) return;
+
+	Array ruta = m_path_manager->call("CalcularRuta", origen.x, origen.y, hover_x, hover_y);
+	int pa = act->get_meta("pa_actual", 0);
 	if (debug_mode) pa = 999;
+
 	std::vector<Vector2i> puntos;
-	for (int i = 1; i < ruta.size() && i <= pa; i++) puntos.push_back(ruta[i]);
-	m_renderer->call("PintarRuta", AParesInt(puntos));
+	for (int i = 1; i < ruta.size(); i++) puntos.push_back(ruta[i]);
+	int pasos = (int)puntos.size();
+	m_renderer->call("PintarRuta", AParesInt(puntos), std::min(pa, pasos));
+
+	int coste_paso = debug_mode ? 0 : pasos;
+	bool adyacente = std::abs(origen.x - hover_x) + std::abs(origen.y - hover_y) == 1;
+
+	if (interactuable && destino != m_salida) {
+		// Los pegados al héroe ya tienen su bocadillo fijo (canal 0)
+		if (adyacente) return;
+		int total = coste_paso + coste_accion;
+		PackedInt32Array celdas; celdas.push_back(hover_x); celdas.push_back(hover_y);
+		PackedStringArray textos; textos.push_back(TextoBocadillo(accion, total));
+		PackedInt32Array estilos; estilos.push_back(pa < total ? 1 : 2);
+		m_renderer->call("FijarBocadillos", 1, celdas, textos, estilos);
+		return;
+	}
+
+	if (destino == m_salida && !adyacente) {
+		PackedInt32Array celdas; celdas.push_back(hover_x); celdas.push_back(hover_y);
+		PackedStringArray textos; textos.push_back(TextoBocadillo("Bajar la escalera", coste_paso));
+		PackedInt32Array estilos; estilos.push_back(pa < coste_paso ? 1 : 2);
+		m_renderer->call("FijarBocadillos", 1, celdas, textos, estilos);
+		return;
+	}
+
+	if (c.is_highlighted) {
+		m_renderer->call("MostrarCoste", hover_x, hover_y, String::num_int64(coste_paso) + String(" PA"), 0);
+	}
 }
 
 void ToggleMenuTactico(Caller* instance) {
@@ -902,11 +1022,21 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 		return;
 	}
 
+	// Clic en otro héroe: pasa a ser el activo y su ficha se queda fija en el HUD
+	for (Node* h : Heroes()) {
+		if (h == act || !HeroeEnMapa(h) || (Vector2i)h->get_meta("grid_pos") != Vector2i(x, y)) continue;
+		String nombre = h->get_name();
+		m_party_manager->call("CambiarPersonajeActivo", nombre);
+		if (m_ui_manager) m_ui_manager->call("FijarFicha", nombre);
+		RecentrarCamara();
+		return;
+	}
+
 	const Cell& c = map_data[x][y];
 	bool cofre = c.is_chest && !c.chest_opened;
 	bool puerta_cerrada = c.is_door && !c.door_open;
 	bool enemigo = c.has_enemy;
-	bool evento_manual = c.has_event && c.event_idx >= 0 && m_eventos[c.event_idx].activo && m_eventos[c.event_idx].gatillo == 0;
+	bool evento_manual = EventoManualActivo(c);
 	bool visible = c.is_visible || debug_mode;
 
 	if ((cofre || puerta_cerrada || enemigo || evento_manual) && visible) {

@@ -1,0 +1,268 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" uid="uid://ciu6t8viq5o13" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="1_tiles"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ventana"]
+content_margin_left = 5.0
+content_margin_top = 4.0
+content_margin_right = 5.0
+content_margin_bottom = 4.0
+bg_color = Color(0.04, 0.05, 0.16, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.55, 0.6, 0.85, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 1
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 2
+shadow_offset = Vector2(2, 2)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fondo_barra"]
+bg_color = Color(0.02, 0.02, 0.05, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vida"]
+bg_color = Color(0.86, 0.2, 0.2, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hambre"]
+bg_color = Color(0.88, 0.62, 0.22, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cordura"]
+bg_color = Color(0.58, 0.42, 0.98, 1)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vida"]
+atlas = ExtResource("1_tiles")
+region = Rect2(144, 128, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hambre"]
+atlas = ExtResource("1_tiles")
+region = Rect2(96, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cordura"]
+atlas = ExtResource("1_tiles")
+region = Rect2(112, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_oro"]
+atlas = ExtResource("1_tiles")
+region = Rect2(96, 128, 16, 16)
+
+[node name="Ficha" type="PanelContainer"]
+custom_minimum_size = Vector2(190, 0)
+texture_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_ventana")
+
+[node name="V" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Cabecera" type="HBoxContainer" parent="V"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="Retrato" type="TextureRect" parent="V/Cabecera"]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Info" type="VBoxContainer" parent="V/Cabecera"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="Fila" type="HBoxContainer" parent="V/Cabecera/Info"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Nombre" type="Label" parent="V/Cabecera/Info/Fila"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 11
+text = "Nombre"
+clip_text = true
+
+[node name="PA" type="HBoxContainer" parent="V/Cabecera/Info/Fila"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Vida" type="HBoxContainer" parent="V/Cabecera/Info"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="Icono" type="TextureRect" parent="V/Cabecera/Info/Vida"]
+custom_minimum_size = Vector2(9, 9)
+layout_mode = 2
+mouse_filter = 2
+texture = SubResource("AtlasTexture_vida")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Barra" type="ProgressBar" parent="V/Cabecera/Info/Vida"]
+custom_minimum_size = Vector2(0, 5)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
+theme_override_styles/fill = SubResource("StyleBoxFlat_vida")
+value = 100.0
+show_percentage = false
+
+[node name="Valor" type="Label" parent="V/Cabecera/Info/Vida"]
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+text = "100"
+horizontal_alignment = 2
+
+[node name="Hambre" type="HBoxContainer" parent="V/Cabecera/Info"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="Icono" type="TextureRect" parent="V/Cabecera/Info/Hambre"]
+custom_minimum_size = Vector2(9, 9)
+layout_mode = 2
+mouse_filter = 2
+texture = SubResource("AtlasTexture_hambre")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Barra" type="ProgressBar" parent="V/Cabecera/Info/Hambre"]
+custom_minimum_size = Vector2(0, 5)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
+theme_override_styles/fill = SubResource("StyleBoxFlat_hambre")
+max_value = 10.0
+value = 10.0
+show_percentage = false
+
+[node name="Valor" type="Label" parent="V/Cabecera/Info/Hambre"]
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+text = "10"
+horizontal_alignment = 2
+
+[node name="Cordura" type="HBoxContainer" parent="V/Cabecera/Info"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="Icono" type="TextureRect" parent="V/Cabecera/Info/Cordura"]
+custom_minimum_size = Vector2(9, 9)
+layout_mode = 2
+mouse_filter = 2
+texture = SubResource("AtlasTexture_cordura")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Barra" type="ProgressBar" parent="V/Cabecera/Info/Cordura"]
+custom_minimum_size = Vector2(0, 5)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
+theme_override_styles/fill = SubResource("StyleBoxFlat_cordura")
+value = 100.0
+show_percentage = false
+
+[node name="Valor" type="Label" parent="V/Cabecera/Info/Cordura"]
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+text = "100"
+horizontal_alignment = 2
+
+[node name="Detalle" type="VBoxContainer" parent="V"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Stats" type="Label" parent="V/Detalle"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = "Stats"
+
+[node name="Recursos" type="HBoxContainer" parent="V/Detalle"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="IconoOro" type="TextureRect" parent="V/Detalle/Recursos"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture = SubResource("AtlasTexture_oro")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Oro" type="Label" parent="V/Detalle/Recursos"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = "0"
+
+[node name="Comida" type="Label" parent="V/Detalle/Recursos"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+text = "Comida: 0"
+
+[node name="Slots" type="HBoxContainer" parent="V/Detalle"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Slot1" type="TextureRect" parent="V/Detalle/Slots"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Slot2" type="TextureRect" parent="V/Detalle/Slots"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Slot3" type="TextureRect" parent="V/Detalle/Slots"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Slot4" type="TextureRect" parent="V/Detalle/Slots"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BtnFicha" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+flat = true

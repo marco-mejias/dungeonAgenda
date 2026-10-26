@@ -4,17 +4,14 @@ extends SceneTree
 # (sin --headless para que haya render y las capturas salgan)
 
 var out_dir := "user://test_shots"
-var paso := 0
-var espera := 0
 var dm: Node
 var pm: Node
 var ui: Node
 var fallos: Array[String] = []
-var pa_antes := 0
-var pos_antes := Vector2i.ZERO
-var objetivo_pick := Vector2i(-1, -1)
-var paso_zoom := 0
-var movido := ""
+var pasos: Array[Callable] = []
+var indice := -1
+var espera_hasta := 0.0
+var memo := {}
 
 func _initialize():
 	var args := OS.get_cmdline_user_args()
@@ -22,17 +19,20 @@ func _initialize():
 		out_dir = args[0]
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	change_scene_to_file("res://Scenes/main.tscn")
+	_definir_pasos()
+
+# ---------- utilidades ----------
+
+func ahora() -> float:
+	return Time.get_ticks_msec() / 1000.0
 
 func captura(nombre: String) -> void:
-	var img := root.get_texture().get_image()
-	img.save_png(out_dir.path_join(nombre + ".png"))
+	root.get_texture().get_image().save_png(out_dir.path_join(nombre + ".png"))
 	print("[test] captura: ", nombre)
 
 func check(cond: bool, msg: String) -> void:
-	if cond:
-		print("[test] OK   ", msg)
-	else:
-		print("[test] FAIL ", msg)
+	print("[test] ", "OK   " if cond else "FAIL ", msg)
+	if not cond:
 		fallos.append(msg)
 
 func activo() -> Node:
@@ -41,7 +41,7 @@ func activo() -> Node:
 func pos_activa() -> Vector2i:
 	return pm.call("GetActiveGridPos")
 
-func moviendo() -> bool:
+func ocupado() -> bool:
 	return dm.get_meta("is_moving", false) or dm.get_meta("bloqueo_evento", false)
 
 func tecla(code: Key, pulsada: bool) -> void:
@@ -51,6 +51,29 @@ func tecla(code: Key, pulsada: bool) -> void:
 	ev.pressed = pulsada
 	Input.parse_input_event(ev)
 
+func rueda(abajo: bool) -> void:
+	for pulsada in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_WHEEL_DOWN if abajo else MOUSE_BUTTON_WHEEL_UP
+		ev.pressed = pulsada
+		Input.parse_input_event(ev)
+
+func raiz2d() -> Node:
+	return dm.get_node_or_null("DungeonRenderer/Capa2D/Raiz")
+
+func bocadillos(canal: int) -> Array:
+	var out := []
+	var r := raiz2d()
+	if r:
+		for h in r.get_children():
+			if str(h.name).begins_with("Bocadillo%d_" % canal):
+				out.append(h)
+	return out
+
+func ficha_visible(nombre: String) -> bool:
+	var f = ui.get_node_or_null("PanelFichas/" + nombre)
+	return f != null and f.visible
+
 # Teletransporte (debug) a una casilla libre junto a 'objetivo'
 func junto_a(objetivo: Vector2i) -> bool:
 	for d in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
@@ -59,30 +82,31 @@ func junto_a(objetivo: Vector2i) -> bool:
 			return true
 	return false
 
-func _process(_delta):
-	if espera > 0:
-		espera -= 1
-		return false
-	if dm == null:
-		dm = root.get_node_or_null("Main/ContenedorMapa/SubViewport/DungeonManager")
-		pm = root.get_node_or_null("Main/PartyManager")
-		ui = root.get_node_or_null("Main/CanvasLayer")
-		espera = 60
-		return false
-	if moviendo() and paso not in [5, 13, 17, 18, 19]:
-		return false
+func raton_a_celda(c: Vector2i) -> void:
+	var cam: Camera3D = dm.get_node("Camera3D")
+	var cont: SubViewportContainer = root.get_node("Main/ContenedorMapa")
+	var p_sub := cam.unproject_position(Vector3(c.x + 0.5, 0, c.y + 0.5))
+	var p_canvas := cont.global_position + p_sub * cont.stretch_shrink
+	Input.warp_mouse(root.get_final_transform() * p_canvas)
 
-	paso += 1
-	match paso:
-		1:
+# ---------- guion ----------
+# Cada paso devuelve los segundos a esperar antes del siguiente.
+
+func _definir_pasos():
+	pasos = [
+		func():
 			captura("01_inicio")
 			check(activo() != null, "hay personaje activo al empezar")
 			var p := pos_activa()
 			check(p.x > 0 and p.y > 0, "el héroe activo está en una casilla válida %s" % p)
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			check(alc.size() > 0, "hay casillas alcanzables (%d)" % (alc.size() / 2))
-		2:
-			# Movernos a la casilla alcanzable más lejana
+			check(ficha_visible(str(activo().name)), "la ficha del héroe activo se ve")
+			var mm: MultiMesh = dm.get_node("DungeonRenderer/Alcance").multimesh
+			check(mm.instance_count > 0, "el overlay de alcance tiene casillas (%d)" % mm.instance_count)
+			return 0.2,
+		func():
+			# Hover sobre la casilla alcanzable más lejana: debe salir la ruta y el coste
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			var p := pos_activa()
 			var mejor := p
@@ -90,79 +114,130 @@ func _process(_delta):
 				var c := Vector2i(alc[i], alc[i + 1])
 				if abs(c.x - p.x) + abs(c.y - p.y) > abs(mejor.x - p.x) + abs(mejor.y - p.y):
 					mejor = c
-			pa_antes = activo().get_meta("pa_actual")
-			movido = str(activo().name)
-			pos_antes = p
-			print("[test] moviendo de ", p, " a ", mejor, " con PA ", pa_antes)
+			memo["destino"] = mejor
+			dm.call("ActualizarHover", mejor.x, mejor.y)
+			return 0.3,
+		func():
+			var coste: Label = dm.get_node("DungeonRenderer/Capa2D/Raiz/Coste")
+			var ruta: MultiMesh = dm.get_node("DungeonRenderer/Ruta").multimesh
+			check(ruta.instance_count > 0, "al pasar el ratón se dibuja la ruta (%d pasos)" % ruta.instance_count)
+			check(coste.visible and coste.text.ends_with("PA"), "y aparece el coste junto al cursor ('%s')" % coste.text)
+			captura("02_hover_ruta")
+			var mejor: Vector2i = memo["destino"]
+			memo["pa_antes"] = int(activo().get_meta("pa_actual"))
+			memo["movido"] = str(activo().name)
+			memo["pos_antes"] = pos_activa()
 			dm.call("ProcesarClicEnCasilla", mejor.x, mejor.y)
 			check(dm.get_meta("is_moving", false), "empieza a moverse")
-		3:
-			captura("02_tras_mover")
-			var gastados: int = pa_antes - int(pm.get_node(NodePath(movido)).get_meta("pa_actual"))
+			return 2.0,
+		func():
+			captura("03_tras_mover")
+			var gastados: int = memo["pa_antes"] - int(pm.get_node(NodePath(memo["movido"])).get_meta("pa_actual"))
 			check(gastados > 0, "moverse gasta PA (%d)" % gastados)
-			check(pos_activa() != pos_antes or activo() == null, "la posición ha cambiado")
-		4:
 			tecla(KEY_E, true)
-			espera = 2
-		5:
+			return 0.05,
+		func():
 			tecla(KEY_E, false)
-			espera = 40
-		6:
-			captura("03_camara_rotada")
+			return 0.8,
+		func():
+			captura("04_camara_rotada")
 			var p := pos_activa()
-			pos_antes = p
+			memo["pos_antes"] = p
 			dm.call("ProcesarClicEnCasilla", p.x, p.y)
-			espera = 10
-		7:
-			captura("04_menu_tactico")
+			return 0.2,
+		func():
+			captura("05_menu_tactico")
 			check(ui.get_node_or_null("MenuTactico_Instancia") != null, "el menú táctico se abre")
-			dm.call("ProcesarClicEnCasilla", pos_antes.x + 1, pos_antes.y)
-			espera = 5
-		8:
+			var p: Vector2i = memo["pos_antes"]
+			dm.call("ProcesarClicEnCasilla", p.x + 1, p.y)
+			return 0.2,
+		func():
 			check(ui.get_node_or_null("MenuTactico_Instancia") == null, "el clic fuera cierra el menú")
-			check(not dm.get_meta("is_moving", false) and pos_activa() == pos_antes, "y no provoca movimiento")
+			check(not dm.get_meta("is_moving", false) and pos_activa() == memo["pos_antes"], "y no provoca movimiento")
+			# Clic en otro héroe: pasa a ser el activo y su ficha queda fijada
+			var otro: Node = null
+			for h in pm.get_children():
+				if h.name != "DatosEquipo" and h != activo() and not h.get_meta("ha_escapado") and int(h.get_meta("pa_actual")) > 0:
+					otro = h
+					break
+			if otro:
+				var gp: Vector2i = otro.get_meta("grid_pos")
+				dm.call("ProcesarClicEnCasilla", gp.x, gp.y)
+				check(activo() == otro, "clicar a %s en el mapa lo selecciona" % otro.name)
+			return 0.3,
+		func():
+			# Modo OCULTAS: solo queda la ficha fijada
+			ui.call("AlternarModoFichas")
+			var visibles := 0
+			for f in ui.get_node("PanelFichas").get_children():
+				if f.visible:
+					visibles += 1
+			check(visibles == 0, "en modo OCULTAS no se ve ninguna ficha (%d)" % visibles)
+			ui.call("FijarFicha", str(activo().name))
+			return 0.3,
+		func():
+			check(ficha_visible(str(activo().name)), "una ficha fijada se ve en modo OCULTAS")
+			captura("06_fichas_ocultas")
+			ui.call("AlternarModoFichas")
 			dm.call("ToggleModoDebug")
-			espera = 10
-		9:
-			captura("05_debug_mapa_completo")
+			return 0.3,
+		func():
+			captura("07_debug_mapa_completo")
 			var cofres: Array = dm.get_meta("lista_cofres", [])
 			check(cofres.size() > 0, "hay cofres (%d)" % cofres.size())
 			if cofres.size() > 0:
-				var c: Vector2i = cofres[0]
-				check(junto_a(c), "teletransporte junto al cofre %s" % c)
-				dm.call("ProcesarClicEnCasilla", c.x, c.y)
-			espera = 30
-		10:
-			captura("06_cofre_abierto")
+				memo["cofre"] = cofres[0]
+				check(junto_a(cofres[0]), "teletransporte junto al cofre %s" % cofres[0])
+			return 0.6,
+		func():
+			var b := bocadillos(0)
+			check(b.size() > 0, "junto al cofre aparece un bocadillo")
+			if b.size() > 0:
+				check(str(b[0].get_meta("texto")).contains("PA"), "el bocadillo indica el coste: '%s'" % str(b[0].get_meta("texto")).replace("\n", " | "))
+			captura("08_bocadillo_cofre")
+			var c: Vector2i = memo.get("cofre", Vector2i(-1, -1))
+			dm.call("ProcesarClicEnCasilla", c.x, c.y)
+			return 0.6,
+		func():
+			captura("09_cofre_abierto")
 			var enemigos: Array = dm.get_meta("lista_enemigos", [])
 			check(enemigos.size() > 0, "hay enemigos (%d)" % enemigos.size())
 			if enemigos.size() > 0:
 				var e: Vector2i = enemigos[0]
+				memo["enemigo"] = e
 				check(junto_a(e), "teletransporte junto al enemigo %s" % e)
-				var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
-				var hp0: int = nodo.get_meta("hp_actual") if nodo else -1
-				dm.call("ProcesarClicEnCasilla", e.x, e.y)
-				var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) else -999
-				check(hp1 < hp0, "el ataque quita vida (%d -> %d)" % [hp0, hp1])
-			espera = 20
-		11:
-			captura("07_combate")
-			# Todos a la escalera
+			return 0.6,
+		func():
+			var e: Vector2i = memo.get("enemigo", Vector2i(-1, -1))
+			var b := bocadillos(0)
+			var hay_ataque := false
+			for x in b:
+				if str(x.get_meta("texto")).begins_with("Atacar"):
+					hay_ataque = true
+			check(hay_ataque, "junto al enemigo el bocadillo ofrece atacar")
+			check(ficha_visible("Enemigo0"), "la ficha del enemigo en pantalla se ve")
+			captura("10_bocadillo_enemigo")
+			var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
+			var hp0: int = nodo.get_meta("hp_actual") if nodo else -1
+			dm.call("ProcesarClicEnCasilla", e.x, e.y)
+			var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) else -999
+			check(hp1 < hp0, "el ataque quita vida (%d -> %d)" % [hp0, hp1])
+			return 0.7,
+		func():
+			captura("11_combate")
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			for i in 6:
-				var a := activo()
-				if a == null:
+				if activo() == null:
 					break
 				dm.call("TeletransporteDebug", salida.x, salida.y)
-			espera = 30
-		12:
-			var fogata := root.get_node("Main/CanvasLayer3")
-			check(fogata.visible, "al escapar todos aparece la fogata")
-			captura("08_fogata")
+			return 0.6,
+		func():
+			check(root.get_node("Main/CanvasLayer3").visible, "al escapar todos aparece la fogata")
+			captura("12_fogata")
 			ui.call("DescansarYContinuar")
-			espera = 60
-		13:
-			captura("09_piso_2")
+			return 1.0,
+		func():
+			captura("13_piso_2")
 			check(int(pm.get_meta("piso_actual")) == 2, "estamos en el piso 2")
 			check(activo() != null, "hay personaje activo en el piso 2")
 			var inicio: Vector2i = dm.get_meta("casilla_inicio")
@@ -172,61 +247,73 @@ func _process(_delta):
 				var gp: Vector2i = h.get_meta("grid_pos")
 				check(abs(gp.x - inicio.x) + abs(gp.y - inicio.y) <= 3, "%s aparece junto al inicio %s (está en %s)" % [h.name, inicio, gp])
 			dm.call("ToggleModoDebug")
-			espera = 20
-		14:
-			captura("10_piso_2_niebla")
-			# Picking: llevamos el ratón real a la casilla vecina del héroe y miramos dónde cae el cursor 3D
+			return 3.0, # la cámara se desliza hasta el nuevo héroe activo
+		func():
+			# Picking: proyectamos una casilla a píxeles del SubViewport y lanzamos el mismo rayo
+			# contra el suelo que usa el InputManager (con h_offset incluido); debe volver a la misma casilla
 			var cam: Camera3D = dm.get_node("Camera3D")
-			var cont: SubViewportContainer = root.get_node("Main/ContenedorMapa")
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
+			var ok := alc.size() >= 2
+			for i in range(0, alc.size(), 2):
+				var c := Vector2i(alc[i], alc[i + 1])
+				var p_sub := cam.unproject_position(Vector3(c.x + 0.5, 0, c.y + 0.5))
+				var o := cam.project_ray_origin(p_sub)
+				var d := cam.project_ray_normal(p_sub)
+				var hit := o + d * (-o.y / d.y)
+				if Vector2i(floori(hit.x), floori(hit.z)) != c:
+					ok = false
+			check(ok, "el rayo de picking devuelve la casilla correcta en todo el alcance (%d casillas)" % (alc.size() / 2))
 			if alc.size() >= 2:
-				objetivo_pick = Vector2i(alc[0], alc[1])
-				var p_sub := cam.unproject_position(Vector3(objetivo_pick.x + 0.5, 0, objetivo_pick.y + 0.5))
-				var p_canvas := cont.global_position + p_sub * cont.stretch_shrink
-				var p_ventana: Vector2 = root.get_final_transform() * p_canvas
-				Input.warp_mouse(p_ventana)
-			espera = 10
-		15:
-			var cursor: Node3D = dm.get_node("DungeonRenderer/Cursor")
-			var celda := Vector2i(floori(cursor.position.x), floori(cursor.position.z))
-			check(cursor.visible and celda == objetivo_pick, "el ratón sobre %s marca la casilla %s" % [objetivo_pick, celda])
-			captura("11_hover")
+				dm.call("ActualizarHover", alc[0], alc[1])
+			return 0.3,
+		func():
+			captura("14_hover_piso2")
 			for i in 8:
-				var ev := InputEventMouseButton.new()
-				ev.button_index = MOUSE_BUTTON_WHEEL_DOWN
-				ev.pressed = true
-				Input.parse_input_event(ev)
-			paso_zoom = 0
-		16:
-			# Alejamos la cámara (una rueda por frame) para ver la niebla de guerra entera
-			paso_zoom += 1
-			var ev := InputEventMouseButton.new()
-			ev.button_index = MOUSE_BUTTON_WHEEL_DOWN
-			ev.pressed = paso_zoom % 2 == 1
-			Input.parse_input_event(ev)
-			if paso_zoom < 24:
-				paso -= 1
-			else:
-				espera = 40
-		17:
-			captura("12_niebla_lejos")
-			# Evento: lanzamos una trampa directamente sobre el héroe activo
+				rueda(true)
+			return 0.1,
+		func():
+			for i in 8:
+				rueda(true)
+			return 1.0,
+		func():
+			captura("15_niebla_lejos")
 			var p := pos_activa()
 			dm.get_node("EventManager").call("Interactuar", p.x, p.y, "TRAMPA", "res://Data/Events/Roca.tres")
 			check(dm.get_meta("bloqueo_evento", false), "el evento bloquea el tablero")
-			espera = 400
-		18:
-			var pantalla: Control = root.get_node("Main/CanvasLayer2/PantallaEvento")
-			check(pantalla.visible, "la pantalla de evento aparece")
-			captura("13_evento")
+			check(bocadillos(0).is_empty(), "durante el evento no hay bocadillos")
+			return 2.0,
+		func():
+			check(root.get_node("Main/CanvasLayer2/PantallaEvento").visible, "la pantalla de evento aparece")
+			captura("16_evento")
 			ui.call("ResolverOpcion", 0)
-			espera = 900
-		19:
-			captura("14_evento_resuelto")
+			return 4.0,
+		func():
+			captura("17_evento_resuelto")
 			ui.call("CerrarEvento")
-			espera = 40
-		20:
+			return 0.8,
+		func():
 			check(not dm.get_meta("bloqueo_evento", false), "al cerrar el evento el tablero se desbloquea")
-			print("[test] RESULTADO: ", "TODO OK" if fallos.is_empty() else "%d FALLOS: %s" % [fallos.size(), fallos])
-			quit(0 if fallos.is_empty() else 1)
+			return 0.0,
+	]
+
+func _process(_delta):
+	if dm == null:
+		dm = root.get_node_or_null("Main/ContenedorMapa/SubViewport/DungeonManager")
+		pm = root.get_node_or_null("Main/PartyManager")
+		ui = root.get_node_or_null("Main/CanvasLayer")
+		espera_hasta = ahora() + 1.0
+		return false
+	if ahora() < espera_hasta:
+		return false
+	# Los pasos de movimiento esperan a que termine el tween (los eventos se gestionan aparte)
+	if dm.get_meta("is_moving", false):
+		return false
+
+	indice += 1
+	if indice >= pasos.size():
+		print("[test] RESULTADO: ", "TODO OK" if fallos.is_empty() else "%d FALLOS: %s" % [fallos.size(), fallos])
+		quit(0 if fallos.is_empty() else 1)
+		return false
+	var segundos: float = pasos[indice].call()
+	espera_hasta = ahora() + segundos
 	return false

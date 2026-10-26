@@ -90,7 +90,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 			dungeon->call("ApagarLucesMapa");
 
 			Label* texto = memnew(Label);
-			texto->set_text(tipo == "TRAMPA" ? "¡TRAMPA!" : "EVENTO");
+			texto->set_text(tipo == "TRAMPA" ? String::utf8("\xC2\xA1TRAMPA!") : String("EVENTO"));
 			texto->add_theme_font_size_override("font_size", 120);
 			texto->add_theme_color_override("font_color", Color(1.0, 0.1, 0.1));
 			texto->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
