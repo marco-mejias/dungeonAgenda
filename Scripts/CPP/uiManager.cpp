@@ -48,7 +48,6 @@ namespace {
 
 JENOVA_SCRIPT_BEGIN
 
-// DECLARACIONES PREVIAS (Para poder llamarlas directamente en C++)
 void ActualizarStatsUI(Caller* instance);
 void ActualizarMarcadorTurno(Caller* instance);
 void UpdateWarriorUI(Caller* instance);
@@ -164,22 +163,23 @@ void DescansarYContinuar(Caller* instance) {
 				child->set_meta("hp_actual", UtilityFunctions::min(max_hp, current_hp + 10));
 				
 				if (!(bool)child->get_meta("esta_muerto")) {
-					int current_hunger = child->has_meta("hambre_actual")  ? (int)child->get_meta("hambre_actual")  : 7;
+					int current_hunger = child->has_meta("hambre_actual")  ? (int)child->get_meta("hambre_actual")  : 10;
 					int current_sanity = child->has_meta("sanidad_actual") ? (int)child->get_meta("sanidad_actual") : 100;
 					
-					child->set_meta("hambre_actual", UtilityFunctions::min(7, current_hunger + 3));
+					child->set_meta("hambre_actual", UtilityFunctions::min(10, current_hunger + 3));
 					child->set_meta("sanidad_actual", UtilityFunctions::min(100, current_sanity + 50));
 				}
 			}
 		}
 	}
+	
 
-	// LLAMADAS DIRECTAS EN C++ (Adiós bugs)
+	// LLAMADAS DIRECTAS EN C++
 	ActualizarMarcadorTurno(instance);
 	ActualizarStatsUI(instance);
 	UpdateWarriorUI(instance);
 
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
+	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 	if (dungeon) {
 		dungeon->call("AvanzarAlSiguientePiso");
 	}
@@ -189,7 +189,7 @@ void DebugForzarSalida(Caller* instance) {
 	if (!self) return;
 	
 	Node* pm = GetPartyManager();
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
+	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 
 	if (!pm || !dungeon) return;
 
@@ -263,14 +263,26 @@ void UpdateWarriorUI(Caller* instance) {
 		int max_slots = p->has_meta("max_slots") ? (int)p->get_meta("max_slots") : 3;
 		TypedArray<Resource> inventory = p->has_meta("items_lista") ? (TypedArray<Resource>)p->get_meta("items_lista") : TypedArray<Resource>();
 
+		// 1. DEFINIMOS LAS RUTAS EXACTAS BASADAS EN TU ÁRBOL
 		String gold_path = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/Oro";
 		String food_path = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/Comida";
+		String pa_path   = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/PA"; // <-- Ruta corregida
 		
+		// 2. ACTUALIZAMOS EL ORO
 		Label* lbl_gold = Object::cast_to<Label>(self->get_node_or_null(NodePath(gold_path)));
 		if (lbl_gold) lbl_gold->set_text("Gold: " + String::num(gold));
 		
+		// 3. ACTUALIZAMOS LA COMIDA
 		Label* lbl_food = Object::cast_to<Label>(self->get_node_or_null(NodePath(food_path)));
 		if (lbl_food) lbl_food->set_text("Food: " + String::num(food));
+
+		// 4. ACTUALIZAMOS TUS PUNTOS DE ACCIÓN (PA) VISIBLES PERMANENTEMENTE
+		Label* lbl_pa = Object::cast_to<Label>(self->get_node_or_null(NodePath(pa_path)));
+		if (lbl_pa) {
+			int pa_act = p->has_meta("pa_actual") ? (int)p->get_meta("pa_actual") : 0;
+			int pa_max = p->has_meta("pa_max")    ? (int)p->get_meta("pa_max")    : 0;
+			lbl_pa->set_text("PA: " + String::num_int64(pa_act) + " / " + String::num_int64(pa_max));
+		}
 
 		for (int s = 1; s <= 4; s++) {
 			String slot_path = base_path + "/MarginContainer/VBoxContainer/Inventario/SlotsItems/Slot" + String::num_int64(s);
@@ -339,7 +351,7 @@ void InicializarTodaLaUI(Caller* instance) {
 			hp_bar->set_max((int)p->get_meta("hp_max"));
 			hp_bar->set_value((int)p->get_meta("hp_actual"));
 		}
-		if (hunger_bar) { hunger_bar->set_max(7); hunger_bar->set_value(7); }
+		if (hunger_bar) { hunger_bar->set_max(10); hunger_bar->set_value(10); }
 		if (sanity_bar) { sanity_bar->set_max(100); sanity_bar->set_value(100); }
 		
 		if (stats_label) stats_label->set_text(GenerarTextoStats(p));
@@ -364,14 +376,20 @@ void InicializarTodaLaUI(Caller* instance) {
 void SeleccionarPersonajeDesdeUI(Caller* instance, String nombre) {
 	if (!self) return;
 
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
+	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 	if (dungeon && dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving")) {
+		Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+		if (audio) audio->call("play_ui", "no");
 		return;
 	}
 
 	Node* pm = GetPartyManager();
 	if (!pm) return;
 	
+	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+	if (audio) audio->call("play_ui", "clic");
+	
+	// 1. Cambiamos el personaje activo en la lógica del juego
 	pm->call("CambiarPersonajeActivo", nombre);
 }
 
@@ -380,6 +398,8 @@ void MostrarStats(Caller* instance, String nombre) {
 	Control* stats_box = Object::cast_to<Control>(self->get_node_or_null("GridContainer/" + nombre + "/MarginContainer/VBoxContainer/Stats_Box"));
 	if (stats_box) {
 		stats_box->set_visible(true);
+		Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+		if (audio) audio->call("play_ui", "open");
 		Ref<Tween> tween = stats_box->create_tween();
 		tween->tween_property(stats_box, "custom_minimum_size", Vector2(0, 140), 0.2)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_OUT);
 	}
@@ -390,6 +410,8 @@ void OcultarStats(Caller* instance, String nombre) {
 	Control* stats_box = Object::cast_to<Control>(self->get_node_or_null("GridContainer/" + nombre + "/MarginContainer/VBoxContainer/Stats_Box"));
 	if (stats_box) {
 		Ref<Tween> tween = stats_box->create_tween();
+		//Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+		//if (audio) audio->call("play_ui", "no");
 		tween->tween_property(stats_box, "custom_minimum_size", Vector2(0, 0), 0.15)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_OUT);
 		tween->connect("finished", Callable(stats_box, StringName("hide")));
 	}
@@ -408,10 +430,16 @@ void CerrarEvento(Caller* instance) {
 	tween->tween_property(m_event_screen, "position", Vector2(628, screen_height), 0.4)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_IN);
 	tween->connect("finished", Callable(m_event_screen, StringName("hide")));
 	
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
-	if (dungeon) {
-		dungeon->call("BajarMapa");
-		dungeon->call("FinalizarEvento");
+	// Fusión del MODO DIOS con el truco Anti-Errores de C++
+	Node* root_node = self->get_node_or_null(NodePath("/root"));
+	if (root_node) {
+		Node* dungeon = root_node->find_child("DungeonManager", true, false);
+		if (dungeon) {
+			dungeon->call("BajarMapa");
+			dungeon->call("FinalizarEvento");
+		} else {
+			godot::UtilityFunctions::print("[ERROR] No se encontró el DungeonManager al cerrar.");
+		}
 	}
 }
 
@@ -458,11 +486,17 @@ void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {
 // ¡AQUÍ ESTÁ EL Caller* instance QUE FALTABA!
 void MostrarNumeroDado(Caller* instance, int roll, bool success) { 
 	if (!self || !m_event_screen) return;
-
+	
+	// Justo antes de cambiar el texto de success
+	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+	if (audio) audio->call("play_sfx", success ? "success" : "fail");
+		
 	RichTextLabel* story_text = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
 	if (story_text) {
+		
 		String color = success ? "[color=green]" : "[color=red]";
 		String result_txt = "[center]Roll Result:\n\n" + color + "[b][font_size=50]" + String::num_int64(roll) + "[/font_size][/b][/color][/center]";
+
 		story_text->set_text(result_txt);
 	}
 }
@@ -514,23 +548,36 @@ void ResolverOpcion(Caller* instance, int option_index) {
 }
 
 void MostrarEventoVisual(Caller* instance, Variant event_data) {
-	if (!self || !m_event_screen) return;
+	if (!self) return;
+
+	// === SALVAVIDAS ANTI-PANTALLAS INVISIBLES ===
+	Node* main_node = self->get_parent();
+	if (main_node) {
+		// Forzamos que la capa 2 esté visible (por si la ocultaste en el editor)
+		CanvasLayer* capa_eventos = Object::cast_to<CanvasLayer>(main_node->get_node_or_null("CanvasLayer2"));
+		if (capa_eventos) capa_eventos->set_visible(true);
+		
+		// Obligamos a buscar la pantalla ahora, no en el Awake
+		m_event_screen = Object::cast_to<Control>(main_node->get_node_or_null("CanvasLayer2/PantallaEvento"));
+	}
+
+	if (!m_event_screen) {
+		godot::UtilityFunctions::print("[ERROR GRAVE] ¡El código no encuentra CanvasLayer2/PantallaEvento! Revisa los nombres en el árbol.");
+		return;
+	}
+	// ============================================
 
 	Ref<Resource> res = event_data;
 	if (res.is_null()) return;
 
 	self->set_meta("evento_actual", res);
-
-	Node* pm = GetPartyManager();
-	if (pm) {
-		Node* hero = Object::cast_to<Node>(pm->call("GetActiveCharacter")); 
-		if (hero) self->set_meta("heroe_en_peligro", hero);
-	}
-
+	
 	String title = res->get("titulo");
 	String desc  = res->get("descripcion");
 	Array options = res->get("opciones");
 	Ref<Texture2D> img = res->get("ilustracion"); 
+
+	// ... [EL RESTO DE TU FUNCIÓN SIGUE IGUAL DESDE AQUÍ] ...
 
 	Label* l_title           = Object::cast_to<Label>(m_event_screen->get_node_or_null("Titulo"));
 	RichTextLabel* l_story   = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
@@ -585,14 +632,23 @@ void MostrarEventoVisual(Caller* instance, Variant event_data) {
 	m_event_screen->set_position(Vector2(628, screen_height)); 
 	m_event_screen->set_visible(true);
 
-	Node* dungeon = self->get_parent()->get_node_or_null("DungeonManager");
-	if (dungeon) dungeon->call("SubirMapa");
-
+	// Fusión del MODO DIOS con el truco Anti-Errores de C++
+	Node* root_node = self->get_node_or_null(NodePath("/root"));
+	if (root_node) {
+		Node* dungeon = root_node->find_child("DungeonManager", true, false);
+		if (dungeon) {
+			dungeon->call("SubirMapa");
+		} else {
+			godot::UtilityFunctions::print("[ERROR] No se encontró el DungeonManager al abrir.");
+		}
+	}
+	
 	Ref<Tween> tween = m_event_screen->create_tween();
 	tween->tween_property(m_event_screen, "position", Vector2(628, 0), 0.5)
 		 ->set_trans(Tween::TRANS_CUBIC)
 		 ->set_ease(Tween::EASE_OUT);
 }
+
 
 // ==========================================
 // STARTUP FUNCTIONS

@@ -31,4 +31,5 @@ titulo = "Culto de Ermitaños"
 descripcion = "Te encuentras unos pequeños ermitaños con sombreros puntiagudos: Demuestranos tu poder! Estan pirados pero...creo que seran peores si no les haces caso..."
 ilustracion = ExtResource("1_7f2yx")
 opciones = Array[ExtResource("2_cm4am")]([SubResource("Resource_7f2yx"), SubResource("Resource_cm4am")])
+gatillo = 1
 metadata/_custom_type_script = "uid://bov68belyjx5p"

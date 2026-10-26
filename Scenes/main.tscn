@@ -4,13 +4,20 @@
 [ext_resource type="Script" uid="uid://la3o4sxf6mh4" path="res://Scripts/CPP/DungeonManager.cpp" id="2_k12tt"]
 [ext_resource type="Texture2D" uid="uid://ciu6t8viq5o13" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_fdnlq"]
 [ext_resource type="Script" uid="uid://dtxk5rqpb7bm1" path="res://Scripts/CPP/partyManager.cpp" id="4_b3802"]
+[ext_resource type="Texture2D" uid="uid://7drpoqa787l2" path="res://Assets/Fog Tiles/Fog.png" id="4_wsu2k"]
 [ext_resource type="Script" uid="uid://de8lgwkdug0rx" path="res://Scripts/GDD/DatosEquipo.gd" id="5_fevyy"]
+[ext_resource type="Script" uid="uid://dnsf46hnyb1lb" path="res://Scenes/CameraManager.cpp" id="5_wsu2k"]
 [ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="6_hibaj"]
+[ext_resource type="Script" uid="uid://bgv3emcuuphrg" path="res://Scenes/InputManager.cpp" id="6_k12tt"]
+[ext_resource type="Script" uid="uid://bgb0t74h04hb" path="res://Scenes/PathManager.cpp" id="7_h1bgf"]
 [ext_resource type="Resource" uid="uid://dpjvahg3x1p0d" path="res://Data/PlayableCharacters/Mago.tres" id="7_pdsj5"]
+[ext_resource type="Script" uid="uid://bikh0nasayb2m" path="res://Scenes/EventManager.cpp" id="8_b3802"]
 [ext_resource type="Resource" uid="uid://cvecxbbwbtevl" path="res://Data/PlayableCharacters/Caballero.tres" id="8_ee4r6"]
+[ext_resource type="Script" uid="uid://b6qfmey87hhtp" path="res://Scenes/CombatManager.cpp" id="9_fevyy"]
 [ext_resource type="Resource" uid="uid://s4i7lq5fxfh1" path="res://Data/PlayableCharacters/Tanque.tres" id="9_gt3je"]
 [ext_resource type="Resource" uid="uid://crhb6huofdd27" path="res://Data/PlayableCharacters/Ladron.tres" id="10_3pmx8"]
 [ext_resource type="Script" uid="uid://dktucv2r4gkux" path="res://Scripts/CPP/uiManager.cpp" id="11_u50mg"]
+[ext_resource type="Script" uid="uid://b4vve4f3yd8c2" path="res://Scripts/GDD/menu_pausa.gd" id="14_jkdf5"]
 [ext_resource type="PackedScene" uid="uid://bxvhm84mm1aa3" path="res://Scenes/ficha_heroe.tscn" id="17_h1bgf"]
 
 [sub_resource type="OccluderPolygon2D" id="OccluderPolygon2D_fdnlq"]
@@ -164,11 +171,127 @@ custom_data_layer_0/name = "evento"
 custom_data_layer_0/type = 1
 sources/1 = SubResource("TileSetAtlasSource_jkdf5")
 
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_k12tt"]
+texture = ExtResource("4_wsu2k")
+separation = Vector2i(1, 1)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+6:0/0 = 0
+7:0/0 = 0
+0:1/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+4:1/0 = 0
+5:1/0 = 0
+6:1/0 = 0
+7:1/0 = 0
+0:2/0 = 0
+1:2/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+4:2/0 = 0
+5:2/0 = 0
+6:2/0 = 0
+7:2/0 = 0
+0:3/0 = 0
+1:3/0 = 0
+2:3/0 = 0
+3:3/0 = 0
+4:3/0 = 0
+5:3/0 = 0
+6:3/0 = 0
+7:3/0 = 0
+0:4/0 = 0
+1:4/0 = 0
+2:4/0 = 0
+3:4/0 = 0
+4:4/0 = 0
+5:4/0 = 0
+6:4/0 = 0
+7:4/0 = 0
+0:5/0 = 0
+1:5/0 = 0
+2:5/0 = 0
+3:5/0 = 0
+4:5/0 = 0
+5:5/0 = 0
+6:5/0 = 0
+7:5/0 = 0
+0:6/0 = 0
+1:6/0 = 0
+2:6/0 = 0
+3:6/0 = 0
+4:6/0 = 0
+5:6/0 = 0
+6:6/0 = 0
+7:6/0 = 0
+0:7/0 = 0
+1:7/0 = 0
+2:7/0 = 0
+3:7/0 = 0
+4:7/0 = 0
+5:7/0 = 0
+6:7/0 = 0
+7:7/0 = 0
+0:8/0 = 0
+1:8/0 = 0
+2:8/0 = 0
+3:8/0 = 0
+4:8/0 = 0
+5:8/0 = 0
+6:8/0 = 0
+7:8/0 = 0
+0:9/0 = 0
+1:9/0 = 0
+2:9/0 = 0
+3:9/0 = 0
+4:9/0 = 0
+5:9/0 = 0
+6:9/0 = 0
+7:9/0 = 0
+0:10/0 = 0
+1:10/0 = 0
+2:10/0 = 0
+3:10/0 = 0
+4:10/0 = 0
+5:10/0 = 0
+6:10/0 = 0
+7:10/0 = 0
+0:11/0 = 0
+1:11/0 = 0
+2:11/0 = 0
+3:11/0 = 0
+4:11/0 = 0
+5:11/0 = 0
+6:11/0 = 0
+7:11/0 = 0
+0:12/0 = 0
+1:12/0 = 0
+2:12/0 = 0
+3:12/0 = 0
+4:12/0 = 0
+5:12/0 = 0
+6:12/0 = 0
+7:12/0 = 0
+0:13/0 = 0
+1:13/0 = 0
+2:13/0 = 0
+3:13/0 = 0
+4:13/0 = 0
+5:13/0 = 0
+6:13/0 = 0
+7:13/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_h1bgf"]
+sources/0 = SubResource("TileSetAtlasSource_k12tt")
+
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fdnlq"]
 blend_mode = 3
-light_mode = 1
-
-[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_jkdf5"]
 light_mode = 1
 
 [sub_resource type="Environment" id="Environment_fdnlq"]
@@ -178,31 +301,86 @@ glow_enabled = true
 glow_intensity = 0.49
 glow_bloom = 0.15
 
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_jkdf5"]
+light_mode = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fdnlq"]
+bg_color = Color(0.09803922, 0.09803922, 0.09803922, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jkdf5"]
+bg_color = Color(0.09803922, 0.09803922, 0.09803922, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_detail = 1
+
 [node name="Main" type="Node2D" unique_id=740303934]
 script = ExtResource("1_wsu2k")
 
-[node name="DungeonManager" type="Node2D" parent="." unique_id=1496626110]
-position = Vector2(650, 100)
-scale = Vector2(2, 2)
+[node name="ContenedorMapa" type="SubViewportContainer" parent="." unique_id=197274589]
+texture_filter = 1
+clip_contents = true
+offset_left = 578.94
+offset_top = 60.155
+offset_right = 1108.94
+offset_bottom = 590.155
+focus_mode = 2
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="ContenedorMapa" unique_id=1943966382]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(529, 530)
+render_target_update_mode = 4
+
+[node name="DungeonManager" type="Node2D" parent="ContenedorMapa/SubViewport" unique_id=1496626110]
 script = ExtResource("2_k12tt")
 
-[node name="Niebla" type="TileMapLayer" parent="DungeonManager" unique_id=582833251]
+[node name="Niebla" type="TileMapLayer" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=582833251]
 visible = false
 z_index = 1
 scale = Vector2(1.0000002, 1.0000002)
 tile_set = SubResource("TileSet_kek77")
 
-[node name="Tablero" type="TileMapLayer" parent="DungeonManager" unique_id=856094185]
+[node name="Tablero" type="TileMapLayer" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=856094185]
 z_index = -1
 texture_filter = 1
 tile_set = SubResource("TileSet_kek77")
 
-[node name="PathLine" type="Line2D" parent="DungeonManager" unique_id=723881103]
-width = 5.0
-default_color = Color(1.8770993e-06, 0.52651983, 0.4475832, 1)
+[node name="PathLine" type="Line2D" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=723881103]
+z_index = 1
+width = 3.0
+default_color = Color(0, 0.5254902, 0.44705883, 0.5764706)
 joint_mode = 2
 begin_cap_mode = 2
 end_cap_mode = 2
+
+[node name="CapaNiebla" type="TileMapLayer" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=916487623]
+visible = false
+tile_set = SubResource("TileSet_h1bgf")
+
+[node name="Camera2D" type="Camera2D" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=314762132]
+zoom = Vector2(4, 4)
+position_smoothing_enabled = true
+position_smoothing_speed = 2.0
+script = ExtResource("5_wsu2k")
+
+[node name="HighlightLayer" type="TileMapLayer" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=476369831]
+modulate = Color(0.88235295, 0.627451, 0, 0.4)
+tile_set = SubResource("TileSet_kek77")
+
+[node name="InputManager" type="Node" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=1151518020]
+script = ExtResource("6_k12tt")
+
+[node name="PathManager" type="Node" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=2033969034]
+script = ExtResource("7_h1bgf")
+
+[node name="EventManager" type="Node" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=288056536]
+script = ExtResource("8_b3802")
+
+[node name="CombatManager" type="Node" parent="ContenedorMapa/SubViewport/DungeonManager" unique_id=289432475]
+script = ExtResource("9_fevyy")
 
 [node name="PartyManager" type="Node" parent="." unique_id=1742771196]
 script = ExtResource("4_b3802")
@@ -262,9 +440,9 @@ text = "grupo descansa en la fogata"
 
 [node name="CanvasLayer2" type="CanvasLayer" parent="." unique_id=1672923392]
 layer = 4
+visible = false
 
 [node name="PantallaEvento" type="Panel" parent="CanvasLayer2" unique_id=1922194707]
-visible = false
 self_modulate = Color(0, 0, 0, 1)
 visibility_layer = 31
 z_index = 14
@@ -278,9 +456,9 @@ offset_left = 0.15997314
 offset_top = -3.888
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="ColorRect" type="ColorRect" parent="CanvasLayer2/PantallaEvento" unique_id=1836872070]
-visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -288,6 +466,7 @@ anchor_bottom = 1.0
 offset_right = 4.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0, 0, 0, 1)
 
 [node name="Titulo" type="Label" parent="CanvasLayer2/PantallaEvento" unique_id=826220811]
@@ -371,17 +550,24 @@ offset_right = 229.0
 grow_vertical = 0
 text = "Debug: bajar todos de piso"
 
-[node name="CanvasModulate" type="CanvasModulate" parent="." unique_id=1357141214]
+[node name="CanvasFondo" type="CanvasLayer" parent="." unique_id=531598387]
+layer = -3
+
+[node name="CanvasModulate" type="CanvasModulate" parent="CanvasFondo" unique_id=1357141214]
 visible = false
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=961355005]
+[node name="ColorRect2" type="ColorRect" parent="CanvasFondo" unique_id=2084228734]
 z_index = -20
 material = SubResource("CanvasItemMaterial_fdnlq")
 offset_right = 1152.0
 offset_bottom = 648.0
+mouse_filter = 2
 color = Color(0.4045111, 0.40451115, 0.4045111, 1)
 
-[node name="CPUParticles2D" type="CPUParticles2D" parent="." unique_id=474401237]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="CanvasFondo" unique_id=3294809]
+environment = SubResource("Environment_fdnlq")
+
+[node name="CPUParticles2D" type="CPUParticles2D" parent="CanvasFondo" unique_id=474401237]
 material = SubResource("CanvasItemMaterial_jkdf5")
 position = Vector2(568, 344)
 amount = 50
@@ -394,12 +580,84 @@ initial_velocity_max = 17.01
 angular_velocity_min = -11.8
 angular_velocity_max = -11.8
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=3294809]
-environment = SubResource("Environment_fdnlq")
-
-[node name="ColorRect2" type="ColorRect" parent="." unique_id=2084228734]
+[node name="ColorRect" type="ColorRect" parent="CanvasFondo" unique_id=961355005]
 z_index = -20
 material = SubResource("CanvasItemMaterial_fdnlq")
 offset_right = 1152.0
 offset_bottom = 648.0
+mouse_filter = 2
 color = Color(0.4045111, 0.40451115, 0.4045111, 1)
+
+[node name="CanvasMenuPausa" type="CanvasLayer" parent="." unique_id=81272121]
+process_mode = 3
+script = ExtResource("14_jkdf5")
+
+[node name="ColorRect" type="ColorRect" parent="CanvasMenuPausa" unique_id=238369127]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0)
+
+[node name="PanelOpciones" type="Panel" parent="CanvasMenuPausa/ColorRect" unique_id=746119189]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasMenuPausa/ColorRect/PanelOpciones" unique_id=1778706349]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -67.0
+offset_top = -105.5
+offset_right = 67.0
+offset_bottom = 105.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=423914022]
+layout_mode = 2
+text = "OPTIONS
+"
+horizontal_alignment = 1
+
+[node name="Label2" type="Label" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=260392548]
+layout_mode = 2
+text = "MUSIC VOLUME"
+
+[node name="SliderMusica" type="HSlider" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=580463072]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="Label3" type="Label" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=510108150]
+layout_mode = 2
+text = "SFX VOLUME"
+
+[node name="SliderSFX" type="HSlider" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=763200887]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="BtnVolver" type="Button" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=1298233690]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_fdnlq")
+theme_override_styles/hover = SubResource("StyleBoxFlat_jkdf5")
+text = "RETURN"
+
+[connection signal="value_changed" from="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer/SliderMusica" to="CanvasMenuPausa" method="_on_slider_musica_value_changed"]
+[connection signal="value_changed" from="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer/SliderSFX" to="CanvasMenuPausa" method="_on_slider_sfx_value_changed"]
+[connection signal="mouse_entered" from="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer/BtnVolver" to="CanvasMenuPausa" method="_on_return_mouse_entered"]
+[connection signal="pressed" from="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer/BtnVolver" to="CanvasMenuPausa" method="_on_return_pressed"]

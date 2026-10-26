@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://crb7igljigebl"]
+
+[ext_resource type="Texture2D" uid="uid://caovj8m6rgokw" path="res://Assets/warrior.png" id="1_m1htj"]
+
+[node name="EnemyBase" type="Node2D" unique_id=1699301883]
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1853826581]
+scale = Vector2(0.005, 0.005)
+texture = ExtResource("1_m1htj")
