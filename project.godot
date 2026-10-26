@@ -19,6 +19,7 @@ config/icon="res://Assets/icon.svg"
 [autoload]
 
 AudioManager="*uid://7alit7602tr"
+Feel="*res://Scripts/GDD/feel.gd"
 
 [display]
 

@@ -115,6 +115,8 @@ func _definir_pasos():
 				if abs(c.x - p.x) + abs(c.y - p.y) > abs(mejor.x - p.x) + abs(mejor.y - p.y):
 					mejor = c
 			memo["destino"] = mejor
+			# El ratón real (si alguien lo mueve) no debe pisar el hover simulado
+			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_DISABLED
 			dm.call("ActualizarHover", mejor.x, mejor.y)
 			return 0.3,
 		func():
@@ -129,6 +131,7 @@ func _definir_pasos():
 			memo["pos_antes"] = pos_activa()
 			dm.call("ProcesarClicEnCasilla", mejor.x, mejor.y)
 			check(dm.get_meta("is_moving", false), "empieza a moverse")
+			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_INHERIT
 			return 2.0,
 		func():
 			captura("03_tras_mover")
@@ -147,7 +150,11 @@ func _definir_pasos():
 			return 0.2,
 		func():
 			captura("05_menu_tactico")
-			check(ui.get_node_or_null("MenuTactico_Instancia") != null, "el menú táctico se abre")
+			var menu = ui.get_node_or_null("MenuTactico_Instancia")
+			check(menu != null, "el menú táctico se abre")
+			if menu:
+				check(menu.filas.size() == 3, "el menú tiene sus tres acciones")
+				check(menu.filas["habilidad"].disabled, "habilidades aparece deshabilitado")
 			var p: Vector2i = memo["pos_antes"]
 			dm.call("ProcesarClicEnCasilla", p.x + 1, p.y)
 			return 0.2,
@@ -246,14 +253,31 @@ func _definir_pasos():
 					hay_ataque = true
 			check(hay_ataque, "junto al enemigo el bocadillo ofrece atacar")
 			check(ficha_visible("Enemigo0"), "la ficha del enemigo en pantalla se ve")
+			# Tarjeta de previsión al pasar sobre el enemigo
+			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_DISABLED
+			dm.call("ActualizarHover", e.x, e.y)
+			return 0.2,
+		func():
+			var e: Vector2i = memo.get("enemigo", Vector2i(-1, -1))
+			var prev: Control = ui.get_node("Prevision")
+			check(prev.visible, "al pasar sobre el enemigo sale la tarjeta de previsión")
+			check(int(dm.call("TipoCursor", e.x, e.y)) == 2, "el cursor sobre un enemigo es la espada")
 			captura("10_bocadillo_enemigo")
 			var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
-			var hp0: int = nodo.get_meta("hp_actual") if nodo else -1
+			memo["hp0"] = int(nodo.get_meta("hp_actual")) if nodo else -1
+			memo["nodo"] = nodo
 			dm.call("ProcesarClicEnCasilla", e.x, e.y)
-			var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) else -999
-			check(hp1 < hp0, "el ataque quita vida (%d -> %d)" % [hp0, hp1])
-			return 0.7,
+			check(dm.get_meta("is_moving", false), "el ataque es una secuencia animada (tablero bloqueado)")
+			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_INHERIT
+			return 0.12,
 		func():
+			captura("10b_impacto")
+			return 1.4,
+		func():
+			var nodo = memo.get("nodo")
+			var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) and not str(nodo.name).ends_with("_muerto") else -999
+			check(hp1 < int(memo["hp0"]), "el ataque quita vida (%d -> %d)" % [memo["hp0"], hp1])
+			check(not dm.get_meta("is_moving", false), "al acabar la secuencia el tablero se desbloquea")
 			captura("11_combate")
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			for i in 6:
@@ -328,6 +352,11 @@ func _definir_pasos():
 			check(root.get_node("Main/CanvasLayer2/PantallaEvento").visible, "la pantalla de evento aparece")
 			captura("16_evento")
 			ui.call("ResolverOpcion", 0)
+			memo["dado_t"] = ahora()
+			return 0.6,
+		func():
+			check(root.get_node("Main/CanvasLayer2/PantallaEvento/Dado").visible, "durante la tirada se ve el dado 3D")
+			captura("16b_dado_rodando")
 			return 4.0,
 		func():
 			captura("17_evento_resuelto")
@@ -336,7 +365,7 @@ func _definir_pasos():
 		func():
 			check(not dm.get_meta("bloqueo_evento", false), "al cerrar el evento el tablero se desbloquea")
 			# Minimapa: algo explorado tiene que estar pintado
-			var mapa: TextureRect = ui.get_node("Minimapa/Mapa")
+			var mapa: TextureRect = ui.get_node("Minimapa/Mascara/Mapa")
 			var img := mapa.texture.get_image()
 			var pintados := 0
 			for x in img.get_width():

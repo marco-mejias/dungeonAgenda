@@ -20,6 +20,11 @@
 #include <Godot/classes/image.hpp>
 #include <Godot/classes/image_texture.hpp>
 #include <Godot/classes/omni_light3d.hpp>
+#include <Godot/classes/directional_light3d.hpp>
+#include <Godot/classes/cpu_particles3d.hpp>
+#include <Godot/classes/quad_mesh.hpp>
+#include <Godot/classes/plane_mesh.hpp>
+#include <Godot/classes/gradient.hpp>
 #include <Godot/classes/sprite3d.hpp>
 #include <Godot/classes/camera3d.hpp>
 #include <Godot/classes/viewport.hpp>
@@ -67,6 +72,11 @@ namespace {
 	int grid = 0;
 	std::vector<uint8_t> tipos;
 	std::vector<uint8_t> niebla;
+	// Niebla suavizada: valor actual por casilla (0 = oculto, 0.5 = explorado, 1 = visible)
+	// que persigue al objetivo para que las casillas se revelen con un fundido tramado
+	std::vector<float> niebla_actual;
+	std::vector<float> niebla_objetivo;
+	bool niebla_animando = false;
 	bool niebla_debug = false;
 
 	Node3D* m_mundo = nullptr;
@@ -77,6 +87,8 @@ namespace {
 	MeshInstance3D* m_marcador = nullptr;
 
 	// Capa 2D dentro del SubViewport: elementos anclados a posiciones 3D (se pixelan como el mundo)
+	CPUParticles3D* m_motas = nullptr;
+	DirectionalLight3D* m_luna = nullptr;
 	CanvasLayer* m_capa2d = nullptr;
 	Control* m_raiz2d = nullptr;
 	Control* m_coste = nullptr;
@@ -210,6 +222,44 @@ namespace {
 		return prop;
 	}
 
+	CPUParticles3D* CrearParticulas(Node* padre, const String& nombre, int cantidad, float vida, float tam, Color color, Vector3 caja, Vector3 gravedad, float vel_min, float vel_max, float dispersion) {
+		CPUParticles3D* p = memnew(CPUParticles3D);
+		p->set_name(nombre);
+		Ref<QuadMesh> quad;
+		quad.instantiate();
+		quad->set_size(Vector2(tam, tam));
+		Ref<StandardMaterial3D> mat;
+		mat.instantiate();
+		mat->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
+		mat->set_billboard_mode(BaseMaterial3D::BILLBOARD_ENABLED);
+		mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
+		mat->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
+		mat->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
+		quad->set_material(mat);
+		p->set_mesh(quad);
+		p->set_amount(cantidad);
+		p->set_lifetime(vida);
+		p->set_emission_shape(CPUParticles3D::EMISSION_SHAPE_BOX);
+		p->set_emission_box_extents(caja);
+		p->set_direction(Vector3(0, 1, 0));
+		p->set_spread(dispersion);
+		p->set_gravity(gravedad);
+		p->set_param_min(CPUParticles3D::PARAM_INITIAL_LINEAR_VELOCITY, vel_min);
+		p->set_param_max(CPUParticles3D::PARAM_INITIAL_LINEAR_VELOCITY, vel_max);
+		Ref<Gradient> rampa;
+		rampa.instantiate();
+		rampa->set_offset(0, 0.0);
+		rampa->set_color(0, Color(color.r, color.g, color.b, 0.0));
+		rampa->set_offset(1, 1.0);
+		rampa->set_color(1, Color(color.r, color.g, color.b, 0.0));
+		rampa->add_point(0.3, color);
+		rampa->add_point(0.7, color);
+		p->set_color_ramp(rampa);
+		p->set_pre_process_time(vida);
+		padre->add_child(p);
+		return p;
+	}
+
 	Sprite3D* CrearSpriteTile(Node* padre, const String& nombre, Rect2 region, float pixel, Vector3 pos, bool sombreado) {
 		Sprite3D* sp = memnew(Sprite3D);
 		sp->set_name(nombre);
@@ -251,6 +301,10 @@ namespace {
 		luz->set_meta("energia_base", 1.1);
 		luz->add_to_group("antorchas");
 		prop->add_child(luz);
+
+		CPUParticles3D* polillas = CrearParticulas(prop, "Polillas", 4, 2.6f, 0.035f, Color(1.0, 0.92, 0.6, 0.9),
+			Vector3(0.25, 0.2, 0.25), Vector3(0, 0.05, 0), 0.12f, 0.3f, 180.0f);
+		polillas->set_position(Vector3(hacia.x * 0.75f, 0.7f, hacia.y * 0.75f));
 	}
 
 	void ColocarAntorchas() {
@@ -585,6 +639,38 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 
 	ColocarAntorchas();
 
+	// --- AMBIENTE: abismo bajo el mapa, motas de polvo que siguen a la cámara y luz lunar ---
+	Ref<PlaneMesh> plano;
+	plano.instantiate();
+	plano->set_size(Vector2(grid * 1.8f, grid * 1.8f));
+	Ref<ShaderMaterial> mat_abismo;
+	mat_abismo.instantiate();
+	mat_abismo->set_shader(ResourceLoader::get_singleton()->load("res://Shaders/ps1_abismo.gdshader"));
+	MeshInstance3D* abismo = memnew(MeshInstance3D);
+	abismo->set_name("Abismo");
+	abismo->set_mesh(plano);
+	abismo->set_material_override(mat_abismo);
+	abismo->set_position(Vector3(grid * 0.5f, -3.0f, grid * 0.5f));
+	m_mundo->add_child(abismo);
+
+	m_motas = CrearParticulas(m_mundo, "Motas", 70, 9.0f, 0.035f, Color(1.0, 0.9, 0.75, 0.35),
+		Vector3(9, 1.6, 7), Vector3(0, 0.01, 0), 0.04f, 0.14f, 180.0f);
+	CPUParticles3D* motas_hondas = CrearParticulas(m_motas, "MotasAbismo", 40, 10.0f, 0.06f, Color(0.6, 0.4, 0.85, 0.3),
+		Vector3(10, 0.8, 8), Vector3(0, 0.02, 0), 0.03f, 0.1f, 180.0f);
+	motas_hondas->set_position(Vector3(0, -2.4f, 0));
+
+	if (!m_luna) {
+		m_luna = memnew(DirectionalLight3D);
+		m_luna->set_name("Luna");
+		m_luna->set_color(Color(0.55, 0.6, 0.95));
+		m_luna->set_param(Light3D::PARAM_ENERGY, 0.32);
+		m_luna->set_rotation(Vector3((float)Math::deg_to_rad(-62.0), (float)Math::deg_to_rad(28.0), 0));
+		self->add_child(m_luna);
+	}
+
+	niebla_actual.assign(grid * grid, 0.0f);
+	niebla_objetivo.assign(grid * grid, 0.0f);
+
 	UtilityFunctions::print("[DungeonRenderer] Mundo 3D construido: ", (int)suelos.size(), " suelos, ", (int)muros.size(), " muros.");
 }
 
@@ -661,6 +747,10 @@ void CrearBrasero(Caller* instance, int x, int y) {
 	luz->set_meta("energia_base", 1.7);
 	luz->add_to_group("antorchas");
 	prop->add_child(luz);
+
+	CPUParticles3D* brasas = CrearParticulas(prop, "Brasas", 10, 1.6f, 0.04f, Color(1.0, 0.6, 0.2, 1.0),
+		Vector3(0.12, 0.02, 0.12), Vector3(0, 0.6, 0), 0.2f, 0.5f, 25.0f);
+	brasas->set_position(Vector3(0, 0.75f, 0));
 }
 
 // Ternas (x, y, tipo): 0 = telaraña de esquina, 1 = huesos, 2 = calavera, 3 = rocas, 4 = piedras
@@ -724,10 +814,10 @@ void ActualizarNiebla(Caller* instance, PackedByteArray estados, int modo_debug)
 			uint8_t e = (i < estados.size()) ? estados[i] : 0;
 			niebla[i] = e;
 			float v = (e == 2) ? 1.0f : (e == 1 ? 0.5f : 0.0f);
-			m_fog_img->set_pixel(x, y, Color(v, 0, 0));
+			if (i < (int)niebla_objetivo.size()) niebla_objetivo[i] = v;
 		}
 	}
-	m_fog_tex->update(m_fog_img);
+	niebla_animando = true;
 
 	if (!m_props) return;
 	TypedArray<Node> props = m_props->get_children();
@@ -993,6 +1083,30 @@ void OnProcess(Caller* instance, double delta) {
 		}
 	}
 
+	// Niebla: cada casilla se acerca a su objetivo (el shader trama la aparición)
+	if (niebla_animando && m_fog_img.is_valid() && (int)niebla_actual.size() == grid * grid) {
+		bool sigue = false;
+		float paso = (float)delta * 3.2f;
+		for (int x = 0; x < grid; x++)
+			for (int y = 0; y < grid; y++) {
+				int i = x * grid + y;
+				float a = niebla_actual[i], b = niebla_objetivo[i];
+				if (a == b) continue;
+				a = (a < b) ? UtilityFunctions::minf(b, a + paso) : UtilityFunctions::maxf(b, a - paso);
+				niebla_actual[i] = a;
+				m_fog_img->set_pixel(x, y, Color(a, 0, 0));
+				sigue = true;
+			}
+		if (sigue) m_fog_tex->update(m_fog_img);
+		niebla_animando = sigue;
+	}
+
+	// Las motas de polvo siguen a la cámara
+	if (m_motas && cam && cam->has_meta("pivote")) {
+		Vector3 piv = cam->get_meta("pivote");
+		m_motas->set_position(piv + Vector3(0, 1.4f, 0));
+	}
+
 	// Parpadeo de antorchas (incluye la luz de los héroes)
 	TypedArray<Node> luces = self->get_tree()->get_nodes_in_group("antorchas");
 	for (int i = 0; i < luces.size(); i++) {
@@ -1030,6 +1144,8 @@ void OnDestroy(Caller* instance) {
 	m_ruta = nullptr;
 	m_cursor = nullptr;
 	m_marcador = nullptr;
+	m_motas = nullptr;
+	m_luna = nullptr;
 	m_capa2d = nullptr;
 	m_raiz2d = nullptr;
 	m_coste = nullptr;

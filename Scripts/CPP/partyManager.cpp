@@ -4,6 +4,10 @@
 #include <Godot/classes/node.hpp>
 #include <Godot/classes/node3d.hpp>
 #include <Godot/classes/canvas_layer.hpp>
+#include <Godot/classes/tween.hpp>
+#include <Godot/classes/property_tweener.hpp>
+#include <Godot/classes/callback_tweener.hpp>
+#include <Godot/classes/interval_tweener.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include <vector>
 
@@ -34,10 +38,20 @@ namespace {
 		return h && !MetaBool(h, "esta_muerto") && !MetaBool(h, "ha_escapado") && !MetaBool(h, "ha_movido") && (int)h->get_meta("pa_actual", 0) > 0;
 	}
 
+	// El héroe se desploma de lado y desaparece
 	void OcultarFicha(Node* h) {
 		if (!m_dungeon_manager || !h) return;
 		Node3D* ficha = Object::cast_to<Node3D>(m_dungeon_manager->get_node_or_null(NodePath(String(h->get_name()))));
-		if (ficha) ficha->set_visible(false);
+		if (!ficha) return;
+		Node3D* cuerpo = Object::cast_to<Node3D>(ficha->get_node_or_null("Cuerpo"));
+		if (!cuerpo) { ficha->set_visible(false); return; }
+		Ref<Tween> tw = ficha->create_tween();
+		tw->tween_property(cuerpo, "rotation:z", 1.45, 0.35)->set_trans(Tween::TRANS_BOUNCE)->set_ease(Tween::EASE_OUT);
+		tw->parallel()->tween_property(cuerpo, "position:y", 0.2, 0.35);
+		tw->tween_interval(0.5);
+		tw->tween_callback(Callable(ficha, StringName("hide")));
+		Node* feel = self ? self->get_node_or_null("/root/Feel") : nullptr;
+		if (feel) feel->call("sacudir", 0.35);
 	}
 
 	void Morir(Node* h, const String& causa) {

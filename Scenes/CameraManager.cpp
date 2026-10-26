@@ -157,10 +157,19 @@ void OnProcess(Caller* instance, double delta) {
 	pivote.z = UtilityFunctions::clampf(pivote.z, 0.0f, GRID);
 	pivote.y = 0.0f;
 
-	cam->set_position(pivote + Direccion() * dist);
+	// Golpe de zoom (críticos) que se recupera solo; lo pone el autoload Feel
+	float punch = cam->has_meta("punch") ? (float)cam->get_meta("punch") : 0.0f;
+	punch = UtilityFunctions::maxf(0.0, punch - 4.0 * delta);
+	cam->set_meta("punch", punch);
+	float dist_visual = dist * (1.0f - 0.12f * punch);
+
+	cam->set_position(pivote + Direccion() * dist_visual);
 	cam->look_at(pivote, Vector3(0, 1, 0));
-	// Desplazamos el encuadre para que el héroe quede a la derecha de las fichas del HUD
-	cam->set_h_offset(-dist * 0.14f);
+	// Desplazamos el encuadre para que el héroe quede a la derecha de las fichas del HUD,
+	// más la sacudida de pantalla que calcula Feel
+	Vector2 sacudida = cam->has_meta("sacudida") ? (Vector2)cam->get_meta("sacudida") : Vector2();
+	cam->set_h_offset(-dist * 0.14f + sacudida.x);
+	cam->set_v_offset(sacudida.y);
 
 	// Datos para la UI anclada (menú táctico) y el renderer
 	cam->set_meta("pivote", pivote);

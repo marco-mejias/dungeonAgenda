@@ -136,6 +136,8 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 
 	if (pa <= 0 || path.size() <= 1) {
 		UtilityFunctions::print("[PathManager] Movimiento abortado. PA: ", pa, " | Pasos de ruta: ", path.size());
+		Node* feel = self_node->get_node_or_null("/root/Feel");
+		if (feel && pa <= 0) feel->call("sacudir_ficha", String(act_char->get_name()));
 		return;
 	}
 

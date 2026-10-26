@@ -7,6 +7,10 @@
 [ext_resource type="Script" path="res://Scripts/GDD/transicion.gd" id="22_trans"]
 [ext_resource type="Script" path="res://Scripts/GDD/fogata.gd" id="23_fogata"]
 [ext_resource type="Script" path="res://Scripts/GDD/minimapa.gd" id="24_minimapa"]
+[ext_resource type="Script" path="res://Scripts/GDD/banner_turno.gd" id="25_banner"]
+[ext_resource type="Script" path="res://Scripts/GDD/prevision_ataque.gd" id="26_prevision"]
+[ext_resource type="Script" path="res://Scripts/GDD/cursor_juego.gd" id="27_cursor"]
+[ext_resource type="Script" path="res://Scripts/GDD/dado3d.gd" id="28_dado"]
 [ext_resource type="Shader" path="res://Shaders/ps1_post.gdshader" id="21_post"]
 [ext_resource type="Script" uid="uid://de8lgwkdug0rx" path="res://Scripts/GDD/DatosEquipo.gd" id="5_fevyy"]
 [ext_resource type="Script" uid="uid://dnsf46hnyb1lb" path="res://Scenes/CameraManager.cpp" id="5_wsu2k"]
@@ -27,10 +31,10 @@ shader = ExtResource("21_post")
 
 [sub_resource type="Environment" id="Environment_mazmorra"]
 background_mode = 1
-background_color = Color(0.02, 0.015, 0.03, 1)
+background_color = Color(0.03, 0.022, 0.05, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.42, 0.36, 0.55, 1)
-ambient_light_energy = 0.8
+ambient_light_color = Color(0.46, 0.42, 0.62, 1)
+ambient_light_energy = 1.0
 tonemap_mode = 0
 fog_enabled = true
 fog_light_color = Color(0.02, 0.015, 0.03, 1)
@@ -287,6 +291,15 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
+[node name="Dado" type="Control" parent="CanvasLayer2/PantallaEvento"]
+layout_mode = 0
+offset_left = 180.0
+offset_top = 74.0
+offset_right = 344.0
+offset_bottom = 238.0
+mouse_filter = 2
+script = ExtResource("28_dado")
+
 [node name="TextoHistoria" type="RichTextLabel" parent="CanvasLayer2/PantallaEvento" unique_id=1225624541]
 layout_mode = 0
 offset_left = 32.0
@@ -295,6 +308,7 @@ offset_right = 492.0
 offset_bottom = 414.0
 mouse_filter = 2
 bbcode_enabled = true
+scroll_active = false
 
 [node name="CajaBotones" type="VBoxContainer" parent="CanvasLayer2/PantallaEvento" unique_id=1350735244]
 layout_mode = 0
@@ -346,6 +360,34 @@ offset_bottom = 164.0
 grow_horizontal = 0
 mouse_filter = 2
 script = ExtResource("24_minimapa")
+
+[node name="Banner" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 150.0
+offset_bottom = 206.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("25_banner")
+
+[node name="Prevision" type="PanelContainer" parent="CanvasLayer"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -268.0
+offset_top = -150.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("26_prevision")
+
+[node name="CursorJuego" type="Node" parent="CanvasLayer"]
+script = ExtResource("27_cursor")
 
 [node name="BtnSalidaDebug" type="Button" parent="CanvasLayer" unique_id=452735484]
 anchors_preset = 2
@@ -439,8 +481,14 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = -270.0
+offset_right = 170.0
+offset_bottom = 270.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = SubResource("Theme_evento")
+theme_override_styles/panel = SubResource("StyleBoxFlat_ev_panel")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CanvasMenuPausa/ColorRect/PanelOpciones" unique_id=1778706349]
 layout_mode = 1

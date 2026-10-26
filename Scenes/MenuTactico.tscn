@@ -6,26 +6,5 @@
 layout_mode = 3
 anchors_preset = 0
 mouse_filter = 2
+texture_filter = 1
 script = ExtResource("1_c7hvf")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=159610449]
-layout_mode = 0
-offset_right = 150.0
-offset_bottom = 104.0
-mouse_filter = 2
-
-[node name="BtnAtacar" type="Button" parent="VBoxContainer" unique_id=284009794]
-layout_mode = 2
-text = "ATAQUE"
-
-[node name="BtnHabilidad" type="Button" parent="VBoxContainer" unique_id=1308787030]
-layout_mode = 2
-text = "HABILIDADES"
-
-[node name="BtnPasar" type="Button" parent="VBoxContainer" unique_id=268918782]
-layout_mode = 2
-text = "PASAR TURNO"
-
-[connection signal="pressed" from="VBoxContainer/BtnAtacar" to="." method="_on_btn_atacar_pressed"]
-[connection signal="pressed" from="VBoxContainer/BtnHabilidad" to="." method="_on_btn_habilidad_pressed"]
-[connection signal="pressed" from="VBoxContainer/BtnPasar" to="." method="_on_btn_pasar_pressed"]
