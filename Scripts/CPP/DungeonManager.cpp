@@ -37,6 +37,7 @@ struct Cell {
 	bool chest_opened = false;
 	bool has_event = false;
 	bool has_enemy = false;
+	bool is_brasero = false; // obstáculo estático que ilumina su sala
 	int event_idx = -1;
 };
 
@@ -73,6 +74,8 @@ namespace {
 	std::vector<Room> m_rooms;
 	std::vector<EventInfo> m_eventos;
 	std::vector<Vector2i> m_spawn_cells;
+	std::vector<Vector2i> m_braseros;
+	const int RADIO_BRASERO = 3;
 	Vector2i m_inicio(1, 1);
 	Vector2i m_salida(2, 2);
 
@@ -173,7 +176,7 @@ namespace {
 	bool EsSueloLibre(int x, int y) {
 		if (!InBounds(x, y)) return false;
 		const Cell& c = map_data[x][y];
-		return !c.is_wall && !(c.is_door && !c.door_open) && !c.is_chest && !c.has_enemy;
+		return !c.is_wall && !(c.is_door && !c.door_open) && !c.is_chest && !c.has_enemy && !c.is_brasero;
 	}
 
 	bool MenuAbierto() {
@@ -349,7 +352,7 @@ namespace {
 	// Casilla vacía, lejos del spawn y de la salida, sin taponar puertas
 	bool CasillaDeSalaValida(int x, int y) {
 		const Cell& c = map_data[x][y];
-		if (c.is_wall || c.is_door || c.is_chest || c.has_event || c.has_enemy) return false;
+		if (c.is_wall || c.is_door || c.is_chest || c.has_event || c.has_enemy || c.is_brasero) return false;
 		if (Vector2i(x, y) == m_salida || CercaDelInicio(Vector2i(x, y), 3) || PegadoAPuerta(x, y)) return false;
 		return true;
 	}
@@ -423,6 +426,33 @@ namespace {
 		}
 	}
 
+	// Un brasero en algunas salas (no la inicial). Nunca en la fila/columna central de la sala,
+	// que es por donde entran los pasillos, para no taponar el paso.
+	void GenerarBraseros() {
+		m_braseros.clear();
+		// 2ª pasada solo si la 1ª no colocó ninguno: así cada piso tiene al menos uno
+		for (int pasada = 0; pasada < 2 && m_braseros.empty(); pasada++)
+		for (size_t i = 1; i < m_rooms.size(); i++) {
+			const Room& r = m_rooms[i];
+			if (pasada == 1 && !m_braseros.empty()) break;
+			if (r.w < 5 || r.h < 5 || (pasada == 0 && UtilityFunctions::randi_range(0, 99) >= 45)) continue;
+			Vector2i centro = r.get_center();
+			std::vector<Vector2i> validas;
+			for (int x = r.x + 1; x < r.x + r.w - 1; x++)
+				for (int y = r.y + 1; y < r.y + r.h - 1; y++) {
+					if (x == centro.x || y == centro.y || !CasillaDeSalaValida(x, y)) continue;
+					bool junto_a_cofre = false;
+					for (const Vector2i& d : DIRS4)
+						if (map_data[x + d.x][y + d.y].is_chest) junto_a_cofre = true;
+					if (!junto_a_cofre) validas.push_back(Vector2i(x, y));
+				}
+			if (validas.empty()) continue;
+			Vector2i p = validas[UtilityFunctions::randi_range(0, (int)validas.size() - 1)];
+			map_data[p.x][p.y].is_brasero = true;
+			m_braseros.push_back(p);
+		}
+	}
+
 	void GenerarEnemigos() {
 		// Saltamos la sala 0 (spawn del jugador). Solo en el interior para no taponar entradas.
 		for (size_t i = 1; i < m_rooms.size(); i++) {
@@ -470,6 +500,20 @@ namespace {
 					map_data[x][y].is_explored = true;
 				}
 			}
+		}
+
+		// Si se ve un brasero, se ve también lo que ilumina
+		for (const Vector2i& b : m_braseros) {
+			if (!map_data[b.x][b.y].is_visible) continue;
+			for (int x = std::max(0, b.x - RADIO_BRASERO); x <= std::min(GRID_SIZE - 1, b.x + RADIO_BRASERO); x++)
+				for (int y = std::max(0, b.y - RADIO_BRASERO); y <= std::min(GRID_SIZE - 1, b.y + RADIO_BRASERO); y++) {
+					int dx = x - b.x, dy = y - b.y;
+					if (dx * dx + dy * dy > RADIO_BRASERO * RADIO_BRASERO + RADIO_BRASERO) continue;
+					if (!CheckLineOfSight(b, Vector2i(x, y))) continue;
+					map_data[x][y].is_visible = true;
+					map_data[x][y].is_lit = true;
+					map_data[x][y].is_explored = true;
+				}
 		}
 
 		// Los muros que rodean al suelo visible también se ven
@@ -724,6 +768,31 @@ namespace {
 		return detectado;
 	}
 
+	// Ternas (x, y, tipo): 0 = telaraña (esquina), 1 = huesos, 2 = calavera, 3 = rocas, 4 = piedras
+	PackedInt32Array GenerarDecoracion() {
+		PackedInt32Array ternas;
+		for (const Room& r : m_rooms)
+			for (int x = r.x; x < r.x + r.w; x++)
+				for (int y = r.y; y < r.y + r.h; y++) {
+					if (!CasillaDeSalaValida(x, y)) continue;
+					bool spawn = false;
+					for (const Vector2i& c : m_spawn_cells) if (c == Vector2i(x, y)) spawn = true;
+					if (spawn) continue;
+
+					bool muro_x = map_data[x - 1][y].is_wall || map_data[x + 1][y].is_wall;
+					bool muro_y = map_data[x][y - 1].is_wall || map_data[x][y + 1].is_wall;
+					if (!muro_x && !muro_y) continue; // solo pegado a la pared
+
+					int tirada = UtilityFunctions::randi_range(0, 99);
+					int tipo = -1;
+					if (muro_x && muro_y) { if (tirada < 55) tipo = 0; }
+					else if (tirada < 12) tipo = UtilityFunctions::randi_range(1, 4);
+					if (tipo < 0) continue;
+					ternas.push_back(x); ternas.push_back(y); ternas.push_back(tipo);
+				}
+		return ternas;
+	}
+
 	void ColocarHeroesEnSpawn() {
 		int idx = 0;
 		for (Node* h : Heroes()) {
@@ -756,13 +825,14 @@ void ConstruirLogica(Caller* instance) {
 	DefinirInicioYSalida();
 	GenerarEventos();
 	GenerarCofres();
+	GenerarBraseros();
 	GenerarEnemigos();
 
 	// CARGA ESTÁTICA DEL ASTAR: muros y puertas cerradas, UNA sola vez
 	std::vector<Vector2i> solidos;
 	for (int x = 0; x < GRID_SIZE; x++)
 		for (int y = 0; y < GRID_SIZE; y++)
-			if (BloqueaVision(x, y)) solidos.push_back(Vector2i(x, y));
+			if (BloqueaVision(x, y) || map_data[x][y].is_brasero) solidos.push_back(Vector2i(x, y));
 
 	if (m_path_manager) {
 		m_path_manager->call("ConfigurarAStar", GRID_SIZE, 1.0f);
@@ -780,6 +850,14 @@ void ConstruirLogica(Caller* instance) {
 	self->set_meta("lista_eventos", eventos);
 	self->set_meta("lista_cofres", cofres);
 	self->set_meta("lista_enemigos", ListaEnemigos());
+
+	Array puertas, braseros;
+	for (int x = 0; x < GRID_SIZE; x++)
+		for (int y = 0; y < GRID_SIZE; y++)
+			if (map_data[x][y].is_door && !map_data[x][y].door_open) puertas.push_back(Vector2i(x, y));
+	for (const Vector2i& b : m_braseros) braseros.push_back(b);
+	self->set_meta("lista_puertas", puertas);
+	self->set_meta("lista_braseros", braseros);
 
 	UtilityFunctions::print("[DungeonManager] Lógica lista. Eventos: ", (int)m_eventos.size(), " | Cofres: ", cofres.size(), " | Enemigos: ", ListaEnemigos().size());
 }
@@ -804,6 +882,8 @@ void ConstruirVisual(Caller* instance) {
 			if (map_data[x][y].is_chest) m_renderer->call("CrearCofre", x, y);
 
 	m_renderer->call("CrearSalida", m_salida.x, m_salida.y);
+	for (const Vector2i& b : m_braseros) m_renderer->call("CrearBrasero", b.x, b.y);
+	m_renderer->call("CrearDecoracion", GenerarDecoracion());
 
 	// Solo los eventos MANUALES tienen marcador: las trampas son ocultas
 	for (const EventInfo& e : m_eventos)
@@ -1311,6 +1391,7 @@ void OnDestroy(Caller* instance) {
 	m_rooms.clear();
 	m_eventos.clear();
 	m_spawn_cells.clear();
+	m_braseros.clear();
 	m_party_manager = nullptr;
 	m_ui_manager = nullptr;
 	m_renderer = nullptr;

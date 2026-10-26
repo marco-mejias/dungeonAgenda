@@ -200,6 +200,36 @@ func _definir_pasos():
 			return 0.6,
 		func():
 			captura("09_cofre_abierto")
+			# Puerta: nos ponemos al lado y la abrimos
+			var puertas: Array = dm.get_meta("lista_puertas", [])
+			memo["puerta"] = null
+			if puertas.size() > 0 and junto_a(puertas[0]):
+				memo["puerta"] = puertas[0]
+				dm.call("ProcesarClicEnCasilla", puertas[0].x, puertas[0].y)
+			else:
+				print("[test] AVISO este piso no tiene puertas accesibles")
+			# Braseros: ocupan su casilla
+			var braseros: Array = dm.get_meta("lista_braseros", [])
+			var alc: PackedInt32Array = dm.call("DebugAlcance")
+			var pisable := false
+			for i in range(0, alc.size(), 2):
+				if Vector2i(alc[i], alc[i + 1]) in braseros:
+					pisable = true
+			check(not pisable, "los braseros (%d) no se pueden pisar" % braseros.size())
+			return 1.0,
+		func():
+			if memo["puerta"] != null:
+				var p: Vector2i = memo["puerta"]
+				var bisagra: Node3D = dm.get_node_or_null("DungeonRenderer/Props/Puerta_%d_%d/Bisagra" % [p.x, p.y])
+				check(bisagra != null and abs(bisagra.rotation.y) > 1.0, "la puerta %s gira al abrirse" % p)
+				captura("09b_puerta_abierta")
+			var braseros: Array = dm.get_meta("lista_braseros", [])
+			if braseros.size() > 0:
+				junto_a(braseros[0])
+			return 0.8,
+		func():
+			if dm.get_meta("lista_braseros", []).size() > 0:
+				captura("09c_brasero")
 			var enemigos: Array = dm.get_meta("lista_enemigos", [])
 			check(enemigos.size() > 0, "hay enemigos (%d)" % enemigos.size())
 			if enemigos.size() > 0:
