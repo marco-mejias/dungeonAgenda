@@ -157,12 +157,14 @@ void DescansarYContinuar(Caller* instance) {
 			if (child && child->get_name() != StringName("DatosEquipo")) {
 				child->set_meta("ha_movido", false);
 				child->set_meta("ha_escapado", false);
-				
-				int current_hp = child->has_meta("hp_actual") ? (int)child->get_meta("hp_actual") : 0;
-				int max_hp     = child->has_meta("hp_max")    ? (int)child->get_meta("hp_max")    : 100;
-				child->set_meta("hp_actual", UtilityFunctions::min(max_hp, current_hp + 10));
-				
+				child->set_meta("in_combat", false);
+
 				if (!(bool)child->get_meta("esta_muerto")) {
+					int current_hp = child->has_meta("hp_actual") ? (int)child->get_meta("hp_actual") : 0;
+					int max_hp     = child->has_meta("hp_max")    ? (int)child->get_meta("hp_max")    : 100;
+					child->set_meta("hp_actual", UtilityFunctions::min(max_hp, current_hp + 10));
+					child->set_meta("pa_actual", child->get_meta("pa_max", 3));
+
 					int current_hunger = child->has_meta("hambre_actual")  ? (int)child->get_meta("hambre_actual")  : 10;
 					int current_sanity = child->has_meta("sanidad_actual") ? (int)child->get_meta("sanidad_actual") : 100;
 					
@@ -270,11 +272,11 @@ void UpdateWarriorUI(Caller* instance) {
 		
 		// 2. ACTUALIZAMOS EL ORO
 		Label* lbl_gold = Object::cast_to<Label>(self->get_node_or_null(NodePath(gold_path)));
-		if (lbl_gold) lbl_gold->set_text("Gold: " + String::num(gold));
+		if (lbl_gold) lbl_gold->set_text("Gold: " + String::num_int64(gold));
 		
 		// 3. ACTUALIZAMOS LA COMIDA
 		Label* lbl_food = Object::cast_to<Label>(self->get_node_or_null(NodePath(food_path)));
-		if (lbl_food) lbl_food->set_text("Food: " + String::num(food));
+		if (lbl_food) lbl_food->set_text("Food: " + String::num_int64(food));
 
 		// 4. ACTUALIZAMOS TUS PUNTOS DE ACCIÓN (PA) VISIBLES PERMANENTEMENTE
 		Label* lbl_pa = Object::cast_to<Label>(self->get_node_or_null(NodePath(pa_path)));
@@ -479,8 +481,19 @@ void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {
 
 	if (!fn_call.is_empty()) {
 		Node* pm = GetPartyManager();
-		if (pm) pm->call(fn_call, param, hero);
+		if (pm && pm->has_method(fn_call)) pm->call(fn_call, param, hero);
+		else UtilityFunctions::printerr("[UI] El evento pide una función que no existe en PartyManager: '", fn_call, "'");
 	}
+}
+
+// Cierra la pantalla de evento al instante (al cambiar de piso o desde debug)
+void CerrarEventoPorDebug(Caller* instance) {
+	if (!self) return;
+	anim_dados = false;
+	wait_resultado = false;
+	if (m_event_screen) m_event_screen->set_visible(false);
+	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
+	if (dungeon) dungeon->call("BajarMapa");
 }
 
 // ¡AQUÍ ESTÁ EL Caller* instance QUE FALTABA!
@@ -547,7 +560,8 @@ void ResolverOpcion(Caller* instance, int option_index) {
 	}
 }
 
-void MostrarEventoVisual(Caller* instance, Variant event_data) {
+// OJO: Jenova revienta si una función llamada con call()/Callable recibe un Variant por valor
+void MostrarEventoVisual(Caller* instance, Resource* event_data) {
 	if (!self) return;
 
 	// === SALVAVIDAS ANTI-PANTALLAS INVISIBLES ===

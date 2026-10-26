@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_suixd")
 nombre_display = "Doom Snailer"
+radio_luz = 3
 retrato_path = "uid://inja7yuwguog"
 vida_max = 150
 velocidad = 2

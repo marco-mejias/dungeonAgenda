@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_j0w5w")
 nombre_display = "Vivi Owl-nittier"
+radio_luz = 5
 retrato_path = "uid://di2242yca8rwu"
 fuerza = 3
 magia = 8

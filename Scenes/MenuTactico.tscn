@@ -4,18 +4,14 @@
 
 [node name="MenuTactico" type="Control" unique_id=1746376194]
 layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+anchors_preset = 0
 mouse_filter = 2
 script = ExtResource("1_c7hvf")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=159610449]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_right = 150.0
+offset_bottom = 104.0
 mouse_filter = 2
 
 [node name="BtnAtacar" type="Button" parent="VBoxContainer" unique_id=284009794]
@@ -30,12 +26,6 @@ text = "HABILIDADES"
 layout_mode = 2
 text = "PASAR TURNO"
 
-[connection signal="mouse_entered" from="VBoxContainer/BtnAtacar" to="." method="_on_mouse_entered"]
-[connection signal="mouse_exited" from="VBoxContainer/BtnAtacar" to="." method="_on_mouse_exited"]
 [connection signal="pressed" from="VBoxContainer/BtnAtacar" to="." method="_on_btn_atacar_pressed"]
-[connection signal="mouse_entered" from="VBoxContainer/BtnHabilidad" to="." method="_on_mouse_entered"]
-[connection signal="mouse_exited" from="VBoxContainer/BtnHabilidad" to="." method="_on_mouse_exited"]
 [connection signal="pressed" from="VBoxContainer/BtnHabilidad" to="." method="_on_btn_habilidad_pressed"]
-[connection signal="mouse_entered" from="VBoxContainer/BtnPasar" to="." method="_on_mouse_entered"]
-[connection signal="mouse_exited" from="VBoxContainer/BtnPasar" to="." method="_on_mouse_exited"]
 [connection signal="pressed" from="VBoxContainer/BtnPasar" to="." method="_on_btn_pasar_pressed"]

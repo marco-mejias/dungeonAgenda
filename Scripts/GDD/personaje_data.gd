@@ -10,3 +10,4 @@ extends Resource
 @export var magia: int = 5
 @export var suerte: int = 5
 @export var ruta_cuerpo: String = "res://prefabs/CuerpoBase.tscn"
+@export var radio_luz: int = 4 # casillas que ilumina/ve en la niebla de guerra
