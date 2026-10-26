@@ -18,7 +18,6 @@
 [ext_resource type="Resource" uid="uid://crhb6huofdd27" path="res://Data/PlayableCharacters/Ladron.tres" id="10_3pmx8"]
 [ext_resource type="Script" uid="uid://dktucv2r4gkux" path="res://Scripts/CPP/uiManager.cpp" id="11_u50mg"]
 [ext_resource type="Script" uid="uid://b4vve4f3yd8c2" path="res://Scripts/GDD/menu_pausa.gd" id="14_jkdf5"]
-[ext_resource type="PackedScene" uid="uid://bxvhm84mm1aa3" path="res://Scenes/ficha_heroe.tscn" id="17_h1bgf"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ps1post"]
 shader = ExtResource("21_post")
@@ -240,28 +239,22 @@ offset_right = 905.0
 offset_bottom = 62.0
 text = "PISO 1 | TURNO 1"
 
-[node name="GridContainer" type="GridContainer" parent="CanvasLayer" unique_id=963860085]
-texture_filter = 2
-offset_left = 53.0
-offset_top = 10.0
-offset_right = 568.0
-offset_bottom = 670.0
-scale = Vector2(0.7, 0.7)
-theme_override_constants/h_separation = 55
-theme_override_constants/v_separation = 70
-columns = 2
+[node name="PanelFichas" type="VBoxContainer" parent="CanvasLayer"]
+offset_left = 8.0
+offset_top = 46.0
+offset_right = 198.0
+offset_bottom = 600.0
+mouse_filter = 2
+theme_override_constants/separation = 4
 
-[node name="IronCat" parent="CanvasLayer/GridContainer" unique_id=430086645 instance=ExtResource("17_h1bgf")]
-layout_mode = 2
-
-[node name="Nathan Snake" parent="CanvasLayer/GridContainer" unique_id=1458817461 instance=ExtResource("17_h1bgf")]
-layout_mode = 2
-
-[node name="Vivi Owl-nittier" parent="CanvasLayer/GridContainer" unique_id=2110287487 instance=ExtResource("17_h1bgf")]
-layout_mode = 2
-
-[node name="Doom Snailer" parent="CanvasLayer/GridContainer" unique_id=1141587071 instance=ExtResource("17_h1bgf")]
-layout_mode = 2
+[node name="BtnFichas" type="Button" parent="CanvasLayer"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 158.0
+offset_bottom = 38.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 11
+text = "FICHAS: AUTO"
 
 [node name="BtnSalidaDebug" type="Button" parent="CanvasLayer" unique_id=452735484]
 anchors_preset = 2

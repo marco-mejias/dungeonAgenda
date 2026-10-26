@@ -21,6 +21,14 @@
 #include <Godot/classes/control.hpp>
 #include <Godot/classes/node2d.hpp>
 #include <Godot/classes/input.hpp>
+#include <Godot/classes/camera3d.hpp>
+#include <Godot/classes/node3d.hpp>
+#include <Godot/classes/atlas_texture.hpp>
+#include <Godot/classes/style_box_flat.hpp>
+#include <Godot/classes/panel_container.hpp>
+#include <Godot/classes/h_box_container.hpp>
+#include <Godot/classes/packed_scene.hpp>
+#include <vector>
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -44,6 +52,19 @@ namespace {
 	int save_index = 0;
 
 	Control* m_event_screen = nullptr;
+
+	// Fichas de personaje: AUTO = las de quien sale en pantalla (+ el activo); OCULTAS = solo las fijadas
+	bool fichas_auto = true;
+	bool tab_prev = false;
+	float t_fichas = 0.0f;
+	std::vector<String> fichas_fijadas;
+	const int MAX_FICHAS_ENEMIGO = 4;
+	Ref<Texture2D> m_hoja_personajes;
+
+	const Color BORDE_NORMAL = Color(0.55, 0.6, 0.85);
+	const Color BORDE_ACTIVO = Color(1.0, 0.8, 0.25);
+	const Color BORDE_ENEMIGO = Color(0.6, 0.18, 0.16);
+	const Color BORDE_ENEMIGO_ALERTA = Color(1.0, 0.3, 0.2);
 }
 
 JENOVA_SCRIPT_BEGIN
@@ -100,25 +121,193 @@ String GenerarTextoStats(Node* character) {
 // MAIN UI FUNCTIONS
 // ==========================================
 
-void ActualizarStatsUI(Caller* instance) {
-	TypedArray<Node> characters = GetPersonajesValidos();
+Control* PanelFichas() {
+	return self ? Object::cast_to<Control>(self->get_node_or_null("PanelFichas")) : nullptr;
+}
 
+Node* GetDungeon() {
+	return self ? self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager") : nullptr;
+}
+
+bool FichaFijada(const String& nombre) {
+	for (const String& n : fichas_fijadas) if (n == nombre) return true;
+	return false;
+}
+
+Ref<StyleBoxFlat> EstiloFicha(Color borde) {
+	Ref<StyleBoxFlat> s;
+	s.instantiate();
+	s->set_bg_color(Color(0.04, 0.05, 0.16, 0.9));
+	s->set_border_width_all(2);
+	s->set_border_color(borde);
+	s->set_corner_radius_all(3);
+	s->set_corner_detail(1);
+	s->set_shadow_color(Color(0, 0, 0, 0.5));
+	s->set_shadow_size(2);
+	s->set_shadow_offset(Vector2(2, 2));
+	s->set_content_margin(SIDE_LEFT, 5);
+	s->set_content_margin(SIDE_RIGHT, 5);
+	s->set_content_margin(SIDE_TOP, 4);
+	s->set_content_margin(SIDE_BOTTOM, 4);
+	return s;
+}
+
+void PintarBorde(Control* ficha, Color borde) {
+	if (ficha->has_meta("borde") && (Color)ficha->get_meta("borde") == borde) return;
+	ficha->set_meta("borde", borde);
+	ficha->add_theme_stylebox_override("panel", EstiloFicha(borde));
+}
+
+void FijarTexto(Control* ficha, const char* ruta, const String& texto) {
+	Label* l = Object::cast_to<Label>(ficha->get_node_or_null(ruta));
+	if (l) l->set_text(texto);
+}
+
+void FijarBarra(Control* ficha, const char* fila, int valor, int maximo) {
+	String base = String("V/Cabecera/Info/") + fila;
+	ProgressBar* barra = Object::cast_to<ProgressBar>(ficha->get_node_or_null(NodePath(base + "/Barra")));
+	if (barra) { barra->set_max(UtilityFunctions::maxi(1, maximo)); barra->set_value(valor); }
+	Label* l = Object::cast_to<Label>(ficha->get_node_or_null(NodePath(base + "/Valor")));
+	if (l) l->set_text(String::num_int64(valor));
+}
+
+// PA como rombos (llenos = disponibles)
+void PintarPA(Control* ficha, int pa, int pa_max) {
+	HBoxContainer* caja = Object::cast_to<HBoxContainer>(ficha->get_node_or_null("V/Cabecera/Info/Fila/PA"));
+	if (!caja) return;
+	int clave = pa * 100 + pa_max;
+	if (caja->has_meta("pintado") && (int)caja->get_meta("pintado") == clave) return;
+	caja->set_meta("pintado", clave);
+
+	TypedArray<Node> viejos = caja->get_children();
+	for (int i = 0; i < viejos.size(); i++) {
+		Node* n = Object::cast_to<Node>(viejos[i]);
+		caja->remove_child(n);
+		n->queue_free();
+	}
+	for (int i = 0; i < pa_max; i++) {
+		ColorRect* r = memnew(ColorRect);
+		r->set_custom_minimum_size(Vector2(5, 5));
+		r->set_pivot_offset(Vector2(2.5, 2.5));
+		r->set_rotation((float)Math_PI * 0.25f);
+		r->set_color(i < pa ? Color(0.4, 0.8, 1.0) : Color(0.16, 0.18, 0.32));
+		r->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+		caja->add_child(r);
+	}
+}
+
+void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
+	FijarTexto(f, "V/Cabecera/Info/Fila/Nombre", p->get_meta("nombre_display", p->get_name()));
+	FijarBarra(f, "Vida", p->get_meta("hp_actual", 0), p->get_meta("hp_max", 100));
+	FijarBarra(f, "Hambre", p->get_meta("hambre_actual", 0), p->get_meta("hambre_max", 10));
+	FijarBarra(f, "Cordura", p->get_meta("sanidad_actual", 0), p->get_meta("sanidad_max", 100));
+	PintarPA(f, p->get_meta("pa_actual", 0), p->get_meta("pa_max", 0));
+
+	FijarTexto(f, "V/Detalle/Stats", GenerarTextoStats(p));
+	FijarTexto(f, "V/Detalle/Recursos/Oro", String::num_int64((int)p->get_meta("oro", 0)));
+	FijarTexto(f, "V/Detalle/Recursos/Comida", "Comida: " + String::num_int64((int)p->get_meta("comida_bolsa", 0)));
+
+	int max_slots = p->get_meta("max_slots", 3);
+	TypedArray<Resource> inv = p->get_meta("items_lista", TypedArray<Resource>());
+	for (int s = 1; s <= 4; s++) {
+		TextureRect* slot = Object::cast_to<TextureRect>(f->get_node_or_null(NodePath("V/Detalle/Slots/Slot" + String::num_int64(s))));
+		if (!slot) continue;
+		slot->set_visible(s <= max_slots);
+		Ref<Texture2D> icono;
+		if (s - 1 < inv.size()) {
+			Ref<Resource> item = inv[s - 1];
+			if (item.is_valid()) icono = item->get("icon");
+		}
+		slot->set_texture(icono);
+	}
+
+	bool muerto = p->get_meta("esta_muerto", false);
+	bool escapado = p->get_meta("ha_escapado", false);
+	bool agotado = p->get_meta("ha_movido", false) || (int)p->get_meta("pa_actual", 0) <= 0;
+	if (muerto) f->set_modulate(Color(0.7, 0.3, 0.3, 0.8));
+	else if (escapado) f->set_modulate(Color(0.6, 0.6, 0.7, 0.55));
+	else if (agotado && p != activo) f->set_modulate(Color(0.6, 0.6, 0.65, 1.0));
+	else f->set_modulate(Color(1, 1, 1, 1));
+	PintarBorde(f, p == activo ? BORDE_ACTIVO : BORDE_NORMAL);
+}
+
+void RellenarFichaEnemigo(Control* f, Node3D* e) {
+	FijarTexto(f, "V/Cabecera/Info/Fila/Nombre", e->get_meta("nombre_display", "Enemigo"));
+	FijarBarra(f, "Vida", e->get_meta("hp_actual", 1), e->get_meta("hp_max", 1));
+	FijarTexto(f, "V/Detalle/Stats", "Fuerza: " + String::num_int64((int)e->get_meta("fuerza", 0)) +
+										 "\nDefensa: " + String::num_int64((int)e->get_meta("defensa", 0)));
+	f->set_meta("enemigo", e->get_name());
+
+	int frame = e->get_meta("frame", 11);
+	if (!f->has_meta("frame_pintado") || (int)f->get_meta("frame_pintado") != frame) {
+		f->set_meta("frame_pintado", frame);
+		if (m_hoja_personajes.is_null())
+			m_hoja_personajes = ResourceLoader::get_singleton()->load("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png");
+		Ref<AtlasTexture> retrato;
+		retrato.instantiate();
+		retrato->set_atlas(m_hoja_personajes);
+		retrato->set_region(Rect2((frame % 7) * 16, (frame / 7) * 16, 16, 16));
+		TextureRect* r = Object::cast_to<TextureRect>(f->get_node_or_null("V/Cabecera/Retrato"));
+		if (r) r->set_texture(retrato);
+	}
+	bool alerta = e->get_meta("in_combat", false);
+	PintarBorde(f, alerta ? BORDE_ENEMIGO_ALERTA : BORDE_ENEMIGO);
+}
+
+void ActualizarStatsUI(Caller* instance) {
+	Control* panel = PanelFichas();
+	Node* pm = GetPartyManager();
+	if (!panel || !pm) return;
+	Node* activo = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
+	TypedArray<Node> characters = GetPersonajesValidos();
 	for (int i = 0; i < characters.size(); i++) {
 		Node* p = Object::cast_to<Node>(characters[i]);
-		if (!p->has_meta("hp_actual")) continue;
+		Control* f = Object::cast_to<Control>(panel->get_node_or_null(NodePath(String(p->get_name()))));
+		if (f) RellenarFichaHeroe(f, p, activo);
+	}
+}
 
-		String base_path = "GridContainer/" + String(p->get_name()) + "/MarginContainer/VBoxContainer/";
+// Qué fichas se ven: fijadas, el activo y lo que hay en pantalla (en AUTO) y el enemigo bajo el cursor
+void ActualizarVisibilidadFichas() {
+	Control* panel = PanelFichas();
+	Node* pm = GetPartyManager();
+	Node* dm = GetDungeon();
+	if (!panel || !pm || !dm) return;
+	Camera3D* cam = Object::cast_to<Camera3D>(dm->get_node_or_null("Camera3D"));
+	Node* activo = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
 
-		ProgressBar* hp_bar     = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Life_Bar")));
-		ProgressBar* hunger_bar = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Hunger_Bar")));
-		ProgressBar* sanity_bar = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Sanity_Bar")));
+	auto en_pantalla = [&](Node3D* n) {
+		return n && n->is_visible() && cam && cam->is_position_in_frustum(n->get_global_position() + Vector3(0, 0.5, 0));
+	};
 
-		if (hp_bar)     hp_bar->set_value((int)p->get_meta("hp_actual"));
-		if (hunger_bar) hunger_bar->set_value((int)p->get_meta("hambre_actual"));
-		if (sanity_bar) sanity_bar->set_value((int)p->get_meta("sanidad_actual"));
+	TypedArray<Node> heroes = GetPersonajesValidos();
+	for (int i = 0; i < heroes.size(); i++) {
+		Node* p = Object::cast_to<Node>(heroes[i]);
+		String nombre = p->get_name();
+		Control* f = Object::cast_to<Control>(panel->get_node_or_null(NodePath(nombre)));
+		if (!f) continue;
+		Node3D* token = Object::cast_to<Node3D>(dm->get_node_or_null(NodePath(nombre)));
+		f->set_visible(FichaFijada(nombre) || (fichas_auto && (p == activo || en_pantalla(token))));
+	}
 
-		Label* stats_label = Object::cast_to<Label>(self->get_node_or_null(NodePath(base_path + "Stats_Box/Label")));
-		if (stats_label) stats_label->set_text(GenerarTextoStats(p));
+	Vector2i hover = dm->get_meta("hover_celda", Vector2i(-1, -1));
+	String nombre_hover = "Enemy_" + String::num_int64(hover.x) + "_" + String::num_int64(hover.y);
+	std::vector<Node3D*> enemigos;
+	TypedArray<Node> hijos = dm->get_children();
+	for (int i = 0; i < hijos.size(); i++) {
+		Node3D* e = Object::cast_to<Node3D>(hijos[i]);
+		if (!e || !e->is_visible()) continue;
+		String n = e->get_name();
+		if (!n.begins_with("Enemy_") || n.ends_with("_muerto")) continue;
+		if (n == nombre_hover) enemigos.insert(enemigos.begin(), e);
+		else if (fichas_auto && en_pantalla(e)) enemigos.push_back(e);
+	}
+	for (int k = 0; k < MAX_FICHAS_ENEMIGO; k++) {
+		Control* f = Object::cast_to<Control>(panel->get_node_or_null(NodePath("Enemigo" + String::num_int64(k))));
+		if (!f) continue;
+		bool usada = k < (int)enemigos.size();
+		f->set_visible(usada);
+		if (usada) RellenarFichaEnemigo(f, enemigos[k]);
 	}
 }
 
@@ -228,155 +417,81 @@ void DebugForzarSalida(Caller* instance) {
 }
 
 void UpdateWarriorUI(Caller* instance) {
-	Node* pm = GetPartyManager();
-	if (!pm) return;
-	
-	Node* active_char = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
-	TypedArray<Node> characters = GetPersonajesValidos();
-
-	for (int i = 0; i < characters.size(); i++) {
-		Node* p = Object::cast_to<Node>(characters[i]);
-		
-		String base_path = "GridContainer/" + String(p->get_name());
-		String portrait_path = base_path + "/MarginContainer/VBoxContainer/Cabecera/Retrato";
-
-		Control* portrait = Object::cast_to<Control>(self->get_node_or_null(NodePath(portrait_path)));
-
-		bool has_moved   = p->has_meta("ha_movido")   ? (bool)p->get_meta("ha_movido")   : false;
-		bool has_escaped = p->has_meta("ha_escapado") ? (bool)p->get_meta("ha_escapado") : false;
-		bool is_dead     = p->has_meta("esta_muerto") ? (bool)p->get_meta("esta_muerto") : false; 
-		
-		if (portrait) {
-			if (is_dead) {
-				portrait->set_modulate(Color(0.3, 0.0, 0.0, 0.8)); 
-			} else if (has_escaped) {
-				portrait->set_modulate(Color(0.2, 0.2, 0.2, 0.3)); 
-			} else if (has_moved) {
-				portrait->set_modulate(Color(0.3, 0.3, 0.3, 1.0)); 
-			} else if (p == active_char) {
-				portrait->set_modulate(Color(0.984, 0.6, 0.0, 1.0)); 
-			} else {
-				portrait->set_modulate(Color(1.0, 1.0, 1.0, 1.0)); 
-			}
-		}
-		
-		int gold = p->has_meta("oro") ? (int)p->get_meta("oro") : 0;
-		int food = p->has_meta("comida_bolsa") ? (int)p->get_meta("comida_bolsa") : 0;
-		int max_slots = p->has_meta("max_slots") ? (int)p->get_meta("max_slots") : 3;
-		TypedArray<Resource> inventory = p->has_meta("items_lista") ? (TypedArray<Resource>)p->get_meta("items_lista") : TypedArray<Resource>();
-
-		// 1. DEFINIMOS LAS RUTAS EXACTAS BASADAS EN TU ÁRBOL
-		String gold_path = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/Oro";
-		String food_path = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/Comida";
-		String pa_path   = base_path + "/MarginContainer/VBoxContainer/Inventario/Recursos/PA"; // <-- Ruta corregida
-		
-		// 2. ACTUALIZAMOS EL ORO
-		Label* lbl_gold = Object::cast_to<Label>(self->get_node_or_null(NodePath(gold_path)));
-		if (lbl_gold) lbl_gold->set_text("Gold: " + String::num_int64(gold));
-		
-		// 3. ACTUALIZAMOS LA COMIDA
-		Label* lbl_food = Object::cast_to<Label>(self->get_node_or_null(NodePath(food_path)));
-		if (lbl_food) lbl_food->set_text("Food: " + String::num_int64(food));
-
-		// 4. ACTUALIZAMOS TUS PUNTOS DE ACCIÓN (PA) VISIBLES PERMANENTEMENTE
-		Label* lbl_pa = Object::cast_to<Label>(self->get_node_or_null(NodePath(pa_path)));
-		if (lbl_pa) {
-			int pa_act = p->has_meta("pa_actual") ? (int)p->get_meta("pa_actual") : 0;
-			int pa_max = p->has_meta("pa_max")    ? (int)p->get_meta("pa_max")    : 0;
-			lbl_pa->set_text("PA: " + String::num_int64(pa_act) + " / " + String::num_int64(pa_max));
-		}
-
-		for (int s = 1; s <= 4; s++) {
-			String slot_path = base_path + "/MarginContainer/VBoxContainer/Inventario/SlotsItems/Slot" + String::num_int64(s);
-			TextureRect* slot = Object::cast_to<TextureRect>(self->get_node_or_null(NodePath(slot_path)));
-			
-			if (!slot) continue;
-
-			if (s > max_slots) {
-				slot->set_visible(false);
-			} else {
-				slot->set_visible(true);
-				
-				if (s - 1 < inventory.size()) {
-					Variant item_var = inventory[s - 1];
-					Ref<Resource> item = item_var;
-					
-					if (item.is_valid()) {
-						Variant icon_var = item->get("icon"); 
-						Ref<Texture2D> icon_tex = icon_var;
-						if (icon_tex.is_valid()) slot->set_texture(icon_tex);
-					} 
-				} else {
-					Ref<Texture2D> empty_tex;
-					slot->set_texture(empty_tex);
-				}
-			}
-		}
-	}
+	ActualizarStatsUI(instance);
+	ActualizarVisibilidadFichas();
 }
 
 void InicializarTodaLaUI(Caller* instance) {
-	TypedArray<Node> characters = GetPersonajesValidos();
+	Control* panel = PanelFichas();
+	if (!panel) return;
+	Ref<PackedScene> escena = ResourceLoader::get_singleton()->load("res://Scenes/ficha_compacta.tscn");
+	if (escena.is_null()) return;
 
+	auto conectar = [&](Control* ficha, const String& nombre, bool seleccionable) {
+		Button* btn = Object::cast_to<Button>(ficha->get_node_or_null("BtnFicha"));
+		if (!btn) return;
+		if (seleccionable) btn->connect("pressed", Callable(self, StringName("SeleccionarPersonajeDesdeUI")).bind(nombre));
+		btn->connect("mouse_entered", Callable(self, StringName("MostrarStats")).bind(nombre));
+		btn->connect("mouse_exited", Callable(self, StringName("OcultarStats")).bind(nombre));
+	};
+
+	TypedArray<Node> characters = GetPersonajesValidos();
 	for (int i = 0; i < characters.size(); i++) {
 		Node* p = Object::cast_to<Node>(characters[i]);
-		if (!p->has_meta("hp_actual")) continue; 
-
 		String name = p->get_name();
-		String base_path = "GridContainer/" + name + "/MarginContainer/VBoxContainer/";
-		
-		Label* l_name           = Object::cast_to<Label>(self->get_node_or_null(NodePath(base_path + "Cabecera/Nombre")));
-		ProgressBar* hp_bar     = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Life_Bar")));
-		ProgressBar* hunger_bar = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Hunger_Bar")));
-		ProgressBar* sanity_bar = Object::cast_to<ProgressBar>(self->get_node_or_null(NodePath(base_path + "Sanity_Bar")));
-		TextureRect* portrait   = Object::cast_to<TextureRect>(self->get_node_or_null(NodePath(base_path + "Cabecera/Retrato")));
-		
-		if (portrait && p->has_meta("retrato_path")) {
-			String path = p->get_meta("retrato_path");
-			if (!path.is_empty()) {
-				Ref<Texture2D> tex = ResourceLoader::get_singleton()->load(path);
-				if (tex.is_valid()) portrait->set_texture(tex); 
-			}
-		}
-		
-		Control* stats_box = Object::cast_to<Control>(self->get_node_or_null(NodePath(base_path + "Stats_Box")));
-		Label* stats_label = Object::cast_to<Label>(self->get_node_or_null(NodePath(base_path + "Stats_Box/Label")));
+		if (panel->get_node_or_null(NodePath(name))) continue;
 
-		if (stats_box) {
-			stats_box->set("custom_minimum_size", Vector2(0, 0));
-			stats_box->set_visible(false);
+		Control* ficha = Object::cast_to<Control>(escena->instantiate());
+		ficha->set_name(name);
+		panel->add_child(ficha);
+
+		TextureRect* portrait = Object::cast_to<TextureRect>(ficha->get_node_or_null("V/Cabecera/Retrato"));
+		String path = p->get_meta("retrato_path", "");
+		if (portrait && !path.is_empty()) {
+			Ref<Texture2D> tex = ResourceLoader::get_singleton()->load(path);
+			if (tex.is_valid()) portrait->set_texture(tex);
 		}
-		
-		if (l_name) l_name->set_text(p->get_meta("nombre_display"));
-		
-		if (hp_bar) {
-			hp_bar->set_max((int)p->get_meta("hp_max"));
-			hp_bar->set_value((int)p->get_meta("hp_actual"));
-		}
-		if (hunger_bar) { hunger_bar->set_max(10); hunger_bar->set_value(10); }
-		if (sanity_bar) { sanity_bar->set_max(100); sanity_bar->set_value(100); }
-		
-		if (stats_label) stats_label->set_text(GenerarTextoStats(p));
-		
-		Button* btn_card = Object::cast_to<Button>(self->get_node_or_null(NodePath("GridContainer/" + name + "/BtnFicha")));
-		if (btn_card) {
-			Callable click_fn = Callable(self, StringName("SeleccionarPersonajeDesdeUI")).bind(name);
-			Callable show_fn  = Callable(self, StringName("MostrarStats")).bind(name);
-			Callable hide_fn  = Callable(self, StringName("OcultarStats")).bind(name);
-			
-			if (!btn_card->is_connected("pressed", click_fn))      btn_card->connect("pressed", click_fn);
-			if (!btn_card->is_connected("mouse_entered", show_fn)) btn_card->connect("mouse_entered", show_fn);
-			if (!btn_card->is_connected("mouse_exited", hide_fn))  btn_card->connect("mouse_exited", hide_fn);
-		}
+		conectar(ficha, name, true);
 	}
+
+	// Fichas de enemigo (se reutilizan según quién esté en pantalla)
+	for (int k = 0; k < MAX_FICHAS_ENEMIGO; k++) {
+		String name = "Enemigo" + String::num_int64(k);
+		if (panel->get_node_or_null(NodePath(name))) continue;
+		Control* ficha = Object::cast_to<Control>(escena->instantiate());
+		ficha->set_name(name);
+		const char* ocultar[] = { "V/Cabecera/Info/Hambre", "V/Cabecera/Info/Cordura", "V/Cabecera/Info/Fila/PA", "V/Detalle/Recursos", "V/Detalle/Slots" };
+		for (const char* r : ocultar) {
+			Control* c = Object::cast_to<Control>(ficha->get_node_or_null(r));
+			if (c) c->set_visible(false);
+		}
+		ficha->set_visible(false);
+		panel->add_child(ficha);
+		conectar(ficha, name, false);
+	}
+
+	ActualizarStatsUI(instance);
+	ActualizarVisibilidadFichas();
 }
 
-// ==========================================
-// MOUSE FUNCTIONS
-// ==========================================
+void AlternarModoFichas(Caller* instance) {
+	fichas_auto = !fichas_auto;
+	fichas_fijadas.clear();
+	Button* btn = Object::cast_to<Button>(self->get_node_or_null("BtnFichas"));
+	if (btn) btn->set_text(fichas_auto ? "FICHAS: AUTO" : "FICHAS: OCULTAS");
+	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+	if (audio) audio->call("play_ui", "clic");
+	ActualizarVisibilidadFichas();
+}
+
+// Al hacer clic en un héroe del mapa su ficha se queda visible (también en modo OCULTAS)
+void FijarFicha(Caller* instance, String nombre) {
+	if (!FichaFijada(nombre)) fichas_fijadas.push_back(nombre);
+	ActualizarVisibilidadFichas();
+}
 
 void SeleccionarPersonajeDesdeUI(Caller* instance, String nombre) {
-	if (!self) return;
+	if (!self || nombre.begins_with("Enemigo")) return;
 
 	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
 	if (dungeon && dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving")) {
@@ -396,27 +511,18 @@ void SeleccionarPersonajeDesdeUI(Caller* instance, String nombre) {
 }
 
 void MostrarStats(Caller* instance, String nombre) {
-	if (!self) return;
-	Control* stats_box = Object::cast_to<Control>(self->get_node_or_null("GridContainer/" + nombre + "/MarginContainer/VBoxContainer/Stats_Box"));
-	if (stats_box) {
-		stats_box->set_visible(true);
-		Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
-		if (audio) audio->call("play_ui", "open");
-		Ref<Tween> tween = stats_box->create_tween();
-		tween->tween_property(stats_box, "custom_minimum_size", Vector2(0, 140), 0.2)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_OUT);
-	}
+	Control* panel = PanelFichas();
+	Control* detalle = panel ? Object::cast_to<Control>(panel->get_node_or_null(NodePath(nombre + "/V/Detalle"))) : nullptr;
+	if (!detalle) return;
+	detalle->set_visible(true);
+	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
+	if (audio) audio->call("play_ui", "open");
 }
 
 void OcultarStats(Caller* instance, String nombre) {
-	if (!self) return;
-	Control* stats_box = Object::cast_to<Control>(self->get_node_or_null("GridContainer/" + nombre + "/MarginContainer/VBoxContainer/Stats_Box"));
-	if (stats_box) {
-		Ref<Tween> tween = stats_box->create_tween();
-		//Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
-		//if (audio) audio->call("play_ui", "no");
-		tween->tween_property(stats_box, "custom_minimum_size", Vector2(0, 0), 0.15)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_OUT);
-		tween->connect("finished", Callable(stats_box, StringName("hide")));
-	}
+	Control* panel = PanelFichas();
+	Control* detalle = panel ? Object::cast_to<Control>(panel->get_node_or_null(NodePath(nombre + "/V/Detalle"))) : nullptr;
+	if (detalle) detalle->set_visible(false);
 }
 
 // ==========================================
@@ -689,6 +795,12 @@ void OnReady(Caller* instance) {
 		}
 	}
 	
+	Button* btn_fichas = Object::cast_to<Button>(self->get_node_or_null("BtnFichas"));
+	if (btn_fichas) {
+		Callable fn = Callable(self, StringName("AlternarModoFichas"));
+		if (!btn_fichas->is_connected("pressed", fn)) btn_fichas->connect("pressed", fn);
+	}
+
 	Button* btn_debug = Object::cast_to<Button>(self->get_node_or_null("BtnSalidaDebug"));
 	if (btn_debug) {
 		Callable debug_fn = Callable(self, StringName("DebugForzarSalida"));
@@ -711,6 +823,17 @@ void OnReady(Caller* instance) {
 
 void OnProcess(Caller* instance, double delta) {
 	if (!self) return;
+
+	// TAB alterna el modo de las fichas
+	bool tab = Input::get_singleton()->is_physical_key_pressed(KEY_TAB);
+	if (tab && !tab_prev) AlternarModoFichas(instance);
+	tab_prev = tab;
+
+	t_fichas -= (float)delta;
+	if (t_fichas <= 0.0f) {
+		t_fichas = 0.1f;
+		ActualizarVisibilidadFichas();
+	}
 
 	if (anim_dados) {
 		tiempo_dados -= delta;

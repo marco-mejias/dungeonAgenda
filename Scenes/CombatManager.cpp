@@ -99,7 +99,7 @@ void AtacarEnemigo(Caller* instance, int x, int y) {
 	enemigo->set_meta("hp_actual", hp);
 
 	UtilityFunctions::print("[CombatManager] ", heroe->get_name(), " golpea al esqueleto por ", dano, critico ? " (¡CRÍTICO!)" : "", ". Le quedan ", UtilityFunctions::maxi(0, hp), " PV.");
-	TextoFlotante(dungeon, enemigo->get_position(), (critico ? "¡" : "") + String::num_int64(dano) + (critico ? "!" : ""), critico ? Color(1, 0.85, 0.2) : Color(1, 1, 1));
+	TextoFlotante(dungeon, enemigo->get_position(), (critico ? String::utf8("\xC2\xA1") : String()) + String::num_int64(dano) + (critico ? String("!") : String()), critico ? Color(1, 0.85, 0.2) : Color(1, 1, 1));
 	Parpadeo(enemigo);
 	if (audio) audio->call("play_sfx", "success");
 
