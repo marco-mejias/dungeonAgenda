@@ -85,7 +85,7 @@ namespace {
 	Ref<Texture2D> m_atlas;
 	Ref<Image> m_fog_img;
 	Ref<ImageTexture> m_fog_tex;
-	Ref<ShaderMaterial> m_mat_suelo, m_mat_muro, m_mat_puerta, m_mat_cofre, m_mat_piedra;
+	Ref<ShaderMaterial> m_mat_suelo, m_mat_muro, m_mat_puerta, m_mat_cofre, m_mat_piedra, m_mat_marco;
 	std::vector<Ref<ShaderMaterial>> m_mats_mundo;
 
 	Vector4 Tile(int col, int fila) { return Vector4(col * TILE, fila * TILE, TILE, TILE); }
@@ -207,6 +207,22 @@ namespace {
 		prop->set_visible(false);
 		m_props->add_child(prop);
 		return prop;
+	}
+
+	Sprite3D* CrearSpriteTile(Node* padre, const String& nombre, Rect2 region, float pixel, Vector3 pos, bool sombreado) {
+		Sprite3D* sp = memnew(Sprite3D);
+		sp->set_name(nombre);
+		sp->set_texture(m_atlas);
+		sp->set_region_enabled(true);
+		sp->set_region_rect(region);
+		sp->set_pixel_size(pixel);
+		sp->set_billboard_mode(BaseMaterial3D::BILLBOARD_FIXED_Y);
+		sp->set_alpha_cut_mode(SpriteBase3D::ALPHA_CUT_DISCARD);
+		sp->set_texture_filter(BaseMaterial3D::TEXTURE_FILTER_NEAREST);
+		sp->set_draw_flag(SpriteBase3D::FLAG_SHADED, sombreado);
+		sp->set_position(pos);
+		padre->add_child(sp);
+		return sp;
 	}
 
 	void CrearAntorcha(int x, int y, Vector2i hacia) {
@@ -472,6 +488,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	m_mat_puerta = CrearMaterialMundo(Tile(8, 3), Tile(8, 7), false, false);
 	m_mat_cofre = CrearMaterialMundo(Tile(3, 8), Tile(3, 8), false, false);
 	m_mat_piedra = CrearMaterialMundo(Tile(2, 4), Tile(7, 2), false, false);
+	m_mat_marco = CrearMaterialMundo(Tile(5, 1), Tile(8, 7), false, false);
 
 	m_mundo = memnew(Node3D);
 	m_mundo->set_name("Mundo");
@@ -526,10 +543,20 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 			uint8_t t = tipos[x * grid + y];
 			if (t != T_PUERTA && t != T_PUERTA_ABIERTA) continue;
 			Node3D* prop = CrearProp(NombreProp("Puerta", x, y), x, y, false);
-			bool corta_en_x = EsMuro(x - 1, y) && EsMuro(x + 1, y); // pasillo vertical: la puerta se extiende en X
-			Vector3 escala = corta_en_x ? Vector3(1.0, WALL_H * 0.96, 0.16) : Vector3(0.16, WALL_H * 0.96, 1.0);
-			MeshInstance3D* hoja = CrearPieza(prop, "Hoja", bloque, m_mat_puerta, Vector3(), escala);
-			if (t == T_PUERTA_ABIERTA) hoja->set_visible(false);
+			// En local la puerta siempre se extiende en X; si el pasillo es horizontal la giramos 90º
+			bool corta_en_x = EsMuro(x - 1, y) && EsMuro(x + 1, y);
+			if (!corta_en_x) prop->set_rotation(Vector3(0, (float)Math_PI * 0.5f, 0));
+
+			CrearPieza(prop, "PosteA", bloque, m_mat_marco, Vector3(-0.44f, 0, 0), Vector3(0.12, WALL_H, 0.24));
+			CrearPieza(prop, "PosteB", bloque, m_mat_marco, Vector3(0.44f, 0, 0), Vector3(0.12, WALL_H, 0.24));
+			CrearPieza(prop, "Dintel", bloque, m_mat_marco, Vector3(0, WALL_H * 0.84f, 0), Vector3(1.0, WALL_H * 0.16f, 0.24));
+
+			Node3D* bisagra = memnew(Node3D);
+			bisagra->set_name("Bisagra");
+			bisagra->set_position(Vector3(-0.38f, 0, 0));
+			prop->add_child(bisagra);
+			CrearPieza(bisagra, "Hoja", bloque, m_mat_puerta, Vector3(0.38f, 0, 0), Vector3(0.76, WALL_H * 0.83f, 0.09));
+			if (t == T_PUERTA_ABIERTA) bisagra->set_rotation(Vector3(0, -1.75f, 0));
 		}
 	}
 
@@ -583,12 +610,10 @@ void AbrirCofre(Caller* instance, int x, int y) {
 void AbrirPuerta(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	if (x >= 0 && y >= 0 && x < grid && y < grid) tipos[x * grid + y] = T_PUERTA_ABIERTA;
-	Node3D* hoja = Object::cast_to<Node3D>(m_props->get_node_or_null(NodePath(NombreProp("Puerta", x, y) + "/Hoja")));
-	if (!hoja) return;
-	// Estilo rastrillo: la puerta se hunde en el suelo
-	Ref<Tween> tw = hoja->create_tween();
-	tw->tween_property(hoja, "position:y", -WALL_H * 1.05, 0.45)->set_trans(Tween::TRANS_QUAD)->set_ease(Tween::EASE_IN);
-	tw->tween_callback(Callable(hoja, StringName("hide")));
+	Node3D* bisagra = Object::cast_to<Node3D>(m_props->get_node_or_null(NodePath(NombreProp("Puerta", x, y) + "/Bisagra")));
+	if (!bisagra) return;
+	Ref<Tween> tw = bisagra->create_tween();
+	tw->tween_property(bisagra, "rotation:y", -1.75, 0.55)->set_trans(Tween::TRANS_BACK)->set_ease(Tween::EASE_OUT);
 }
 
 void CrearSalida(Caller* instance, int x, int y) {
@@ -606,6 +631,57 @@ void CrearSalida(Caller* instance, int x, int y) {
 	luz->set_param(Light3D::PARAM_RANGE, 2.8);
 	luz->set_position(Vector3(0, 1.0, 0));
 	prop->add_child(luz);
+}
+
+// Brasero de pie: base de piedra, cuenco y llama con luz propia
+void CrearBrasero(Caller* instance, int x, int y) {
+	if (!m_props) return;
+	Node3D* prop = CrearProp(NombreProp("Brasero", x, y), x, y, false);
+	prop->set_meta("sprites", true);
+	Ref<ArrayMesh> bloque = CrearBloque(1.0f);
+	CrearPieza(prop, "Pie", bloque, m_mat_piedra, Vector3(0, 0, 0), Vector3(0.36, 0.08, 0.36));
+	CrearPieza(prop, "Columna", bloque, m_mat_marco, Vector3(0, 0.08f, 0), Vector3(0.14, 0.36, 0.14));
+	CrearPieza(prop, "Cuenco", bloque, m_mat_piedra, Vector3(0, 0.44f, 0), Vector3(0.5, 0.12, 0.5));
+
+	Sprite3D* llama = CrearSpriteTile(prop, "Llama", Rect2(0, 144, 16, 10), 0.045f, Vector3(0, 0.78f, 0), false);
+	llama->add_to_group("llamas");
+
+	OmniLight3D* luz = memnew(OmniLight3D);
+	luz->set_name("Luz");
+	luz->set_color(Color(1.0, 0.6, 0.28));
+	luz->set_param(Light3D::PARAM_ENERGY, 1.7);
+	luz->set_param(Light3D::PARAM_RANGE, 4.5);
+	luz->set_position(Vector3(0, 1.1f, 0));
+	luz->set_meta("energia_base", 1.7);
+	luz->add_to_group("antorchas");
+	prop->add_child(luz);
+}
+
+// Ternas (x, y, tipo): 0 = telaraña de esquina, 1 = huesos, 2 = calavera, 3 = rocas, 4 = piedras
+void CrearDecoracion(Caller* instance, PackedInt32Array ternas) {
+	if (!m_props) return;
+	for (int i = 0; i + 2 < ternas.size(); i += 3) {
+		int x = ternas[i], y = ternas[i + 1], tipo = ternas[i + 2];
+		Node3D* prop = CrearProp(NombreProp("Deco", x, y), x, y, false);
+		prop->set_meta("sprites", true);
+		float desp_x = (UtilityFunctions::randf() - 0.5f) * 0.3f;
+		float desp_z = (UtilityFunctions::randf() - 0.5f) * 0.3f;
+		switch (tipo) {
+			case 0: {
+				// Telaraña colgando en la esquina formada por los dos muros
+				float hx = EsMuro(x - 1, y) ? -1.0f : 1.0f;
+				float hz = EsMuro(x, y - 1) ? -1.0f : 1.0f;
+				Rect2 r = UtilityFunctions::randi_range(0, 1) == 0 ? Rect2(64, 96, 16, 16) : Rect2(80, 96, 16, 16);
+				Sprite3D* sp = CrearSpriteTile(prop, "Sprite", r, 0.045f, Vector3(hx * 0.34f, 0.72f, hz * 0.34f), true);
+				sp->set_flip_h(hx > 0);
+				break;
+			}
+			case 1: CrearSpriteTile(prop, "Sprite", Rect2(128, 96, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+			case 2: CrearSpriteTile(prop, "Sprite", Rect2(112, 112, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+			case 3: CrearSpriteTile(prop, "Sprite", Rect2(144, 64, 16, 16), 0.032f, Vector3(desp_x, 0.24f, desp_z), true); break;
+			default: CrearSpriteTile(prop, "Sprite", Rect2(144, 80, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+		}
+	}
 }
 
 void CrearMarcadorEvento(Caller* instance, int x, int y) {
@@ -656,6 +732,15 @@ void ActualizarNiebla(Caller* instance, PackedByteArray estados, int modo_debug)
 		uint8_t e = niebla[c.x * grid + c.y];
 		bool solo_visible = (bool)prop->get_meta("solo_si_visible");
 		prop->set_visible(solo_visible ? (e == 2 || niebla_debug) : (e >= 1));
+
+		if (prop->has_meta("sprites")) {
+			Color tono = (e == 2 || niebla_debug) ? Color(1, 1, 1) : Color(0.32, 0.32, 0.42);
+			TypedArray<Node> hijos = prop->get_children();
+			for (int j = 0; j < hijos.size(); j++) {
+				Sprite3D* sp = Object::cast_to<Sprite3D>(hijos[j]);
+				if (sp && !sp->is_in_group("llamas")) sp->set_modulate(tono);
+			}
+		}
 	}
 }
 
@@ -912,6 +997,15 @@ void OnProcess(Caller* instance, double delta) {
 		luz->set_param(Light3D::PARAM_ENERGY, base * f);
 	}
 
+	// Llamas de los braseros: pequeño latido de tamaño
+	TypedArray<Node> llamas = self->get_tree()->get_nodes_in_group("llamas");
+	for (int i = 0; i < llamas.size(); i++) {
+		Node3D* l = Object::cast_to<Node3D>(llamas[i]);
+		if (!l) continue;
+		float k = 1.0f + 0.12f * std::sin(t * 9.0f + i * 2.3f) + 0.06f * std::sin(t * 17.0f + i);
+		l->set_scale(Vector3(1.0f + 0.05f * std::sin(t * 13.0f + i), k, 1.0f));
+	}
+
 	// Gemas de evento flotando
 	TypedArray<Node> gemas = self->get_tree()->get_nodes_in_group("gemas_evento");
 	for (int i = 0; i < gemas.size(); i++) {
@@ -934,7 +1028,7 @@ void OnDestroy(Caller* instance) {
 	m_raiz2d = nullptr;
 	m_coste = nullptr;
 	m_mats_mundo.clear();
-	m_mat_suelo.unref(); m_mat_muro.unref(); m_mat_puerta.unref(); m_mat_cofre.unref(); m_mat_piedra.unref();
+	m_mat_suelo.unref(); m_mat_muro.unref(); m_mat_puerta.unref(); m_mat_cofre.unref(); m_mat_piedra.unref(); m_mat_marco.unref();
 	m_fog_tex.unref(); m_fog_img.unref(); m_shader.unref(); m_shader_overlay.unref(); m_atlas.unref();
 }
 
