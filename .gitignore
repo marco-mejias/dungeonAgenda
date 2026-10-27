@@ -10,3 +10,7 @@
 .vs/
 *.sln
 *.vcxproj*
+# Skills de agentes (instaladas en local, no van al repositorio)
+.agents/
+.claude/
+skills-lock.json

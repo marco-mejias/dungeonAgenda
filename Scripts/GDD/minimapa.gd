@@ -1,11 +1,15 @@
 extends Control
 
 # Minimapa de lo explorado (esquina superior derecha). Gira con la cámara para que
-# "arriba" sea siempre hacia donde mira. M lo oculta/muestra. Clic = llevar la cámara allí.
+# "arriba" sea siempre hacia donde mira y acompaña su zoom. M lo oculta/muestra.
+# Mantener pulsado = vistazo de la cámara a ese punto; al soltar vuelve al héroe.
 
 const GRID := 35
 const LADO := 132.0
-const ZOOM := 2.2 # el mapa entero no cabe a buen tamaño: vemos la zona del héroe activo
+# Zoom del minimapa: ZOOM_BASE con la cámara a su distancia de referencia; sigue al zoom de la cámara
+const ZOOM_BASE := 2.2
+const ZOOM_MIN := 1.0
+const ZOOM_MAX := 4.5
 # Códigos que devuelve DungeonManager.ObtenerMinimapa()
 const COLORES := {
 	0: Color(0, 0, 0, 0),             # sin explorar
@@ -28,6 +32,8 @@ var mapa: TextureRect
 var t_refresco := 0.0
 var m_prev := false
 var yaw_actual := 45.0
+var zoom_actual := ZOOM_BASE
+var vistazo := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -69,7 +75,7 @@ func _ready() -> void:
 	mapa.texture = textura
 	mapa.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mapa.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mapa.size = Vector2(LADO, LADO) * ZOOM
+	mapa.size = Vector2(LADO, LADO) * ZOOM_BASE
 	mapa.mouse_filter = Control.MOUSE_FILTER_STOP
 	mapa.gui_input.connect(_on_mapa_input)
 	mascara.add_child(mapa)
@@ -93,9 +99,20 @@ func _process(delta: float) -> void:
 		yaw_actual = lerp(yaw_actual, yaw, min(1.0, 10.0 * delta))
 		var y := deg_to_rad(yaw_actual)
 		mapa.rotation = -PI * 0.5 - atan2(-cos(y), -sin(y))
+		# zoom_factor = 2 a la distancia de referencia: más cerca = más zoom también aquí
+		var zoom_cam: float = cam.get_meta("zoom_factor", 2.0)
+		var objetivo := clampf(ZOOM_BASE * zoom_cam * 0.5, ZOOM_MIN, ZOOM_MAX)
+		zoom_actual = lerp(zoom_actual, objetivo, min(1.0, 10.0 * delta))
+		mapa.size = Vector2(LADO, LADO) * zoom_actual
 		var pivote: Vector3 = cam.get_meta("pivote", Vector3(GRID * 0.5, 0, GRID * 0.5))
 		mapa.pivot_offset = Vector2(pivote.x, pivote.z) / GRID * mapa.size
 		mapa.position = mapa.get_parent().size * 0.5 - mapa.pivot_offset
+
+	# Al soltar el botón se acaba el vistazo y la cámara vuelve al héroe
+	if vistazo and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		vistazo = false
+		if cam and cam.has_meta("vistazo"):
+			cam.remove_meta("vistazo")
 
 	t_refresco -= delta
 	if t_refresco > 0.0:
@@ -116,5 +133,7 @@ func _on_mapa_input(ev: InputEvent) -> void:
 		var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 		var cam: Node = dm.get_node_or_null("Camera3D") if dm else null
 		if cam and celda.x >= 0 and celda.y >= 0 and celda.x < GRID and celda.y < GRID:
-			cam.set_meta("ir_a", Vector3(celda.x, 0, celda.y))
+			# El punto se fija al pulsar (el mapa se recentra mientras la cámara viaja)
+			cam.set_meta("vistazo", Vector3(celda.x, 0, celda.y))
+			vistazo = true
 		accept_event()

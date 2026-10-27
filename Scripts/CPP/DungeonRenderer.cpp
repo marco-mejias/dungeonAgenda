@@ -42,31 +42,20 @@
 #include <Godot/classes/scene_tree.hpp>
 #include <Godot/classes/time.hpp>
 #include <Godot/variant/utility_functions.hpp>
+#include "Scripts/CPP/Render/Mallas.hpp"
+#include "Scripts/CPP/Render/Capa2D.hpp"
 #include <vector>
 #include <cmath>
 
 using namespace godot;
 using namespace jenova::sdk;
+using namespace render;
 
 namespace {
-	// Tipos de casilla que nos manda el DungeonManager
-	const uint8_t T_MURO = 0;
-	const uint8_t T_SUELO = 1;
-	const uint8_t T_PUERTA = 2;
-	const uint8_t T_PUERTA_ABIERTA = 3;
-
 	// Tipos de overlay de alcance
 	const int O_ANDAR = 0;
 	const int O_INTERACTUAR = 1;
 	const int O_ENEMIGO = 2;
-
-	// Estilos de bocadillo
-	const int B_NORMAL = 0;
-	const int B_SIN_PA = 1;
-	const int B_HOVER = 2;
-
-	const float WALL_H = 1.0f;
-	const float TILE = 0.1f; // 16px de 160px en el atlas
 
 	Node3D* self = nullptr;
 	int grid = 0;
@@ -86,9 +75,9 @@ namespace {
 	MeshInstance3D* m_cursor = nullptr;
 	MeshInstance3D* m_marcador = nullptr;
 
-	// Capa 2D dentro del SubViewport: elementos anclados a posiciones 3D (se pixelan como el mundo)
 	CPUParticles3D* m_motas = nullptr;
 	DirectionalLight3D* m_luna = nullptr;
+	// Capa 2D dentro del SubViewport: elementos anclados a posiciones 3D (ver Render/Capa2D.hpp)
 	CanvasLayer* m_capa2d = nullptr;
 	Control* m_raiz2d = nullptr;
 	Control* m_coste = nullptr;
@@ -101,10 +90,6 @@ namespace {
 	Ref<ShaderMaterial> m_mat_suelo, m_mat_muro, m_mat_puerta, m_mat_cofre, m_mat_piedra, m_mat_marco;
 	std::vector<Ref<ShaderMaterial>> m_mats_mundo;
 
-	Vector4 Tile(int col, int fila) { return Vector4(col * TILE, fila * TILE, TILE, TILE); }
-
-	Vector3 GridToWorld(int x, int y) { return Vector3(x + 0.5f, 0.0f, y + 0.5f); }
-
 	bool EsMuro(int x, int y) {
 		if (x < 0 || y < 0 || x >= grid || y >= grid) return true;
 		return tipos[x * grid + y] == T_MURO;
@@ -115,44 +100,6 @@ namespace {
 	Camera3D* Camara() {
 		Node* d = Dungeon();
 		return d ? Object::cast_to<Camera3D>(d->get_node_or_null("Camera3D")) : nullptr;
-	}
-
-	// Bloque de base 1x1 centrado en el origen, desde y=0 hasta y=h. UV2.x = 1 en la tapa superior.
-	Ref<ArrayMesh> CrearBloque(float h, bool con_lados = true) {
-		PackedVector3Array v, n;
-		PackedVector2Array uv, uv2;
-		PackedInt32Array idx;
-
-		auto cara = [&](Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal, float top) {
-			int base = v.size();
-			v.push_back(a); v.push_back(b); v.push_back(c); v.push_back(d);
-			for (int i = 0; i < 4; i++) { n.push_back(normal); uv2.push_back(Vector2(top, 0)); }
-			uv.push_back(Vector2(0, 0)); uv.push_back(Vector2(1, 0)); uv.push_back(Vector2(1, 1)); uv.push_back(Vector2(0, 1));
-			idx.push_back(base); idx.push_back(base + 1); idx.push_back(base + 2);
-			idx.push_back(base); idx.push_back(base + 2); idx.push_back(base + 3);
-		};
-
-		const float s = 0.5f;
-		if (con_lados) {
-			cara(Vector3(-s, h, s), Vector3(s, h, s), Vector3(s, 0, s), Vector3(-s, 0, s), Vector3(0, 0, 1), 0);
-			cara(Vector3(s, h, -s), Vector3(-s, h, -s), Vector3(-s, 0, -s), Vector3(s, 0, -s), Vector3(0, 0, -1), 0);
-			cara(Vector3(s, h, s), Vector3(s, h, -s), Vector3(s, 0, -s), Vector3(s, 0, s), Vector3(1, 0, 0), 0);
-			cara(Vector3(-s, h, -s), Vector3(-s, h, s), Vector3(-s, 0, s), Vector3(-s, 0, -s), Vector3(-1, 0, 0), 0);
-		}
-		cara(Vector3(-s, h, -s), Vector3(s, h, -s), Vector3(s, h, s), Vector3(-s, h, s), Vector3(0, 1, 0), 1);
-
-		Array arrays;
-		arrays.resize(Mesh::ARRAY_MAX);
-		arrays[Mesh::ARRAY_VERTEX] = v;
-		arrays[Mesh::ARRAY_NORMAL] = n;
-		arrays[Mesh::ARRAY_TEX_UV] = uv;
-		arrays[Mesh::ARRAY_TEX_UV2] = uv2;
-		arrays[Mesh::ARRAY_INDEX] = idx;
-
-		Ref<ArrayMesh> mesh;
-		mesh.instantiate();
-		mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
-		return mesh;
 	}
 
 	Ref<ShaderMaterial> CrearMaterialMundo(Vector4 lado, Vector4 tapa, bool cutaway, bool tile_instancia) {
@@ -170,47 +117,6 @@ namespace {
 		return mat;
 	}
 
-	Ref<StandardMaterial3D> CrearMaterialOverlay(Color color, bool color_instancia = false) {
-		Ref<StandardMaterial3D> mat;
-		mat.instantiate();
-		mat->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
-		mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
-		mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
-		mat->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
-		mat->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, color_instancia);
-		mat->set_albedo(color);
-		return mat;
-	}
-
-	MultiMeshInstance3D* CrearMultiMesh(const String& nombre, Ref<Mesh> mesh, Ref<Material> mat, bool custom_data, bool colores = false) {
-		Ref<MultiMesh> mm;
-		mm.instantiate();
-		mm->set_transform_format(MultiMesh::TRANSFORM_3D);
-		mm->set_use_custom_data(custom_data);
-		mm->set_use_colors(colores);
-		mm->set_mesh(mesh);
-		MultiMeshInstance3D* inst = memnew(MultiMeshInstance3D);
-		inst->set_name(nombre);
-		inst->set_multimesh(mm);
-		if (mat.is_valid()) inst->set_material_override(mat);
-		return inst;
-	}
-
-	String NombreProp(const String& tipo, int x, int y) {
-		return tipo + String("_") + String::num_int64(x) + String("_") + String::num_int64(y);
-	}
-
-	MeshInstance3D* CrearPieza(Node* padre, const String& nombre, Ref<Mesh> mesh, Ref<Material> mat, Vector3 pos, Vector3 escala) {
-		MeshInstance3D* m = memnew(MeshInstance3D);
-		m->set_name(nombre);
-		m->set_mesh(mesh);
-		m->set_material_override(mat);
-		m->set_position(pos);
-		m->set_scale(escala);
-		padre->add_child(m);
-		return m;
-	}
-
 	Node3D* CrearProp(const String& nombre, int x, int y, bool solo_si_visible) {
 		Node3D* prop = memnew(Node3D);
 		prop->set_name(nombre);
@@ -220,60 +126,6 @@ namespace {
 		prop->set_visible(false);
 		m_props->add_child(prop);
 		return prop;
-	}
-
-	CPUParticles3D* CrearParticulas(Node* padre, const String& nombre, int cantidad, float vida, float tam, Color color, Vector3 caja, Vector3 gravedad, float vel_min, float vel_max, float dispersion) {
-		CPUParticles3D* p = memnew(CPUParticles3D);
-		p->set_name(nombre);
-		Ref<QuadMesh> quad;
-		quad.instantiate();
-		quad->set_size(Vector2(tam, tam));
-		Ref<StandardMaterial3D> mat;
-		mat.instantiate();
-		mat->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
-		mat->set_billboard_mode(BaseMaterial3D::BILLBOARD_ENABLED);
-		mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
-		mat->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
-		mat->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
-		quad->set_material(mat);
-		p->set_mesh(quad);
-		p->set_amount(cantidad);
-		p->set_lifetime(vida);
-		p->set_emission_shape(CPUParticles3D::EMISSION_SHAPE_BOX);
-		p->set_emission_box_extents(caja);
-		p->set_direction(Vector3(0, 1, 0));
-		p->set_spread(dispersion);
-		p->set_gravity(gravedad);
-		p->set_param_min(CPUParticles3D::PARAM_INITIAL_LINEAR_VELOCITY, vel_min);
-		p->set_param_max(CPUParticles3D::PARAM_INITIAL_LINEAR_VELOCITY, vel_max);
-		Ref<Gradient> rampa;
-		rampa.instantiate();
-		rampa->set_offset(0, 0.0);
-		rampa->set_color(0, Color(color.r, color.g, color.b, 0.0));
-		rampa->set_offset(1, 1.0);
-		rampa->set_color(1, Color(color.r, color.g, color.b, 0.0));
-		rampa->add_point(0.3, color);
-		rampa->add_point(0.7, color);
-		p->set_color_ramp(rampa);
-		p->set_pre_process_time(vida);
-		padre->add_child(p);
-		return p;
-	}
-
-	Sprite3D* CrearSpriteTile(Node* padre, const String& nombre, Rect2 region, float pixel, Vector3 pos, bool sombreado) {
-		Sprite3D* sp = memnew(Sprite3D);
-		sp->set_name(nombre);
-		sp->set_texture(m_atlas);
-		sp->set_region_enabled(true);
-		sp->set_region_rect(region);
-		sp->set_pixel_size(pixel);
-		sp->set_billboard_mode(BaseMaterial3D::BILLBOARD_FIXED_Y);
-		sp->set_alpha_cut_mode(SpriteBase3D::ALPHA_CUT_DISCARD);
-		sp->set_texture_filter(BaseMaterial3D::TEXTURE_FILTER_NEAREST);
-		sp->set_draw_flag(SpriteBase3D::FLAG_SHADED, sombreado);
-		sp->set_position(pos);
-		padre->add_child(sp);
-		return sp;
 	}
 
 	void CrearAntorcha(int x, int y, Vector2i hacia) {
@@ -336,144 +188,6 @@ namespace {
 		}
 	}
 
-	// ==========================================
-	// CAPA 2D ANCLADA AL MUNDO
-	// ==========================================
-
-	Ref<StyleBoxFlat> EstiloGlobo(int estilo) {
-		Ref<StyleBoxFlat> s;
-		s.instantiate();
-		Color fondo = estilo == B_SIN_PA ? Color(1.0, 0.86, 0.84) : (estilo == B_HOVER ? Color(0.9, 0.92, 1.0, 0.94) : Color(0.98, 0.96, 0.88));
-		s->set_bg_color(fondo);
-		s->set_border_color(Color(0.05, 0.04, 0.06));
-		s->set_border_width_all(1);
-		s->set_corner_radius_all(3);
-		s->set_corner_detail(2);
-		s->set_content_margin(SIDE_LEFT, 4);
-		s->set_content_margin(SIDE_RIGHT, 4);
-		s->set_content_margin(SIDE_TOP, 1);
-		s->set_content_margin(SIDE_BOTTOM, 2);
-		return s;
-	}
-
-	Polygon2D* Triangulo(const String& nombre, Vector2 a, Vector2 b, Vector2 c, Color color) {
-		Polygon2D* p = memnew(Polygon2D);
-		p->set_name(nombre);
-		PackedVector2Array pts;
-		pts.push_back(a); pts.push_back(b); pts.push_back(c);
-		p->set_polygon(pts);
-		p->set_color(color);
-		return p;
-	}
-
-	// wrapper (posición + zoom) > Escala (animación de aparición) > Cola + Globo > Texto
-	Control* CrearBocadillo(const String& nombre, const String& texto, int estilo) {
-		Control* wrapper = memnew(Control);
-		wrapper->set_name(nombre);
-		wrapper->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-
-		Control* escala = memnew(Control);
-		escala->set_name("Escala");
-		escala->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-		wrapper->add_child(escala);
-
-		Ref<StyleBoxFlat> estilo_globo = EstiloGlobo(estilo);
-		escala->add_child(Triangulo("ColaBorde", Vector2(-4, -6), Vector2(4, -6), Vector2(0, 1), Color(0.05, 0.04, 0.06)));
-
-		PanelContainer* globo = memnew(PanelContainer);
-		globo->set_name("Globo");
-		globo->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-		globo->add_theme_stylebox_override("panel", estilo_globo);
-		escala->add_child(globo);
-
-		escala->add_child(Triangulo("Cola", Vector2(-3, -7), Vector2(3, -7), Vector2(0, -1), estilo_globo->get_bg_color()));
-
-		Label* label = memnew(Label);
-		label->set_name("Texto");
-		label->set_text(texto);
-		label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-		label->add_theme_font_size_override("font_size", estilo == B_HOVER ? 7 : 8);
-		label->add_theme_color_override("font_color", estilo == B_SIN_PA ? Color(0.6, 0.05, 0.05) : Color(0.08, 0.06, 0.1));
-		label->add_theme_constant_override("line_spacing", -2);
-		globo->add_child(label);
-
-		wrapper->set_meta("texto", texto);
-		wrapper->set_meta("estilo", estilo);
-
-		escala->set_scale(Vector2(0.2, 0.2));
-		Ref<Tween> tw = escala->create_tween();
-		tw->tween_property(escala, "scale", Vector2(1, 1), 0.18)->set_trans(Tween::TRANS_BACK)->set_ease(Tween::EASE_OUT);
-		return wrapper;
-	}
-
-	float EscalaZoom(Camera3D* cam) {
-		float z = cam && cam->has_meta("zoom_factor") ? (float)cam->get_meta("zoom_factor") : 2.0f;
-		// Con menos reducción de resolución (opción del menú) el viewport es mayor: compensamos
-		float shrink = 2.0f;
-		Node* sub = cam ? cam->get_viewport() : nullptr;
-		Node* contenedor = sub ? sub->get_parent() : nullptr;
-		if (contenedor && contenedor->has_method("get_stretch_shrink")) shrink = (float)(int)contenedor->call("get_stretch_shrink");
-		return UtilityFunctions::clampf(z * 0.5f, 0.7f, 1.4f) * (2.0f / UtilityFunctions::maxf(1.0f, shrink));
-	}
-
-	// Coloca un elemento 2D sobre un punto 3D; lo oculta si queda detrás de la cámara
-	void Anclar(Control* c, Camera3D* cam, Vector3 mundo, float escala) {
-		if (!c || !cam) return;
-		if (cam->is_position_behind(mundo)) { c->set_visible(false); return; }
-		c->set_position(cam->unproject_position(mundo).round());
-		c->set_scale(Vector2(escala, escala));
-	}
-
-	void ColocarGlobo(Control* wrapper) {
-		PanelContainer* globo = Object::cast_to<PanelContainer>(wrapper->get_node_or_null("Escala/Globo"));
-		if (!globo) return;
-		Vector2 sz = globo->get_combined_minimum_size();
-		globo->set_size(sz);
-		globo->set_position(Vector2(std::round(-sz.x * 0.5f), std::round(-sz.y - 5.0f)));
-	}
-
-	Control* CrearUIEnemigo(const String& nombre) {
-		Control* ui = memnew(Control);
-		ui->set_name(nombre);
-		ui->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
-
-		Label* alerta = memnew(Label);
-		alerta->set_name("Alerta");
-		alerta->set_text("!");
-		alerta->add_theme_font_size_override("font_size", 14);
-		alerta->add_theme_color_override("font_color", Color(1.0, 0.85, 0.15));
-		alerta->add_theme_color_override("font_outline_color", Color(0.15, 0.0, 0.0));
-		alerta->add_theme_constant_override("outline_size", 3);
-		alerta->set_position(Vector2(-3, -30));
-		alerta->set_visible(false);
-		ui->add_child(alerta);
-
-		ProgressBar* vida = memnew(ProgressBar);
-		vida->set_name("Vida");
-		vida->set_show_percentage(false);
-		vida->set_custom_minimum_size(Vector2(18, 3));
-		vida->set_size(Vector2(18, 3));
-		vida->set_position(Vector2(-9, -6));
-		Ref<StyleBoxFlat> fondo; fondo.instantiate(); fondo->set_bg_color(Color(0.05, 0.02, 0.02));
-		fondo->set_border_width_all(1); fondo->set_border_color(Color(0.05, 0.02, 0.02));
-		Ref<StyleBoxFlat> relleno; relleno.instantiate(); relleno->set_bg_color(Color(0.9, 0.15, 0.12));
-		vida->add_theme_stylebox_override("background", fondo);
-		vida->add_theme_stylebox_override("fill", relleno);
-		vida->set_visible(false);
-		ui->add_child(vida);
-		return ui;
-	}
-
-	// Segundo frame de la animación idle de cada sprite (Dungeon_Character_2: pares de frames)
-	int Pareja(int f) {
-		switch (f) {
-			case 0: return 1; case 1: return 0; case 2: return 3; case 3: return 2;
-			case 4: return 5; case 5: return 4; case 6: return 5;
-			case 9: return 10; case 10: return 9; case 11: return 12; case 12: return 11; case 13: return 12;
-			default: return f;
-		}
-	}
-
 	void CrearCapa2D() {
 		if (m_capa2d) return;
 		m_capa2d = memnew(CanvasLayer);
@@ -495,6 +209,187 @@ namespace {
 		coste->set_visible(false);
 		m_raiz2d->add_child(coste);
 		m_coste = coste;
+	}
+
+	// ==========================================
+	// ANIMACIÓN POR FRAME (OnProcess)
+	// ==========================================
+
+	Node3D* TokenActivo(Node* dungeon) {
+		Node* pm = self->get_node_or_null("/root/Main/PartyManager");
+		Node* act = pm ? Object::cast_to<Node>(pm->call("GetActiveCharacter")) : nullptr;
+		return act ? Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(String(act->get_name())))) : nullptr;
+	}
+
+	void ActualizarCutaway(Camera3D* cam, Node3D* token_activo) {
+		// Cutaway: los muros entre la cámara y el héroe activo se tramean
+		if (cam && m_mat_muro.is_valid()) {
+			Vector3 foco = cam->has_meta("pivote") ? (Vector3)cam->get_meta("pivote") : Vector3();
+			if (token_activo && token_activo->is_visible()) foco = token_activo->get_global_position();
+			m_mat_muro->set_shader_parameter("focus_pos", foco);
+			m_mat_muro->set_shader_parameter("cam_pos", cam->get_global_position());
+		}
+	}
+
+	void ActualizarMarcador(Node* dungeon, Node3D* token_activo, float t) {
+		// Marcador del héroe activo: rombo dorado girando sobre su cabeza
+		if (!m_marcador) {
+			Ref<PrismMesh> prisma;
+			prisma.instantiate();
+			prisma->set_size(Vector3(0.16, 0.2, 0.16));
+			Ref<StandardMaterial3D> mat;
+			mat.instantiate();
+			mat->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
+			mat->set_albedo(Color(1.0, 0.82, 0.25));
+			mat->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
+			m_marcador = memnew(MeshInstance3D);
+			m_marcador->set_name("MarcadorActivo");
+			m_marcador->set_mesh(prisma);
+			m_marcador->set_material_override(mat);
+			self->add_child(m_marcador);
+		}
+		bool bloqueado = dungeon->has_meta("bloqueo_evento") && (bool)dungeon->get_meta("bloqueo_evento");
+		if (token_activo && token_activo->is_visible() && !bloqueado) {
+			m_marcador->set_visible(true);
+			m_marcador->set_position(token_activo->get_position() + Vector3(0, 1.18f + 0.05f * std::sin(t * 4.0f), 0));
+			m_marcador->set_rotation(Vector3((float)Math_PI, t * 2.5f, 0));
+		} else {
+			m_marcador->set_visible(false);
+		}
+	}
+
+	// Idle de los sprites y la UI 2D de cada enemigo. Devuelve los nombres de UI que siguen vivas.
+	std::vector<String> AnimarFichas(Node* dungeon, Camera3D* cam, float escala, float t) {
+		// Idle: los sprites alternan sus dos frames; y UI 2D de los enemigos
+		TypedArray<Node> hijos = dungeon->get_children();
+		std::vector<String> uis_vivas;
+		for (int i = 0; i < hijos.size(); i++) {
+			Node3D* ficha = Object::cast_to<Node3D>(hijos[i]);
+			if (!ficha) continue;
+			Sprite3D* cuerpo = Object::cast_to<Sprite3D>(ficha->get_node_or_null("Cuerpo"));
+			if (!cuerpo) continue;
+
+			if (!cuerpo->has_meta("frame_a")) cuerpo->set_meta("frame_a", cuerpo->get_frame());
+			int fa = cuerpo->get_meta("frame_a");
+			int fase = (int)(t * 1.8f + (ficha->get_instance_id() % 7) * 0.37f) % 2;
+			cuerpo->set_frame(fase == 0 ? fa : Pareja(fa));
+
+			String nombre = ficha->get_name();
+			if (!m_raiz2d || !nombre.begins_with("Enemy_") || nombre.ends_with("_muerto")) continue;
+
+			String nombre_ui = "UI_" + nombre;
+			uis_vivas.push_back(nombre_ui);
+			Control* ui = Object::cast_to<Control>(m_raiz2d->get_node_or_null(NodePath(nombre_ui)));
+			if (!ui) { ui = CrearUIEnemigo(nombre_ui); m_raiz2d->add_child(ui); }
+
+			bool visible = ficha->is_visible();
+			ui->set_visible(visible);
+			if (!visible || !cam) continue;
+			Anclar(ui, cam, ficha->get_position() + Vector3(0, 0.95f, 0), escala);
+
+			bool alerta = ficha->has_meta("in_combat") && (bool)ficha->get_meta("in_combat");
+			Control* signo = Object::cast_to<Control>(ui->get_node_or_null("Alerta"));
+			if (signo) {
+				if (alerta && !signo->is_visible()) {
+					signo->set_visible(true);
+					signo->set_pivot_offset(Vector2(3, 10));
+					signo->set_scale(Vector2(0.2, 2.0));
+					Ref<Tween> tw = signo->create_tween();
+					tw->tween_property(signo, "scale", Vector2(1, 1), 0.25)->set_trans(Tween::TRANS_ELASTIC)->set_ease(Tween::EASE_OUT);
+				}
+				if (!alerta) signo->set_visible(false);
+				signo->set_position(Vector2(-3, -30 + 2.0f * std::sin(t * 6.0f)));
+			}
+			ProgressBar* vida = Object::cast_to<ProgressBar>(ui->get_node_or_null("Vida"));
+			if (vida) {
+				int hp = ficha->get_meta("hp_actual", 1);
+				int hp_max = ficha->get_meta("hp_max", 1);
+				vida->set_max(hp_max);
+				vida->set_value(hp);
+				vida->set_visible(hp < hp_max);
+			}
+		}
+		return uis_vivas;
+	}
+
+	void RecolocarCapa2D(Camera3D* cam, float escala, const std::vector<String>& uis_vivas) {
+		// Bocadillos y coste: recolocar sobre su punto 3D; quitar la UI de enemigos que ya no existen
+		if (m_raiz2d && cam) {
+			TypedArray<Node> elems = m_raiz2d->get_children();
+			for (int i = 0; i < elems.size(); i++) {
+				Control* c = Object::cast_to<Control>(elems[i]);
+				if (!c) continue;
+				String n = c->get_name();
+				if (n.begins_with("UI_")) {
+					bool viva = false;
+					for (const String& u : uis_vivas) if (u == n) { viva = true; break; }
+					if (!viva) { m_raiz2d->remove_child(c); c->queue_free(); }
+					continue;
+				}
+				if (!c->has_meta("anclaje")) continue;
+				if (c == m_coste && !c->is_visible()) continue;
+				c->set_visible(true);
+				Anclar(c, cam, c->get_meta("anclaje"), escala);
+				if (n.begins_with("Bocadillo")) ColocarGlobo(c);
+			}
+		}
+	}
+
+	void AnimarNiebla(double delta) {
+		// Niebla: cada casilla se acerca a su objetivo (el shader trama la aparición)
+		if (niebla_animando && m_fog_img.is_valid() && (int)niebla_actual.size() == grid * grid) {
+			bool sigue = false;
+			float paso = (float)delta * 3.2f;
+			for (int x = 0; x < grid; x++)
+				for (int y = 0; y < grid; y++) {
+					int i = x * grid + y;
+					float a = niebla_actual[i], b = niebla_objetivo[i];
+					if (a == b) continue;
+					a = (a < b) ? UtilityFunctions::minf(b, a + paso) : UtilityFunctions::maxf(b, a - paso);
+					niebla_actual[i] = a;
+					m_fog_img->set_pixel(x, y, Color(a, 0, 0));
+					sigue = true;
+				}
+			if (sigue) m_fog_tex->update(m_fog_img);
+			niebla_animando = sigue;
+		}
+	}
+
+	// Motas, parpadeo de luces, llamas y gemas
+	void AnimarAmbiente(Camera3D* cam, float t) {
+		// Las motas de polvo siguen a la cámara
+		if (m_motas && cam && cam->has_meta("pivote")) {
+			Vector3 piv = cam->get_meta("pivote");
+			m_motas->set_position(piv + Vector3(0, 1.4f, 0));
+		}
+
+		// Parpadeo de antorchas (incluye la luz de los héroes)
+		TypedArray<Node> luces = self->get_tree()->get_nodes_in_group("antorchas");
+		for (int i = 0; i < luces.size(); i++) {
+			OmniLight3D* luz = Object::cast_to<OmniLight3D>(luces[i]);
+			if (!luz) continue;
+			double base = luz->has_meta("energia_base") ? (double)luz->get_meta("energia_base") : 1.0;
+			double f = 1.0 + 0.07 * std::sin(t * 11.0 + i * 1.7) + 0.05 * std::sin(t * 23.0 + i * 3.1);
+			luz->set_param(Light3D::PARAM_ENERGY, base * f);
+		}
+
+		// Llamas de los braseros: pequeño latido de tamaño
+		TypedArray<Node> llamas = self->get_tree()->get_nodes_in_group("llamas");
+		for (int i = 0; i < llamas.size(); i++) {
+			Node3D* l = Object::cast_to<Node3D>(llamas[i]);
+			if (!l) continue;
+			float k = 1.0f + 0.12f * std::sin(t * 9.0f + i * 2.3f) + 0.06f * std::sin(t * 17.0f + i);
+			l->set_scale(Vector3(1.0f + 0.05f * std::sin(t * 13.0f + i), k, 1.0f));
+		}
+
+		// Gemas de evento flotando
+		TypedArray<Node> gemas = self->get_tree()->get_nodes_in_group("gemas_evento");
+		for (int i = 0; i < gemas.size(); i++) {
+			Node3D* g = Object::cast_to<Node3D>(gemas[i]);
+			if (!g) continue;
+			g->set_rotation(Vector3(0, t * 2.0f, 0));
+			g->set_position(Vector3(0, 0.55f + 0.06f * std::sin(t * 3.0f + i), 0));
+		}
 	}
 }
 
@@ -735,7 +630,7 @@ void CrearBrasero(Caller* instance, int x, int y) {
 	CrearPieza(prop, "Columna", bloque, m_mat_marco, Vector3(0, 0.08f, 0), Vector3(0.14, 0.36, 0.14));
 	CrearPieza(prop, "Cuenco", bloque, m_mat_piedra, Vector3(0, 0.44f, 0), Vector3(0.5, 0.12, 0.5));
 
-	Sprite3D* llama = CrearSpriteTile(prop, "Llama", Rect2(0, 144, 16, 10), 0.045f, Vector3(0, 0.78f, 0), false);
+	Sprite3D* llama = CrearSpriteTile(m_atlas, prop, "Llama", Rect2(0, 144, 16, 10), 0.045f, Vector3(0, 0.78f, 0), false);
 	llama->add_to_group("llamas");
 
 	OmniLight3D* luz = memnew(OmniLight3D);
@@ -768,14 +663,14 @@ void CrearDecoracion(Caller* instance, PackedInt32Array ternas) {
 				float hx = EsMuro(x - 1, y) ? -1.0f : 1.0f;
 				float hz = EsMuro(x, y - 1) ? -1.0f : 1.0f;
 				Rect2 r = UtilityFunctions::randi_range(0, 1) == 0 ? Rect2(64, 96, 16, 16) : Rect2(80, 96, 16, 16);
-				Sprite3D* sp = CrearSpriteTile(prop, "Sprite", r, 0.045f, Vector3(hx * 0.34f, 0.72f, hz * 0.34f), true);
+				Sprite3D* sp = CrearSpriteTile(m_atlas, prop, "Sprite", r, 0.045f, Vector3(hx * 0.34f, 0.72f, hz * 0.34f), true);
 				sp->set_flip_h(hx > 0);
 				break;
 			}
-			case 1: CrearSpriteTile(prop, "Sprite", Rect2(128, 96, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
-			case 2: CrearSpriteTile(prop, "Sprite", Rect2(112, 112, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
-			case 3: CrearSpriteTile(prop, "Sprite", Rect2(144, 64, 16, 16), 0.032f, Vector3(desp_x, 0.24f, desp_z), true); break;
-			default: CrearSpriteTile(prop, "Sprite", Rect2(144, 80, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+			case 1: CrearSpriteTile(m_atlas, prop, "Sprite", Rect2(128, 96, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+			case 2: CrearSpriteTile(m_atlas, prop, "Sprite", Rect2(112, 112, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
+			case 3: CrearSpriteTile(m_atlas, prop, "Sprite", Rect2(144, 64, 16, 16), 0.032f, Vector3(desp_x, 0.24f, desp_z), true); break;
+			default: CrearSpriteTile(m_atlas, prop, "Sprite", Rect2(144, 80, 16, 16), 0.028f, Vector3(desp_x, 0.2f, desp_z), true); break;
 		}
 	}
 }
@@ -965,175 +860,19 @@ void OnAwake(Caller* instance) {
 
 void OnProcess(Caller* instance, double delta) {
 	if (!self) return;
-	float t = Time::get_singleton()->get_ticks_msec() / 1000.0f;
 	Node* dungeon = Dungeon();
-	Camera3D* cam = Camara();
 	if (!dungeon) return;
-
-	// --- Héroe activo ---
-	Node3D* token_activo = nullptr;
-	Node* pm = self->get_node_or_null("/root/Main/PartyManager");
-	if (pm) {
-		Node* act = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
-		if (act) token_activo = Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(String(act->get_name()))));
-	}
-
-	// Cutaway: los muros entre la cámara y el héroe activo se tramean
-	if (cam && m_mat_muro.is_valid()) {
-		Vector3 foco = cam->has_meta("pivote") ? (Vector3)cam->get_meta("pivote") : Vector3();
-		if (token_activo && token_activo->is_visible()) foco = token_activo->get_global_position();
-		m_mat_muro->set_shader_parameter("focus_pos", foco);
-		m_mat_muro->set_shader_parameter("cam_pos", cam->get_global_position());
-	}
-
-	// Marcador del héroe activo: rombo dorado girando sobre su cabeza
-	if (!m_marcador) {
-		Ref<PrismMesh> prisma;
-		prisma.instantiate();
-		prisma->set_size(Vector3(0.16, 0.2, 0.16));
-		Ref<StandardMaterial3D> mat;
-		mat.instantiate();
-		mat->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
-		mat->set_albedo(Color(1.0, 0.82, 0.25));
-		mat->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
-		m_marcador = memnew(MeshInstance3D);
-		m_marcador->set_name("MarcadorActivo");
-		m_marcador->set_mesh(prisma);
-		m_marcador->set_material_override(mat);
-		self->add_child(m_marcador);
-	}
-	bool bloqueado = dungeon->has_meta("bloqueo_evento") && (bool)dungeon->get_meta("bloqueo_evento");
-	if (token_activo && token_activo->is_visible() && !bloqueado) {
-		m_marcador->set_visible(true);
-		m_marcador->set_position(token_activo->get_position() + Vector3(0, 1.18f + 0.05f * std::sin(t * 4.0f), 0));
-		m_marcador->set_rotation(Vector3((float)Math_PI, t * 2.5f, 0));
-	} else {
-		m_marcador->set_visible(false);
-	}
-
-	// Idle: los sprites alternan sus dos frames; y UI 2D de los enemigos
+	float t = Time::get_singleton()->get_ticks_msec() / 1000.0f;
+	Camera3D* cam = Camara();
+	Node3D* token_activo = TokenActivo(dungeon);
 	float escala = EscalaZoom(cam);
-	TypedArray<Node> hijos = dungeon->get_children();
-	std::vector<String> uis_vivas;
-	for (int i = 0; i < hijos.size(); i++) {
-		Node3D* ficha = Object::cast_to<Node3D>(hijos[i]);
-		if (!ficha) continue;
-		Sprite3D* cuerpo = Object::cast_to<Sprite3D>(ficha->get_node_or_null("Cuerpo"));
-		if (!cuerpo) continue;
 
-		if (!cuerpo->has_meta("frame_a")) cuerpo->set_meta("frame_a", cuerpo->get_frame());
-		int fa = cuerpo->get_meta("frame_a");
-		int fase = (int)(t * 1.8f + (ficha->get_instance_id() % 7) * 0.37f) % 2;
-		cuerpo->set_frame(fase == 0 ? fa : Pareja(fa));
-
-		String nombre = ficha->get_name();
-		if (!m_raiz2d || !nombre.begins_with("Enemy_") || nombre.ends_with("_muerto")) continue;
-
-		String nombre_ui = "UI_" + nombre;
-		uis_vivas.push_back(nombre_ui);
-		Control* ui = Object::cast_to<Control>(m_raiz2d->get_node_or_null(NodePath(nombre_ui)));
-		if (!ui) { ui = CrearUIEnemigo(nombre_ui); m_raiz2d->add_child(ui); }
-
-		bool visible = ficha->is_visible();
-		ui->set_visible(visible);
-		if (!visible || !cam) continue;
-		Anclar(ui, cam, ficha->get_position() + Vector3(0, 0.95f, 0), escala);
-
-		bool alerta = ficha->has_meta("in_combat") && (bool)ficha->get_meta("in_combat");
-		Control* signo = Object::cast_to<Control>(ui->get_node_or_null("Alerta"));
-		if (signo) {
-			if (alerta && !signo->is_visible()) {
-				signo->set_visible(true);
-				signo->set_pivot_offset(Vector2(3, 10));
-				signo->set_scale(Vector2(0.2, 2.0));
-				Ref<Tween> tw = signo->create_tween();
-				tw->tween_property(signo, "scale", Vector2(1, 1), 0.25)->set_trans(Tween::TRANS_ELASTIC)->set_ease(Tween::EASE_OUT);
-			}
-			if (!alerta) signo->set_visible(false);
-			signo->set_position(Vector2(-3, -30 + 2.0f * std::sin(t * 6.0f)));
-		}
-		ProgressBar* vida = Object::cast_to<ProgressBar>(ui->get_node_or_null("Vida"));
-		if (vida) {
-			int hp = ficha->get_meta("hp_actual", 1);
-			int hp_max = ficha->get_meta("hp_max", 1);
-			vida->set_max(hp_max);
-			vida->set_value(hp);
-			vida->set_visible(hp < hp_max);
-		}
-	}
-
-	// Bocadillos y coste: recolocar sobre su punto 3D; quitar la UI de enemigos que ya no existen
-	if (m_raiz2d && cam) {
-		TypedArray<Node> elems = m_raiz2d->get_children();
-		for (int i = 0; i < elems.size(); i++) {
-			Control* c = Object::cast_to<Control>(elems[i]);
-			if (!c) continue;
-			String n = c->get_name();
-			if (n.begins_with("UI_")) {
-				bool viva = false;
-				for (const String& u : uis_vivas) if (u == n) { viva = true; break; }
-				if (!viva) { m_raiz2d->remove_child(c); c->queue_free(); }
-				continue;
-			}
-			if (!c->has_meta("anclaje")) continue;
-			if (c == m_coste && !c->is_visible()) continue;
-			c->set_visible(true);
-			Anclar(c, cam, c->get_meta("anclaje"), escala);
-			if (n.begins_with("Bocadillo")) ColocarGlobo(c);
-		}
-	}
-
-	// Niebla: cada casilla se acerca a su objetivo (el shader trama la aparición)
-	if (niebla_animando && m_fog_img.is_valid() && (int)niebla_actual.size() == grid * grid) {
-		bool sigue = false;
-		float paso = (float)delta * 3.2f;
-		for (int x = 0; x < grid; x++)
-			for (int y = 0; y < grid; y++) {
-				int i = x * grid + y;
-				float a = niebla_actual[i], b = niebla_objetivo[i];
-				if (a == b) continue;
-				a = (a < b) ? UtilityFunctions::minf(b, a + paso) : UtilityFunctions::maxf(b, a - paso);
-				niebla_actual[i] = a;
-				m_fog_img->set_pixel(x, y, Color(a, 0, 0));
-				sigue = true;
-			}
-		if (sigue) m_fog_tex->update(m_fog_img);
-		niebla_animando = sigue;
-	}
-
-	// Las motas de polvo siguen a la cámara
-	if (m_motas && cam && cam->has_meta("pivote")) {
-		Vector3 piv = cam->get_meta("pivote");
-		m_motas->set_position(piv + Vector3(0, 1.4f, 0));
-	}
-
-	// Parpadeo de antorchas (incluye la luz de los héroes)
-	TypedArray<Node> luces = self->get_tree()->get_nodes_in_group("antorchas");
-	for (int i = 0; i < luces.size(); i++) {
-		OmniLight3D* luz = Object::cast_to<OmniLight3D>(luces[i]);
-		if (!luz) continue;
-		double base = luz->has_meta("energia_base") ? (double)luz->get_meta("energia_base") : 1.0;
-		double f = 1.0 + 0.07 * std::sin(t * 11.0 + i * 1.7) + 0.05 * std::sin(t * 23.0 + i * 3.1);
-		luz->set_param(Light3D::PARAM_ENERGY, base * f);
-	}
-
-	// Llamas de los braseros: pequeño latido de tamaño
-	TypedArray<Node> llamas = self->get_tree()->get_nodes_in_group("llamas");
-	for (int i = 0; i < llamas.size(); i++) {
-		Node3D* l = Object::cast_to<Node3D>(llamas[i]);
-		if (!l) continue;
-		float k = 1.0f + 0.12f * std::sin(t * 9.0f + i * 2.3f) + 0.06f * std::sin(t * 17.0f + i);
-		l->set_scale(Vector3(1.0f + 0.05f * std::sin(t * 13.0f + i), k, 1.0f));
-	}
-
-	// Gemas de evento flotando
-	TypedArray<Node> gemas = self->get_tree()->get_nodes_in_group("gemas_evento");
-	for (int i = 0; i < gemas.size(); i++) {
-		Node3D* g = Object::cast_to<Node3D>(gemas[i]);
-		if (!g) continue;
-		g->set_rotation(Vector3(0, t * 2.0f, 0));
-		g->set_position(Vector3(0, 0.55f + 0.06f * std::sin(t * 3.0f + i), 0));
-	}
+	ActualizarCutaway(cam, token_activo);
+	ActualizarMarcador(dungeon, token_activo, t);
+	std::vector<String> uis_vivas = AnimarFichas(dungeon, cam, escala, t);
+	RecolocarCapa2D(cam, escala, uis_vivas);
+	AnimarNiebla(delta);
+	AnimarAmbiente(cam, t);
 }
 
 void OnDestroy(Caller* instance) {

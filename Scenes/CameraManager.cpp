@@ -2,7 +2,10 @@
 
 // Cámara "pseudo-isométrica": perspectiva con FOV muy cerrado y lejana, para
 // conservar el temblor de vértices y la deformación de texturas PS1.
-// Q/E rotan 90°, rueda = zoom (distancia), clic derecho = arrastrar.
+// Va ANCLADA al héroe activo (centrado, también al caminar y al rotar).
+// Q/E rotan 90° alrededor del héroe, rueda = zoom (distancia).
+// Clic derecho mantenido = mirar libremente; al soltar vuelve al héroe deslizándose.
+// El minimapa puede pedir un "vistazo" (meta "vistazo") mientras se mantiene pulsado.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -30,13 +33,11 @@ namespace {
 	float dist = 18.0f, dist_obj = 18.0f;
 	bool inicializada = false;
 	bool q_prev = false, e_prev = false;
-	bool auto_centrar = true;
 	bool arrastrando = false;
+	bool volviendo = false; // tras soltar el arrastre/vistazo: regreso suave al héroe
 	Vector2 raton_prev;
-	// OJO: nada de godot::String globales: se construirían al cargar la DLL, antes que GDExtension
-	uint64_t last_char_id = 0;
-	Vector3 ir_a;
-	bool yendo = false;
+	const float VEL_SEGUIR = 14.0f;  // casi pegada al héroe mientras camina
+	const float VEL_VOLVER = 5.0f;   // regreso suave al soltar
 
 	Vector3 Direccion() {
 		float p = PITCH_DEG * (float)Math_PI / 180.0f;
@@ -108,7 +109,7 @@ void OnProcess(Caller* instance, double delta) {
 	yaw += (yaw_obj - yaw) * k;
 	dist += (dist_obj - dist) * k;
 
-	// === ARRASTRE CON CLIC DERECHO (sobre el plano del suelo) ===
+	// === CLIC DERECHO MANTENIDO: mirar libremente (arrastre sobre el plano del suelo) ===
 	Vector2 raton = RatonEnContenedor(cam);
 	bool derecho = input->is_mouse_button_pressed(MOUSE_BUTTON_RIGHT);
 	if (derecho && arrastrando) {
@@ -119,38 +120,26 @@ void OnProcess(Caller* instance, double delta) {
 		float escala = dist * 0.0025f;
 		pivote -= right * d.x * escala;
 		pivote += fwd * d.y * escala;
-		auto_centrar = false;
 	}
+	if (!derecho && arrastrando) volviendo = true; // acabamos de soltar
 	arrastrando = derecho;
 	raton_prev = raton;
 
-	// === SEGUIMIENTO DEL HÉROE ACTIVO ===
-	uint64_t char_id = token ? token->get_instance_id() : 0;
-	if (char_id != 0 && char_id != last_char_id) {
-		auto_centrar = true;
-		last_char_id = char_id;
+	// === VISTAZO DESDE EL MINIMAPA (mientras se mantiene pulsado) ===
+	bool vistazo = cam->has_meta("vistazo");
+	if (vistazo && !derecho) {
+		Vector3 punto = cam->get_meta("vistazo");
+		pivote = pivote.lerp(punto, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
+		volviendo = true;
 	}
-	// El DungeonManager puede pedir recentrar (teletransporte, nuevo piso...)
-	if (cam->has_meta("recentrar") && (bool)cam->get_meta("recentrar")) {
-		auto_centrar = true;
-		cam->set_meta("recentrar", false);
-	}
-	// El minimapa puede pedir ir a un punto concreto
-	if (cam->has_meta("ir_a")) {
-		ir_a = cam->get_meta("ir_a");
-		yendo = true;
-		auto_centrar = false;
-		cam->remove_meta("ir_a");
-	}
-	if (yendo) {
-		pivote = pivote.lerp(ir_a, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
-		if (pivote.distance_to(ir_a) < 0.05f || derecho) yendo = false;
-	}
-	bool moviendo = dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving");
-	if (token && !derecho && (moviendo || auto_centrar)) {
+
+	// === ANCLADA AL HÉROE ACTIVO ===
+	if (cam->has_meta("recentrar")) cam->remove_meta("recentrar"); // ya siempre seguimos al héroe
+	if (token && token->is_visible() && !derecho && !vistazo) {
 		Vector3 objetivo = token->get_position();
-		pivote = pivote.lerp(objetivo, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
-		if (pivote.distance_to(objetivo) < 0.05f) auto_centrar = false;
+		float vel = volviendo ? VEL_VOLVER : VEL_SEGUIR;
+		pivote = pivote.lerp(objetivo, (float)UtilityFunctions::minf(1.0, vel * delta));
+		if (pivote.distance_to(objetivo) < 0.05f) volviendo = false;
 	}
 
 	pivote.x = UtilityFunctions::clampf(pivote.x, 0.0f, GRID);
@@ -165,10 +154,9 @@ void OnProcess(Caller* instance, double delta) {
 
 	cam->set_position(pivote + Direccion() * dist_visual);
 	cam->look_at(pivote, Vector3(0, 1, 0));
-	// Desplazamos el encuadre para que el héroe quede a la derecha de las fichas del HUD,
-	// más la sacudida de pantalla que calcula Feel
+	// Héroe en el centro exacto: solo aplicamos la sacudida de pantalla que calcula Feel
 	Vector2 sacudida = cam->has_meta("sacudida") ? (Vector2)cam->get_meta("sacudida") : Vector2();
-	cam->set_h_offset(-dist * 0.14f + sacudida.x);
+	cam->set_h_offset(sacudida.x);
 	cam->set_v_offset(sacudida.y);
 
 	// Datos para la UI anclada (menú táctico) y el renderer

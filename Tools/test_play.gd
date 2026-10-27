@@ -89,6 +89,16 @@ func raton_a_celda(c: Vector2i) -> void:
 	var p_canvas := cont.global_position + p_sub * cont.stretch_shrink
 	Input.warp_mouse(root.get_final_transform() * p_canvas)
 
+# La cámara está anclada al héroe activo, sin desplazamiento lateral
+func _check_camara_centrada(cuando: String) -> void:
+	var cam: Camera3D = dm.get_node("Camera3D")
+	var token: Node3D = dm.get_node_or_null(str(activo().name)) if activo() else null
+	if not token:
+		return
+	var piv: Vector3 = cam.get_meta("pivote")
+	var d := Vector2(piv.x, piv.z).distance_to(Vector2(token.position.x, token.position.z))
+	check(d < 0.25 and absf(cam.h_offset) < 0.3, "%s la cámara está centrada en el héroe (a %.2f, h_offset %.2f)" % [cuando, d, cam.h_offset])
+
 # ---------- guion ----------
 # Cada paso devuelve los segundos a esperar antes del siguiente.
 
@@ -137,12 +147,30 @@ func _definir_pasos():
 			captura("03_tras_mover")
 			var gastados: int = memo["pa_antes"] - int(pm.get_node(NodePath(memo["movido"])).get_meta("pa_actual"))
 			check(gastados > 0, "moverse gasta PA (%d)" % gastados)
+			_check_camara_centrada("tras caminar")
+			# Vistazo (lo que hace el minimapa o el arrastre): la cámara se va a otro punto...
+			var cam: Camera3D = dm.get_node("Camera3D")
+			var p := pos_activa()
+			memo["vistazo"] = Vector3(clampi(p.x + 8, 1, 33) + 0.5, 0, clampi(p.y + 8, 1, 33) + 0.5)
+			cam.set_meta("vistazo", memo["vistazo"])
+			return 1.2,
+		func():
+			var cam: Camera3D = dm.get_node("Camera3D")
+			var piv: Vector3 = cam.get_meta("pivote")
+			check(piv.distance_to(memo["vistazo"]) < 1.0, "durante el vistazo la cámara va al punto (a %.2f)" % piv.distance_to(memo["vistazo"]))
+			captura("03b_vistazo")
+			# ...y al soltar vuelve sola al héroe
+			cam.remove_meta("vistazo")
+			return 2.0,
+		func():
+			_check_camara_centrada("al soltar el vistazo")
 			tecla(KEY_E, true)
 			return 0.05,
 		func():
 			tecla(KEY_E, false)
 			return 0.8,
 		func():
+			_check_camara_centrada("tras rotar con E")
 			captura("04_camara_rotada")
 			var p := pos_activa()
 			memo["pos_antes"] = p
@@ -334,6 +362,7 @@ func _definir_pasos():
 			return 0.3,
 		func():
 			captura("14_hover_piso2")
+			memo["minimapa_antes"] = (ui.get_node("Minimapa/Mascara/Mapa") as Control).size.x
 			for i in 8:
 				rueda(true)
 			return 0.1,
@@ -342,6 +371,8 @@ func _definir_pasos():
 				rueda(true)
 			return 1.0,
 		func():
+			var ahora_mm: float = (ui.get_node("Minimapa/Mascara/Mapa") as Control).size.x
+			check(ahora_mm < float(memo["minimapa_antes"]) - 1.0, "al alejar la cámara el minimapa también se aleja (%d -> %d px)" % [memo["minimapa_antes"], ahora_mm])
 			captura("15_niebla_lejos")
 			var p := pos_activa()
 			dm.get_node("EventManager").call("Interactuar", p.x, p.y, "TRAMPA", "res://Data/Events/Roca.tres")
