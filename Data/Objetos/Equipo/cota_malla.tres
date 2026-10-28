@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_qbhph"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_m33by"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/cota_malla.png" id="3_amrcf"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_1fdpi"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_bwg4q"]
+
+[sub_resource type="Resource" id="Resource_p3eoi"]
+script = ExtResource("4_1fdpi")
+stat = "defensa"
+plano = 3
+
+[resource]
+script = ExtResource("5_bwg4q")
+modificadores = Array[ExtResource("4_1fdpi")]([SubResource("Resource_p3eoi")])
+clases_permitidas = PackedStringArray("Caballero", "Tanque")
+nombre = "Cota de malla"
+descripcion = "Anillas de hierro. Pesa, pero protege."
+icono = ExtResource("3_amrcf")
+tipo = 1
+peso = 6.0
+valor = 30

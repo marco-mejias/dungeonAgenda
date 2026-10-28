@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="TablaBotin" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/entrada_botin.gd" id="1_denn1"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="2_kcmey"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/tabla_botin.gd" id="3_dyumo"]
+
+[sub_resource type="Resource" id="Resource_krg16"]
+script = ExtResource("1_denn1")
+recurso = 1
+cantidad_min = 3
+cantidad_max = 8
+peso = 80
+
+[sub_resource type="Resource" id="Resource_o0w2d"]
+script = ExtResource("1_denn1")
+objeto = ExtResource("2_kcmey")
+peso = 12
+
+[sub_resource type="Resource" id="Resource_yygln"]
+script = ExtResource("1_denn1")
+recurso = 2
+peso = 8
+
+[resource]
+script = ExtResource("3_dyumo")
+id = "enemigo"
+entradas = Array[ExtResource("1_denn1")]([SubResource("Resource_krg16"), SubResource("Resource_o0w2d"), SubResource("Resource_yygln")])

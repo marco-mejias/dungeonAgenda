@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_8e7bw"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_n4bmd"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/daga.png" id="3_8j3pj"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_2ltwl"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_04xdq"]
+
+[resource]
+script = ExtResource("5_04xdq")
+dano = 2
+coste_pa = 1
+critico_extra = 15
+animacion = 1
+ranura = 0
+clases_permitidas = PackedStringArray()
+nombre = "Daga"
+descripcion = "Rápida y traicionera: ataca por 1 PA."
+icono = ExtResource("3_8j3pj")
+tipo = 0
+valor = 12

@@ -11,3 +11,9 @@ extends Resource
 @export var suerte: int = 5
 @export var ruta_cuerpo: String = "res://prefabs/CuerpoBase.tscn"
 @export var radio_luz: int = 4 # casillas que ilumina/ve en la niebla de guerra
+
+@export_group("Equipo inicial")
+## Clase del héroe (la usan las restricciones de EquipoData.clases_permitidas)
+@export_enum("Caballero", "Ladron", "Mago", "Tanque") var clase: String = "Caballero"
+@export var equipo_inicial: Array[EquipoData] = []
+@export var inventario_inicial: Array[ObjetoData] = []

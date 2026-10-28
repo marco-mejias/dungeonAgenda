@@ -1,6 +1,12 @@
-[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://cvecxbbwbtevl"]
+[gd_resource type="Resource" script_class="PersonajeData" format=3]
 
-[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_l4g75"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="1_gh8fb"]
+[ext_resource type="Script" path="res://Scripts/GDD/personaje_data.gd" id="1_l4g75"]
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/espada_corta.tres" id="2_774hh"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/cota_malla.tres" id="3_pj8nk"]
+[ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_pequena.tres" id="4_1lmn8"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_hwyw7"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_1o4do"]
 
 [resource]
 script = ExtResource("1_l4g75")
@@ -9,4 +15,6 @@ retrato_path = "uid://dbfvxgwybojdm"
 vida_max = 125
 magia = 4
 ruta_cuerpo = "res://Characters/caballero.tscn"
+equipo_inicial = Array[ExtResource("1_gh8fb")]([ExtResource("2_774hh"), ExtResource("3_pj8nk"), ExtResource("4_1lmn8")])
+inventario_inicial = Array[ExtResource("5_hwyw7")]([ExtResource("6_1o4do")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

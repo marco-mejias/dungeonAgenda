@@ -59,6 +59,13 @@ func destello_pantalla(color: Color, duracion: float = 0.3) -> void:
 
 # Un icono del tileset (región) sale del punto 3D y vuela hasta la ficha del héroe
 func volar_a_ficha(desde: Vector3, heroe: String, region: Rect2, texto: String) -> void:
+	var at := AtlasTexture.new()
+	at.atlas = HOJA_TILES
+	at.region = region
+	volar_textura_a_ficha(desde, heroe, at, texto)
+
+# Igual, con cualquier textura (el icono de un objeto del catálogo)
+func volar_textura_a_ficha(desde: Vector3, heroe: String, textura: Texture2D, texto: String) -> void:
 	var cam: Camera3D = get_node_or_null(RUTA_DUNGEON + "/Camera3D")
 	var cont: SubViewportContainer = get_node_or_null("/root/Main/ContenedorMapa")
 	if not cam or not cont or cam.is_position_behind(desde):
@@ -66,10 +73,7 @@ func volar_a_ficha(desde: Vector3, heroe: String, region: Rect2, texto: String) 
 	var origen := cont.global_position + cam.unproject_position(desde) * cont.stretch_shrink
 
 	var icono := TextureRect.new()
-	var at := AtlasTexture.new()
-	at.atlas = HOJA_TILES
-	at.region = region
-	icono.texture = at
+	icono.texture = textura
 	icono.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icono.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icono.size = Vector2(28, 28)

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_6c11g"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_nkdvs"]
+[ext_resource type="Texture2D" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_jj56w"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_3yjsc"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_10t70"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6wqyk"]
+atlas = ExtResource("3_jj56w")
+region = Rect2(0, 144, 16, 16)
+
+[sub_resource type="Resource" id="Resource_1sxov"]
+script = ExtResource("4_3yjsc")
+stat = "radio_luz"
+plano = 1
+
+[resource]
+script = ExtResource("5_10t70")
+ranura = 5
+modificadores = Array[ExtResource("4_3yjsc")]([SubResource("Resource_1sxov")])
+clases_permitidas = PackedStringArray()
+nombre = "Antorcha"
+descripcion = "Ilumina una casilla más alrededor."
+icono = SubResource("AtlasTexture_6wqyk")
+tipo = 3
+valor = 5

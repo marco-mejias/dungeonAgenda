@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_xtnt5"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_mul0c"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/arco_corto.png" id="3_67jch"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_6wct2"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_18pl3"]
+
+[resource]
+script = ExtResource("5_18pl3")
+alcance_min = 2
+alcance_max = 4
+dos_manos = true
+animacion = 3
+ranura = 0
+clases_permitidas = PackedStringArray()
+nombre = "Arco corto"
+descripcion = "Dispara de 2 a 4 casillas. No sirve pegado al enemigo."
+icono = ExtResource("3_67jch")
+tipo = 0
+peso = 1.5
+valor = 25

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_df5w1"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_qigjb"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/anillo_suerte.png" id="3_jjayp"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_jslo5"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_lvf2k"]
+
+[sub_resource type="Resource" id="Resource_jg42y"]
+script = ExtResource("4_jslo5")
+stat = "suerte"
+plano = 3
+
+[resource]
+script = ExtResource("5_lvf2k")
+ranura = 4
+modificadores = Array[ExtResource("4_jslo5")]([SubResource("Resource_jg42y")])
+clases_permitidas = PackedStringArray()
+nombre = "Anillo de la suerte"
+descripcion = "Brilla cuando la fortuna sonríe."
+icono = ExtResource("3_jjayp")
+tipo = 2
+peso = 0.1
+valor = 40

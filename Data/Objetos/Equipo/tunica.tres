@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_5hcna"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_qnj3t"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/tunica.png" id="3_u430a"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_ieqde"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_gmpl2"]
+
+[sub_resource type="Resource" id="Resource_h3wk7"]
+script = ExtResource("4_ieqde")
+stat = "magia"
+plano = 2
+
+[sub_resource type="Resource" id="Resource_b7057"]
+script = ExtResource("4_ieqde")
+stat = "sanidad_max"
+plano = 10
+
+[resource]
+script = ExtResource("5_gmpl2")
+modificadores = Array[ExtResource("4_ieqde")]([SubResource("Resource_h3wk7"), SubResource("Resource_b7057")])
+clases_permitidas = PackedStringArray()
+nombre = "Túnica de aprendiz"
+descripcion = "Bordados que ayudan a concentrarse."
+icono = ExtResource("3_u430a")
+tipo = 1
+valor = 15

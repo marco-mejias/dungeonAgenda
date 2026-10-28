@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MochilaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_3ddvo"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_p5bji"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/mochila_grande.png" id="3_naj8l"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_sp4b7"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/mochila_data.gd" id="5_y4sc2"]
+
+[resource]
+script = ExtResource("5_y4sc2")
+capacidad = 15.0
+ranura = 6
+clases_permitidas = PackedStringArray()
+nombre = "Mochila grande"
+descripcion = "Para quien carga con todo."
+icono = ExtResource("3_naj8l")
+tipo = 4
+peso = 2.0
+valor = 20

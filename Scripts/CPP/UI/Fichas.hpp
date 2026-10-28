@@ -21,6 +21,7 @@
 #include <Godot/classes/interval_tweener.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include <vector>
+#include "Scripts/CPP/Inventario/Inventario.hpp"
 
 namespace ui {
 
@@ -46,11 +47,19 @@ inline String GenerarTextoStats(Node* character) {
 	int mag = character->has_meta("magia")     ? (int)character->get_meta("magia")     : 0;
 	int lck = character->has_meta("suerte")    ? (int)character->get_meta("suerte")    : 0;
 
-	return "Velocidad: " + String::num_int64(spd) + "\n" +
+	String texto = "Velocidad: " + String::num_int64(spd) + "\n" +
 		   "Fuerza: "    + String::num_int64(str) + "\n" +
 		   "Defensa: "   + String::num_int64(def) + "\n" +
 		   "Magia: "     + String::num_int64(mag) + "\n" +
 		   "Suerte: "    + String::num_int64(lck);
+
+	// Arma y carga de la mochila (solo los héroes tienen equipo)
+	if (character->has_meta("equipo")) {
+		Ref<Resource> arma = inventario::Arma(character);
+		texto += "\nArma: " + (arma.is_valid() ? inventario::NombreDe(arma) : String::utf8("pu\xC3\xB1os"));
+		texto += "\nCarga: " + String::num(inventario::PesoInventario(character), 1) + " / " + String::num(inventario::Capacidad(character), 1) + " kg";
+	}
+	return texto;
 }
 
 inline Ref<StyleBoxFlat> EstiloFicha(Color borde) {
@@ -143,18 +152,16 @@ inline void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
 	FijarTexto(f, "V/Detalle/Recursos/Oro", String::num_int64((int)p->get_meta("oro", 0)));
 	FijarTexto(f, "V/Detalle/Recursos/Comida", "Comida: " + String::num_int64((int)p->get_meta("comida_bolsa", 0)));
 
-	int max_slots = p->get_meta("max_slots", 3);
-	TypedArray<Resource> inv = p->get_meta("items_lista", TypedArray<Resource>());
+	// Las 4 casillas de la ficha muestran lo que lleva puesto
+	const char* const RANURAS_FICHA[4] = { "mano_principal", "mano_secundaria", "cuerpo", "cabeza" };
 	for (int s = 1; s <= 4; s++) {
 		TextureRect* slot = Object::cast_to<TextureRect>(f->get_node_or_null(NodePath("V/Detalle/Slots/Slot" + String::num_int64(s))));
 		if (!slot) continue;
-		slot->set_visible(s <= max_slots);
+		Ref<Resource> item = inventario::Equipado(p, RANURAS_FICHA[s - 1]);
 		Ref<Texture2D> icono;
-		if (s - 1 < inv.size()) {
-			Ref<Resource> item = inv[s - 1];
-			if (item.is_valid()) icono = item->get("icon");
-		}
+		if (item.is_valid()) icono = item->get("icono");
 		slot->set_texture(icono);
+		slot->set_tooltip_text(item.is_valid() ? inventario::NombreDe(item) : String(""));
 	}
 
 	bool muerto = p->get_meta("esta_muerto", false);

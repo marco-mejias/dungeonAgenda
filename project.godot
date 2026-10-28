@@ -20,6 +20,7 @@ config/icon="res://Assets/icon.svg"
 
 AudioManager="*uid://7alit7602tr"
 Feel="*res://Scripts/GDD/feel.gd"
+Catalogo="*res://Scripts/GDD/catalogo.gd"
 
 [display]
 

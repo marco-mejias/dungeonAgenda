@@ -18,6 +18,7 @@
 #include <Godot/classes/callback_tweener.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include "Scripts/CPP/Mazmorra/Mazmorra.hpp"
+#include "Scripts/CPP/Combate/Reglas.hpp"
 #include <algorithm>
 #include <vector>
 #include <queue>
@@ -139,7 +140,15 @@ namespace {
 		if (m_renderer) m_renderer->call("LimpiarOverlay");
 	}
 
-	const int COSTE_INTERACCION = 2; // igual que EventManager y CombatManager
+	const int COSTE_INTERACCION = 2; // igual que EventManager (atacar cuesta lo que diga el arma)
+
+	// ¿Puede el héroe atacar al enemigo de 'p' desde donde está? (alcance del arma + línea de visión)
+	bool PuedeAtacar(Node* act, Vector2i p) {
+		if (!act || !Mazmorra::InBounds(p.x, p.y) || !mapa.map_data[p.x][p.y].has_enemy) return false;
+		Vector2i origen = act->get_meta("grid_pos", Vector2i(-99, -99));
+		if (!reglas::EnAlcance(act, origen, p)) return false;
+		return !reglas::RequiereVision(act) || mapa.CheckLineOfSight(origen, p);
+	}
 
 	// ¿Hay algo con lo que interactuar en esta casilla? Rellena la acción y su coste en PA.
 	// tipo_overlay: 1 = interactuable, 2 = enemigo
@@ -150,8 +159,8 @@ namespace {
 		tipo_overlay = 1;
 		if (c.has_enemy) {
 			Node* e = self->get_node_or_null(NodePath(NombreEnemigo(p)));
-			int dano = 1;
-			if (e && act) dano = std::max(1, (int)act->get_meta("fuerza", 1) - (int)e->get_meta("defensa", 0));
+			int dano = (e && act) ? reglas::DanoBase(act, e) : 1;
+			if (act && !debug_mode) coste = reglas::CosteAtaque(act);
 			// Jenova recodifica el .cpp al preprocesarlo: los caracteres no ASCII van como bytes UTF-8 escapados
 			accion = String("Atacar: ") + String::num_int64(dano) + String::utf8(" de da\xC3\xB1o");
 			tipo_overlay = 2;
@@ -186,6 +195,7 @@ namespace {
 			String accion; int coste = 0, tipo = 0;
 			if (!Mazmorra::InBounds(n.x, n.y) || !(mapa.map_data[n.x][n.y].is_visible || debug_mode)) continue;
 			if (!DescribirInteraccion(n, act, accion, coste, tipo)) continue;
+			if (tipo == 2 && !PuedeAtacar(act, n)) continue; // p.ej. con un arco no se dispara a bocajarro
 			if (n == mapa.m_salida) coste = 1; // un paso
 			if (debug_mode) coste = 0;
 			celdas.push_back(n.x); celdas.push_back(n.y);
@@ -376,6 +386,7 @@ JENOVA_SCRIPT_BEGIN
 
 void ConstruirLogica(Caller* instance) {
 	mapa.GenerarPiso();
+	self->set_meta("botin_cofres", Dictionary()); // botín pendiente de los cofres del piso anterior
 
 	// CARGA ESTÁTICA DEL ASTAR: muros y puertas cerradas, UNA sola vez
 	std::vector<Vector2i> solidos;
@@ -619,6 +630,16 @@ void ActualizarHover(Caller* instance, int hover_x, int hover_y) {
 	bool interactuable = (c.is_visible || debug_mode) && DescribirInteraccion(destino, act, accion, coste_accion, tipo);
 	if (!c.is_highlighted && !interactuable) return;
 
+	// Enemigo al alcance de un arma a distancia: se ataca desde aquí, sin caminar
+	int pa_ahora = debug_mode ? 999 : (int)act->get_meta("pa_actual", 0);
+	if (tipo == 2 && interactuable && reglas::Distancia(origen, destino) > 1 && PuedeAtacar(act, destino)) {
+		PackedInt32Array celdas; celdas.push_back(hover_x); celdas.push_back(hover_y);
+		PackedStringArray textos; textos.push_back(TextoBocadillo(accion, coste_accion));
+		PackedInt32Array estilos; estilos.push_back(pa_ahora < coste_accion ? 1 : 2);
+		m_renderer->call("FijarBocadillos", 1, celdas, textos, estilos);
+		return;
+	}
+
 	Array ruta = m_path_manager->call("CalcularRuta", origen.x, origen.y, hover_x, hover_y);
 	int pa = act->get_meta("pa_actual", 0);
 	if (debug_mode) pa = 999;
@@ -719,12 +740,21 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 	bool visible = c.is_visible || debug_mode;
 
 	if ((cofre || puerta_cerrada || enemigo || evento_manual) && visible) {
+		// Enemigo al alcance del arma (pegado o, con arma a distancia, más lejos): atacar
+		if (enemigo && PuedeAtacar(act, Vector2i(x, y))) {
+			Node* combat = self->get_node_or_null("CombatManager");
+			if (combat) combat->call("AtacarEnemigo", x, y);
+			return;
+		}
 		int dist = std::abs(actual.x - x) + std::abs(actual.y - y);
+		if (dist == 1 && enemigo) {
+			// Pegado pero el arma no llega (un arco a bocajarro): toca apartarse
+			Node* audio = self->get_node_or_null("/root/AudioManager");
+			if (audio) audio->call("play_ui", "no");
+			return;
+		}
 		if (dist == 1) {
-			if (enemigo) {
-				Node* combat = self->get_node_or_null("CombatManager");
-				if (combat) combat->call("AtacarEnemigo", x, y);
-			} else if (m_event_manager) {
+			if (m_event_manager) {
 				String tipo = cofre ? "COFRE" : (puerta_cerrada ? "PUERTA" : "EVENTO");
 				String path = evento_manual ? mapa.m_eventos[c.event_idx].path : String("");
 				m_event_manager->call("Interactuar", x, y, tipo, path);
@@ -824,13 +854,24 @@ void AplicarEstadoEvento(Caller* instance, int x, int y) {
 	if (m_renderer) m_renderer->call("QuitarMarcadorEvento", x, y);
 }
 
+// El enemigo más cercano al que llega el arma del héroe activo (botón "Atacar" del menú)
 Vector2i BuscarEnemigoAdyacente(Caller* instance) {
+	Node* act = ActiveChar();
 	Vector2i p = ActivePos();
-	for (const Vector2i& d : DIRS4) {
-		Vector2i n = p + d;
-		if (Mazmorra::InBounds(n.x, n.y) && mapa.map_data[n.x][n.y].has_enemy) return n;
+	Vector2i mejor(-1, -1);
+	int mejor_dist = 999;
+	Array enemigos = mapa.ListaEnemigos();
+	for (int i = 0; i < enemigos.size(); i++) {
+		Vector2i e = enemigos[i];
+		if (!(mapa.map_data[e.x][e.y].is_visible || debug_mode) || !PuedeAtacar(act, e)) continue;
+		int d = reglas::Distancia(p, e);
+		if (d < mejor_dist) { mejor_dist = d; mejor = e; }
 	}
-	return Vector2i(-1, -1);
+	return mejor;
+}
+
+Variant PuedeAtacarA(Caller* instance, int x, int y) {
+	return PuedeAtacar(ActiveChar(), Vector2i(x, y));
 }
 
 void EliminarEnemigo(Caller* instance, int x, int y) {

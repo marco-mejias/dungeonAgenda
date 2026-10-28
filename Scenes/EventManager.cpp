@@ -11,6 +11,7 @@
 #include <Godot/classes/interval_tweener.hpp>
 #include <Godot/classes/viewport.hpp>
 #include <Godot/variant/utility_functions.hpp>
+#include "Scripts/CPP/Inventario/Inventario.hpp"
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -54,34 +55,31 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 
 	// === A. COFRES ===
 	if (tipo == "COFRE") {
-		int roll = UtilityFunctions::randi() % 3;
-		if (roll == 0) {
-			int oro = (UtilityFunctions::randi() % 20) + 10;
-			act_char->set_meta("oro", (int)act_char->get_meta("oro", 0) + oro);
-			UtilityFunctions::print("[EventManager] Cofre: +", oro, " de oro.");
-			if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(96, 128, 16, 16), "+" + String::num_int64(oro));
-		} else if (roll == 1) {
-			int comida = (UtilityFunctions::randi() % 2) + 1;
-			act_char->set_meta("comida_bolsa", (int)act_char->get_meta("comida_bolsa", 0) + comida);
-			UtilityFunctions::print("[EventManager] Cofre: +", comida, " de comida.");
-			if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(96, 112, 16, 16), "+" + String::num_int64(comida));
+		// El botín se tira una sola vez por cofre (tabla "cofre" del Catalogo). Lo que no cabe
+		// en la mochila se queda dentro y el cofre sigue cerrado hasta que alguien se lo lleve.
+		Dictionary pendientes = dungeon->get_meta("botin_cofres", Dictionary());
+		Vector2i celda(x, y);
+		Array botin;
+		if (pendientes.has(celda)) {
+			botin = pendientes[celda];
 		} else {
-			TypedArray<Resource> inv = act_char->get_meta("items_lista", TypedArray<Resource>());
-			int max_s = act_char->get_meta("max_slots", 3);
-			if (inv.size() < max_s) {
-				Ref<Resource> item = ResourceLoader::get_singleton()->load("res://Data/Items/Espada.tres");
-				if (item.is_valid()) {
-					inv.push_back(item);
-					act_char->set_meta("items_lista", inv);
-					if (feel) feel->call("volar_a_ficha", pos_mundo, String(act_char->get_name()), Rect2(64, 112, 16, 16), String("Espada"));
-					UtilityFunctions::print("[EventManager] Cofre: ¡una espada!");
-				}
-			} else {
-				UtilityFunctions::print("[EventManager] Cofre: había algo, pero no te cabe en la mochila.");
-			}
+			Node* cat = inventario::Catalogo(self_node);
+			int piso = pm->get_meta("piso_actual", 1);
+			if (cat) botin = cat->call("tirar_botin", String("cofre"), piso);
 		}
-		dungeon->call("AplicarEstadoCofre", x, y);
-		interactuo = true;
+		Array restos = inventario::EntregarBotin(act_char, botin, pos_mundo);
+		if (restos.is_empty()) {
+			pendientes.erase(celda);
+			dungeon->call("AplicarEstadoCofre", x, y);
+			interactuo = true;
+		} else {
+			pendientes[celda] = restos;
+			UtilityFunctions::print("[EventManager] Cofre: no cabe todo en la mochila de ", act_char->get_name(), ".");
+			if (audio) audio->call("play_ui", "no");
+			if (feel) feel->call("sacudir_ficha", String(act_char->get_name()));
+			interactuo = restos.size() < botin.size(); // si no se llevó nada, ni gasta PA
+		}
+		dungeon->set_meta("botin_cofres", pendientes);
 	}
 	// === B. PUERTAS ===
 	else if (tipo == "PUERTA") {

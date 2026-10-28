@@ -1,6 +1,12 @@
-[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://crhb6huofdd27"]
+[gd_resource type="Resource" script_class="PersonajeData" format=3]
 
-[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_tqqmb"]
+[ext_resource type="Script" path="res://Scripts/GDD/personaje_data.gd" id="1_tqqmb"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="1_ynhmi"]
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/daga.tres" id="2_dalue"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/capucha.tres" id="3_8k0ik"]
+[ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_pequena.tres" id="4_1ab2a"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_0x2rm"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_exdfg"]
 
 [resource]
 script = ExtResource("1_tqqmb")
@@ -11,4 +17,7 @@ velocidad = 5
 fuerza = 6
 suerte = 8
 ruta_cuerpo = "res://Characters/ladron.tscn"
+clase = "Ladron"
+equipo_inicial = Array[ExtResource("1_ynhmi")]([ExtResource("2_dalue"), ExtResource("3_8k0ik"), ExtResource("4_1ab2a")])
+inventario_inicial = Array[ExtResource("5_0x2rm")]([ExtResource("6_exdfg"), ExtResource("6_exdfg")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

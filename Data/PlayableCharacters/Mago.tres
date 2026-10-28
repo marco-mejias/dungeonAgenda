@@ -1,13 +1,23 @@
-[gd_resource type="Resource" script_class="PersonajeData" format=3 uid="uid://dpjvahg3x1p0d"]
+[gd_resource type="Resource" script_class="PersonajeData" format=3]
 
-[ext_resource type="Script" uid="uid://bq1ry7f5g8dcv" path="res://Scripts/GDD/personaje_data.gd" id="1_j0w5w"]
+[ext_resource type="Script" path="res://Scripts/GDD/personaje_data.gd" id="1_j0w5w"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="1_meqfh"]
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/baston_arcano.tres" id="2_p5oyo"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/tunica.tres" id="3_2v377"]
+[ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_pequena.tres" id="4_fdfsj"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_4y1g7"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_gsg4e"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/tonico_cordura.tres" id="7_nu8p8"]
 
 [resource]
 script = ExtResource("1_j0w5w")
 nombre_display = "Vivi Owl-nittier"
-radio_luz = 5
 retrato_path = "uid://di2242yca8rwu"
 fuerza = 3
 magia = 8
 ruta_cuerpo = "res://Characters/mago.tscn"
+radio_luz = 5
+clase = "Mago"
+equipo_inicial = Array[ExtResource("1_meqfh")]([ExtResource("2_p5oyo"), ExtResource("3_2v377"), ExtResource("4_fdfsj")])
+inventario_inicial = Array[ExtResource("5_4y1g7")]([ExtResource("6_gsg4e"), ExtResource("7_nu8p8")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

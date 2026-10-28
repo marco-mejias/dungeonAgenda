@@ -99,6 +99,137 @@ func _check_camara_centrada(cuando: String) -> void:
 	var d := Vector2(piv.x, piv.z).distance_to(Vector2(token.position.x, token.position.z))
 	check(d < 0.25 and absf(cam.h_offset) < 0.3, "%s la cámara está centrada en el héroe (a %.2f, h_offset %.2f)" % [cuando, d, cam.h_offset])
 
+# Lo que tiene un héroe (para ver si un cofre le ha dado algo)
+func _riqueza(h: Node) -> String:
+	var objetos := 0
+	for e in h.get_meta("inventario", []):
+		objetos += int(e["cantidad"])
+	return "%d oro, %d comida, %d objetos" % [h.get_meta("oro", 0), h.get_meta("comida_bolsa", 0), objetos]
+
+func _indice_de(heroe: String, id: String) -> int:
+	for e in pm.call("DescribirInventario", heroe):
+		if e["id"] == id:
+			return int(e["indice"])
+	return -1
+
+func _heroes() -> Array:
+	var out: Array = []
+	for h in pm.get_children():
+		if h.name != "DatosEquipo":
+			out.append(h)
+	return out
+
+# Inventario, equipo, peso, consumibles e intercambio (deja a los héroes como estaban)
+func _check_inventario() -> void:
+	var cat := root.get_node("Catalogo")
+	check(cat.objetos.size() >= 15, "el catálogo carga los objetos de Data/Objetos (%d)" % cat.objetos.size())
+	check(cat.avisos.is_empty(), "el catálogo no da avisos %s" % [cat.avisos])
+	var guardado := {}
+	for h in _heroes():
+		guardado[h] = [h.get_meta("inventario").duplicate(true), h.get_meta("equipo").duplicate(true), int(h.get_meta("hp_actual"))]
+
+	var h := activo()
+	var n := str(h.name)
+	var eq: Dictionary = h.get_meta("equipo", {})
+	check(eq.has("mano_principal") and eq.has("mochila"), "%s empieza con arma y mochila (%s, %s)" % [n, eq.get("mano_principal", "-"), eq.get("mochila", "-")])
+	var base: Dictionary = h.get_meta("stats_base")
+	var bono := 0
+	for r in eq:
+		var d = cat.obtener(eq[r])
+		if d is EquipoData:
+			for m in d.modificadores:
+				if m.stat == "defensa":
+					bono += m.plano
+	check(int(h.get_meta("defensa")) == int(base["defensa"]) + bono, "la defensa final suma el equipo (%d + %d = %d)" % [base["defensa"], bono, h.get_meta("defensa")])
+
+	# Apilado y límite de peso
+	var inv0: Array = pm.call("DescribirInventario", n)
+	var entran: int = pm.call("AnadirObjeto", n, "pocion_vida", 2)
+	var inv1: Array = pm.call("DescribirInventario", n)
+	check(entran == 2 and inv1.size() == inv0.size(), "las pociones se apilan (%d entradas -> %d)" % [inv0.size(), inv1.size()])
+	var cap: float = pm.call("CapacidadInventario", n)
+	var caben: int = pm.call("AnadirObjeto", n, "cota_malla", 10)
+	var peso: float = pm.call("PesoInventario", n)
+	check(caben < 10 and peso <= cap + 0.01, "la mochila tiene límite: caben %d cotas (%.1f / %.1f kg)" % [caben, peso, cap])
+	h.set_meta("inventario", guardado[h][0].duplicate(true))
+
+	# Antorcha en la ranura de luz: +1 de radio y se puede quitar
+	var radio0 := int(h.get_meta("radio_luz"))
+	pm.call("AnadirObjeto", n, "antorcha", 1)
+	var err: String = pm.call("Equipar", n, _indice_de(n, "antorcha"))
+	check(err == "" and int(h.get_meta("radio_luz")) == radio0 + 1, "equipar la antorcha da +1 de luz (%d -> %d) '%s'" % [radio0, h.get_meta("radio_luz"), err])
+	err = pm.call("Desequipar", n, "luz")
+	check(err == "" and int(h.get_meta("radio_luz")) == radio0, "al quitarla vuelve la luz de antes (%d)" % h.get_meta("radio_luz"))
+
+	# Restricción de clase: un mago no se pone la cota de malla
+	for o in _heroes():
+		if o.get_meta("clase") == "Mago":
+			pm.call("AnadirObjeto", str(o.name), "cota_malla", 1)
+			err = pm.call("Equipar", str(o.name), _indice_de(str(o.name), "cota_malla"))
+			check(err.contains("clase"), "el mago no puede ponerse la cota de malla ('%s')" % err)
+
+	# Poción: cura y se gasta
+	h.set_meta("hp_actual", int(h.get_meta("hp_max")) - 30)
+	var pociones := 0
+	for e in pm.call("DescribirInventario", n):
+		if e["id"] == "pocion_vida":
+			pociones += int(e["cantidad"])
+	err = pm.call("UsarObjeto", n, _indice_de(n, "pocion_vida"))
+	var quedan := 0
+	for e in pm.call("DescribirInventario", n):
+		if e["id"] == "pocion_vida":
+			quedan += int(e["cantidad"])
+	check(err == "" and int(h.get_meta("hp_actual")) == int(h.get_meta("hp_max")) - 5 and quedan == pociones - 1, "la poción cura 25 PV y se gasta (%d -> %d pociones)" % [pociones, quedan])
+
+	# Dar objetos: solo pegados (fuera de la fogata)
+	var pegado: Node = null
+	var lejos: Node = null
+	var pos: Vector2i = h.get_meta("grid_pos")
+	for o in _heroes():
+		if o == h:
+			continue
+		var d := absi(Vector2i(o.get_meta("grid_pos")).x - pos.x) + absi(Vector2i(o.get_meta("grid_pos")).y - pos.y)
+		if d == 1 and pegado == null:
+			pegado = o
+		elif d > 1 and lejos == null:
+			lejos = o
+	if lejos:
+		err = pm.call("DarObjeto", n, 0, str(lejos.name), 1)
+		check(err != "", "no se puede dar nada a %s si está lejos ('%s')" % [lejos.name, err])
+	if pegado:
+		var antes := int(pm.call("PesoInventario", str(pegado.name)))
+		err = pm.call("DarObjeto", n, 0, str(pegado.name), 1)
+		check(err == "" and float(pm.call("PesoInventario", str(pegado.name))) > antes - 0.01, "%s le da un objeto a %s, que está pegado ('%s')" % [n, pegado.name, err])
+
+	# Todo como estaba
+	for o in guardado:
+		o.set_meta("inventario", guardado[o][0])
+		o.set_meta("equipo", guardado[o][1])
+		o.set_meta("hp_actual", guardado[o][2])
+	ui.call("UpdateWarriorUI")
+	captura("01b_ficha_con_equipo")
+
+# Equipa un arco al héroe activo y lo coloca a 2-3 casillas en línea recta de un enemigo
+func _preparar_arco() -> void:
+	var h := activo()
+	if h == null:
+		return
+	var n := str(h.name)
+	pm.call("AnadirObjeto", n, "arco_corto", 1)
+	var err: String = pm.call("Equipar", n, _indice_de(n, "arco_corto"))
+	check(err == "", "%s se equipa el arco ('%s')" % [n, err])
+	h.set_meta("pa_actual", maxi(int(h.get_meta("pa_actual")), 4))
+	for e in dm.get_meta("lista_enemigos", []):
+		for d in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+			for k in [2, 3]:
+				var c: Vector2i = e + d * k
+				dm.call("TeletransporteDebug", c.x, c.y)
+				dm.call("CalcularMapaDeLuces")
+				if pos_activa() == c and bool(dm.call("PuedeAtacarA", e.x, e.y)):
+					memo["objetivo_arco"] = e
+					return
+	print("[test] AVISO no hay sitio para probar el arco")
+
 # ---------- guion ----------
 # Cada paso devuelve los segundos a esperar antes del siguiente.
 
@@ -115,6 +246,9 @@ func _definir_pasos():
 			var mm: MultiMesh = dm.get_node("DungeonRenderer/Alcance").multimesh
 			check(mm.instance_count > 0, "el overlay de alcance tiene casillas (%d)" % mm.instance_count)
 			return 0.2,
+		func():
+			_check_inventario()
+			return 0.3,
 		func():
 			# Hover sobre la casilla alcanzable más lejana: debe salir la ruta y el coste
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
@@ -231,9 +365,13 @@ func _definir_pasos():
 				check(str(b[0].get_meta("texto")).contains("PA"), "el bocadillo indica el coste: '%s'" % str(b[0].get_meta("texto")).replace("\n", " | "))
 			captura("08_bocadillo_cofre")
 			var c: Vector2i = memo.get("cofre", Vector2i(-1, -1))
+			memo["riqueza_cofre"] = _riqueza(activo())
+			memo["heroe_cofre"] = activo()
 			dm.call("ProcesarClicEnCasilla", c.x, c.y)
 			return 0.6,
 		func():
+			var h: Node = memo["heroe_cofre"]
+			check(_riqueza(h) != memo["riqueza_cofre"], "el botín del cofre llega a %s (%s -> %s)" % [h.name, memo["riqueza_cofre"], _riqueza(h)])
 			captura("09_cofre_abierto")
 			# Puerta: nos ponemos al lado y la abrimos
 			var puertas: Array = dm.get_meta("lista_puertas", [])
@@ -290,6 +428,13 @@ func _definir_pasos():
 			var prev: Control = ui.get_node("Prevision")
 			check(prev.visible, "al pasar sobre el enemigo sale la tarjeta de previsión")
 			check(int(dm.call("TipoCursor", e.x, e.y)) == 2, "el cursor sobre un enemigo es la espada")
+			var enemigo_n := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
+			var prevision: Dictionary = dm.get_node("CombatManager").call("PrevisionAtaque", e.x, e.y)
+			var arma = root.get_node("Catalogo").obtener(activo().get_meta("equipo").get("mano_principal", ""))
+			if arma and enemigo_n:
+				var esperado := maxi(1, arma.dano + int(activo().get_meta(arma.stat_ataque)) - int(enemigo_n.get_meta("defensa")))
+				var coste_esperado: int = 0 if dm.get_meta("debug_mode", false) else arma.coste_pa
+				check(int(prevision["dano"]) == esperado and int(prevision["coste"]) == coste_esperado, "la previsión usa el arma (%s: %d de daño, %d PA)" % [arma.nombre, prevision["dano"], prevision["coste"]])
 			captura("10_bocadillo_enemigo")
 			var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
 			memo["hp0"] = int(nodo.get_meta("hp_actual")) if nodo else -1
@@ -307,6 +452,27 @@ func _definir_pasos():
 			check(hp1 < int(memo["hp0"]), "el ataque quita vida (%d -> %d)" % [memo["hp0"], hp1])
 			check(not dm.get_meta("is_moving", false), "al acabar la secuencia el tablero se desbloquea")
 			captura("11_combate")
+			_preparar_arco()
+			return 0.8,
+		func():
+			var e: Vector2i = memo.get("objetivo_arco", Vector2i(-1, -1))
+			if e.x >= 0:
+				check(bool(dm.call("PuedeAtacarA", e.x, e.y)), "con el arco se puede disparar a %d casillas" % (absi(pos_activa().x - e.x) + absi(pos_activa().y - e.y)))
+				var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
+				memo["hp_e_arco"] = int(nodo.get_meta("hp_actual")) if nodo else -1
+				memo["nodo_arco"] = nodo
+				memo["arquero"] = activo()
+				memo["hp_h_arco"] = int(activo().get_meta("hp_actual"))
+				dm.call("ProcesarClicEnCasilla", e.x, e.y)
+			return 1.6,
+		func():
+			if memo.has("nodo_arco"):
+				var nodo = memo["nodo_arco"]
+				var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) and not str(nodo.name).ends_with("_muerto") else -999
+				check(hp1 < int(memo["hp_e_arco"]), "el disparo quita vida (%d -> %d)" % [memo["hp_e_arco"], hp1])
+				var h: Node = memo["arquero"]
+				check(int(h.get_meta("hp_actual")) == int(memo["hp_h_arco"]), "a distancia no hay contraataque (%s sigue con %d PV)" % [h.name, h.get_meta("hp_actual")])
+				captura("11b_disparo")
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			for i in 6:
 				if activo() == null:
@@ -320,6 +486,17 @@ func _definir_pasos():
 				if c is TextureRect and c.has_meta("frame"):
 					sentados += 1
 			check(sentados > 0, "en la fogata se sienta el grupo (%d)" % sentados)
+			var vivos: Array = []
+			for h in pm.get_children():
+				if h.name != "DatosEquipo" and not h.get_meta("esta_muerto", false):
+					vivos.append(h)
+			if vivos.size() >= 2:
+				var a: String = str(vivos[0].name)
+				var b: String = str(vivos[1].name)
+				var inv_a: Array = pm.call("DescribirInventario", a)
+				if inv_a.size() > 0:
+					var err: String = pm.call("DarObjeto", a, 0, b, 1)
+					check(err == "", "en la fogata %s le da %s a %s ('%s')" % [a, inv_a[0]["nombre"], b, err])
 			captura("12_fogata")
 			ui.call("DescansarYContinuar")
 			return 1.0,

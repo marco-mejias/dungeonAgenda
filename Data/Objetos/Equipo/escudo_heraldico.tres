@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_tocvv"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_3aqo2"]
+[ext_resource type="Texture2D" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_8sykj"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_thokg"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_0t8fc"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_nu08l"]
+atlas = ExtResource("3_8sykj")
+region = Rect2(64, 112, 16, 16)
+
+[sub_resource type="Resource" id="Resource_v65vi"]
+script = ExtResource("4_thokg")
+stat = "defensa"
+plano = 2
+
+[resource]
+script = ExtResource("5_0t8fc")
+ranura = 1
+modificadores = Array[ExtResource("4_thokg")]([SubResource("Resource_v65vi")])
+clases_permitidas = PackedStringArray()
+nombre = "Escudo heráldico"
+descripcion = "Escudo de armas de alguna casa olvidada."
+icono = SubResource("AtlasTexture_nu08l")
+tipo = 1
+peso = 3.0
+valor = 15

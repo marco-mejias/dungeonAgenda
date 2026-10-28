@@ -30,6 +30,7 @@
 #include <Godot/classes/packed_scene.hpp>
 #include <vector>
 #include "Scripts/CPP/UI/Fichas.hpp"
+#include "Scripts/CPP/Inventario/Inventario.hpp"
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -156,6 +157,7 @@ void EjecutarCambioDePiso(Caller* instance) {
 		int floor = pm->has_meta("piso_actual") ? (int)pm->get_meta("piso_actual") : 1;
 		pm->set_meta("piso_actual", floor + 1);
 		pm->set_meta("turno_actual", 1);
+		pm->call("FinDePiso"); // se acaban los efectos "hasta el final del piso"
 
 		TypedArray<Node> children = pm->get_children();
 		for (int i = 0; i < children.size(); i++) {
@@ -416,6 +418,14 @@ void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {
 		int sanity = hero->has_meta("sanidad_actual") ? (int)hero->get_meta("sanidad_actual") : 100;
 		hero->set_meta("sanidad_actual", UtilityFunctions::max(0, sanity - 10)); 
 		ActualizarStatsUI(instance); // LLAMADA C++ DIRECTA
+	}
+
+	// Efectos del nuevo sistema (Efecto.tres en la opción)
+	Array efectos = success ? option->get("efectos_exito") : option->get("efectos_fracaso");
+	if (hero && !efectos.is_empty()) {
+		String texto = inventario::AplicarEfectos(efectos, hero);
+		UtilityFunctions::print("[UI] Efectos del evento: ", texto);
+		ActualizarStatsUI(instance);
 	}
 
 	if (!fn_call.is_empty()) {

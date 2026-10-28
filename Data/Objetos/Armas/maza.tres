@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_av33u"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_j0h8m"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/maza.png" id="3_xy31w"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_7kivf"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_m7j07"]
+
+[resource]
+script = ExtResource("5_m7j07")
+dano = 5
+animacion = 2
+ranura = 0
+clases_permitidas = PackedStringArray()
+nombre = "Maza"
+descripcion = "Pesada; machaca armaduras."
+icono = ExtResource("3_xy31w")
+tipo = 0
+peso = 4.0
+valor = 18

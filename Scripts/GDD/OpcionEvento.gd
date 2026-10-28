@@ -16,3 +16,8 @@ class_name OpcionEvento
 @export var parametro_exito: int = 0
 @export var funcion_fracaso: String = ""
 @export var parametro_fracaso: int = 0
+
+@export_category("Efectos (nuevo sistema)")
+# Se aplican al héroe además de la función de arriba (que sigue funcionando)
+@export var efectos_exito: Array[Efecto] = []
+@export var efectos_fracaso: Array[Efecto] = []

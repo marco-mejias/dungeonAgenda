@@ -9,6 +9,7 @@
 #include <Godot/classes/callback_tweener.hpp>
 #include <Godot/classes/interval_tweener.hpp>
 #include <Godot/variant/utility_functions.hpp>
+#include "Scripts/CPP/Inventario/Inventario.hpp"
 #include <vector>
 
 using namespace godot;
@@ -65,6 +66,38 @@ namespace {
 		act_char = nullptr;
 		for (Node* h : Heroes()) {
 			if (PuedeJugar(h)) { act_char = h; break; }
+		}
+	}
+
+	Node* Heroe(const String& nombre) {
+		if (!self || nombre.is_empty() || nombre == "DatosEquipo") return nullptr;
+		return self->get_node_or_null(NodePath(nombre));
+	}
+
+	bool EnFogata() {
+		CanvasLayer* fogata = self ? Object::cast_to<CanvasLayer>(self->get_parent()->get_node_or_null("CanvasLayer3")) : nullptr;
+		return fogata && fogata->is_visible();
+	}
+
+	bool EnMapa(Node* h) { return h && !MetaBool(h, "esta_muerto") && !MetaBool(h, "ha_escapado") && h->has_meta("grid_pos"); }
+
+	bool PuedenIntercambiarObjetos(Node* a, Node* b) {
+		if (!a || !b || a == b || MetaBool(a, "esta_muerto") || MetaBool(b, "esta_muerto")) return false;
+		if (EnFogata()) return true;
+		if (!EnMapa(a) || !EnMapa(b)) return false;
+		Vector2i pa = a->get_meta("grid_pos"), pb = b->get_meta("grid_pos");
+		return std::abs(pa.x - pb.x) + std::abs(pa.y - pb.y) == 1;
+	}
+
+	// Cambiar el equipo puede cambiar la luz (radio_luz), los PA o la vida: refrescamos todo
+	void TrasCambiarEquipo(Node* h) {
+		if (m_ui_manager) {
+			m_ui_manager->call("UpdateWarriorUI");
+			m_ui_manager->call("ActualizarStatsUI");
+		}
+		if (m_dungeon_manager) {
+			m_dungeon_manager->call("CalcularMapaDeLuces");
+			m_dungeon_manager->call("RefrescarLuces");
 		}
 	}
 
@@ -185,6 +218,7 @@ void TerminarTurnoPersonaje(Caller* instance) {
 				UtilityFunctions::print("[Survival] ", h->get_name(), " loses 15 sanity due to isolation.");
 			}
 
+			inventario::AvanzarDia(h); // los efectos temporales duran X días
 			h->set_meta("ha_movido", false);
 			h->set_meta("pa_actual", h->get_meta("pa_max", 3));
 		}
@@ -247,6 +281,91 @@ void PersonajeEscapa(Caller* instance, Node* hero) {
 }
 
 // ==========================================
+// INVENTARIO Y EQUIPO (la lógica está en Inventario/Inventario.hpp)
+// ==========================================
+// Equipar, usar e intercambiar no cuestan PA. Las funciones devuelven "" si todo fue bien
+// o el motivo del fallo (para la interfaz).
+
+Variant Equipar(Caller* instance, String heroe, int indice) {
+	Node* h = Heroe(heroe);
+	if (!h) return String::utf8("No existe ese h\xC3\xA9roe");
+	String error = inventario::Equipar(h, indice);
+	if (error.is_empty()) TrasCambiarEquipo(h);
+	return error;
+}
+
+Variant Desequipar(Caller* instance, String heroe, String ranura) {
+	Node* h = Heroe(heroe);
+	if (!h) return String::utf8("No existe ese h\xC3\xA9roe");
+	String error = inventario::Desequipar(h, ranura);
+	if (error.is_empty()) TrasCambiarEquipo(h);
+	return error;
+}
+
+// Devuelve cuántas unidades han entrado
+Variant AnadirObjeto(Caller* instance, String heroe, String id, int cantidad) {
+	Node* h = Heroe(heroe);
+	if (!h) return 0;
+	int n = inventario::Anadir(h, id, cantidad);
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	return n;
+}
+
+Variant UsarObjeto(Caller* instance, String heroe, int indice) {
+	Node* h = Heroe(heroe);
+	if (!h || MetaBool(h, "esta_muerto")) return String("No puede usarlo");
+	String resultado;
+	String error = inventario::Usar(h, indice, resultado);
+	if (error.is_empty()) {
+		UtilityFunctions::print("[PartyManager] ", heroe, " usa un objeto: ", resultado);
+		TrasCambiarEquipo(h);
+	}
+	return error;
+}
+
+// En la fogata se puede dar cualquier cosa; en la mazmorra, solo entre héroes pegados
+Variant PuedenIntercambiar(Caller* instance, String a, String b) {
+	return PuedenIntercambiarObjetos(Heroe(a), Heroe(b));
+}
+
+Variant DarObjeto(Caller* instance, String origen, int indice, String destino, int cantidad) {
+	Node* de = Heroe(origen);
+	Node* para = Heroe(destino);
+	if (!de || !para || de == para) return String::utf8("No existe ese h\xC3\xA9roe");
+	if (!PuedenIntercambiarObjetos(de, para)) return String("Tienen que estar juntos (o en la fogata)");
+	Array inv = inventario::Inventario(de);
+	if (indice < 0 || indice >= inv.size()) return String("No existe ese objeto");
+	Dictionary e = inv[indice];
+	int n = std::min(cantidad, (int)e["cantidad"]);
+	int entran = inventario::Anadir(para, e["id"], n);
+	if (entran <= 0) return String("No le cabe en la mochila");
+	inventario::Quitar(de, indice, entran);
+	UtilityFunctions::print("[PartyManager] ", origen, " da ", entran, "x ", e["id"], " a ", destino);
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	return entran < n ? String("Solo le caben ") + String::num_int64(entran) : String("");
+}
+
+Variant DescribirInventario(Caller* instance, String heroe) {
+	Node* h = Heroe(heroe);
+	return h ? inventario::DescribirInventario(h) : Array();
+}
+
+Variant PesoInventario(Caller* instance, String heroe) {
+	Node* h = Heroe(heroe);
+	return h ? inventario::PesoInventario(h) : 0.0f;
+}
+
+Variant CapacidadInventario(Caller* instance, String heroe) {
+	Node* h = Heroe(heroe);
+	return h ? inventario::Capacidad(h) : 0.0f;
+}
+
+// Al bajar de piso se acaban los efectos "hasta el final del piso"
+void FinDePiso(Caller* instance) {
+	for (Node* h : Heroes()) inventario::FinDePiso(h);
+}
+
+// ==========================================
 // INITIALIZATION
 // ==========================================
 
@@ -275,43 +394,25 @@ void OnReady(Caller* instance) {
 		if (res.is_null()) continue;
 
 		String name = res->get("nombre_display");
-		int hp = res->get("vida_max");
-		int spd = res->get("velocidad");
 
 		Node* soul = memnew(Node);
 		soul->set_name(name);
 		soul->set_meta("nombre_display", name);
-		soul->set_meta("hp_max", hp);
-		soul->set_meta("hp_actual", hp);
-		soul->set_meta("velocidad", spd);
 		soul->set_meta("retrato_path", res->get("retrato_path"));
 		soul->set_meta("ha_movido", false);
-		soul->set_meta("defensa", res->get("defensa"));
-		soul->set_meta("fuerza", res->get("fuerza"));
-		soul->set_meta("magia", res->get("magia"));
-		soul->set_meta("suerte", res->get("suerte"));
-		soul->set_meta("hambre_max", 10);
-		soul->set_meta("hambre_actual", 10);
-		soul->set_meta("sanidad_max", 100);
-		soul->set_meta("sanidad_actual", 100);
 		soul->set_meta("esta_muerto", false);
 		soul->set_meta("ha_escapado", false);
 		soul->set_meta("in_combat", false);
-		soul->set_meta("pa_max", spd);
-		soul->set_meta("pa_actual", spd);
-
-		// Radio de visión propio (antes se usaban los PA, y con 0 PA no veías nada)
-		Variant radio = res->get("radio_luz");
-		soul->set_meta("radio_luz", radio.get_type() == Variant::NIL ? 4 : (int)radio);
-
 		soul->set_meta("oro", 0);
 		soul->set_meta("comida_bolsa", 0);
+		self->add_child(soul); // antes de equiparlo: el inventario busca el Catalogo desde el árbol
 
-		// El tanque es una mula de carga
-		soul->set_meta("max_slots", name == "Doom Snailer" ? 4 : 3);
-		soul->set_meta("items_lista", TypedArray<Resource>());
-
-		self->add_child(soul);
+		// Stats base + equipo inicial -> stats finales (hp_max, fuerza, radio_luz...)
+		inventario::Inicializar(soul, res);
+		soul->set_meta("hp_actual", soul->get_meta("hp_max"));
+		soul->set_meta("sanidad_actual", soul->get_meta("sanidad_max"));
+		soul->set_meta("hambre_actual", soul->get_meta("hambre_max"));
+		soul->set_meta("pa_actual", soul->get_meta("pa_max"));
 
 		if (m_dungeon_manager) m_dungeon_manager->call("SpawnVisualCharacter", res, i);
 	}

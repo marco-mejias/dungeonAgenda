@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_r8eo4"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_nh0hp"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/baston_arcano.png" id="3_dp3jd"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_kadx2"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_5rxei"]
+
+[resource]
+script = ExtResource("5_5rxei")
+stat_ataque = "magia"
+alcance_max = 3
+dos_manos = true
+animacion = 4
+ranura = 0
+clases_permitidas = PackedStringArray()
+nombre = "Bastón arcano"
+descripcion = "Lanza chispas a 3 casillas con línea de visión."
+icono = ExtResource("3_dp3jd")
+tipo = 0
+peso = 2.0
+valor = 30

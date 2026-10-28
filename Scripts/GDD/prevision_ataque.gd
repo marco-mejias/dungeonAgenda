@@ -112,15 +112,15 @@ func _rellenar(d: Dictionary, objetivo: Vector2i, dm: Node) -> void:
 	elif d["mata_critico"]:
 		resultado.text = "Le quedan %d PV (con crítico, cae)" % (hp - int(d["dano"]))
 		resultado.add_theme_color_override("font_color", Color(1, 1, 1))
+	elif d.get("a_distancia", false):
+		resultado.text = "A distancia: sin contraataque"
+		resultado.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
 	else:
 		resultado.text = "Contraataque: -%d PV" % d["contra"]
 		resultado.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
 
-	var pm := get_node_or_null("/root/Main/PartyManager")
-	var pos: Vector2i = pm.call("GetActiveGridPos") if pm else Vector2i(-99, -99)
-	var adyacente := absi(pos.x - objetivo.x) + absi(pos.y - objetivo.y) == 1
 	var falta_pa := int(d["pa"]) < int(d["coste"])
-	if not adyacente:
+	if not d.get("en_alcance", false):
 		coste.text = "Acércate para atacar · %d PA" % d["coste"]
 		coste.add_theme_color_override("font_color", Color(0.7, 0.75, 0.9))
 	elif falta_pa:
