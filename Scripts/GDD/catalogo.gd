@@ -14,14 +14,15 @@ var avisos: PackedStringArray = []
 func _ready() -> void:
 	recargar()
 
-func recargar() -> void:
+# desde_disco: vuelve a leer los .tres aunque ya estén en memoria (para editarlos con el juego en marcha)
+func recargar(desde_disco: bool = false) -> void:
 	objetos.clear()
 	tablas.clear()
 	avisos.clear()
-	for r in _cargar_carpeta(CARPETA_OBJETOS):
+	for r in _cargar_carpeta(CARPETA_OBJETOS, desde_disco):
 		if r is ObjetoData:
 			_registrar_objeto(r)
-	for r in _cargar_carpeta(CARPETA_BOTIN):
+	for r in _cargar_carpeta(CARPETA_BOTIN, desde_disco):
 		if r is TablaBotin:
 			tablas[r.obtener_id()] = r
 	for a in avisos:
@@ -41,18 +42,19 @@ func _registrar_objeto(o: ObjetoData) -> void:
 		avisos.append("'%s': alcance_min > alcance_max" % id)
 	objetos[id] = o
 
-func _cargar_carpeta(ruta: String) -> Array:
+func _cargar_carpeta(ruta: String, desde_disco: bool = false) -> Array:
 	var salida: Array = []
 	var dir := DirAccess.open(ruta)
 	if dir == null:
 		return salida
 	for sub in dir.get_directories():
-		salida.append_array(_cargar_carpeta(ruta.path_join(sub)))
+		salida.append_array(_cargar_carpeta(ruta.path_join(sub), desde_disco))
 	for f in dir.get_files():
 		# En un juego exportado los .tres aparecen como .tres.remap
 		var nombre := f.trim_suffix(".remap")
 		if nombre.get_extension() in ["tres", "res"]:
-			var r := load(ruta.path_join(nombre))
+			var modo := ResourceLoader.CACHE_MODE_REPLACE_DEEP if desde_disco else ResourceLoader.CACHE_MODE_REUSE
+			var r := ResourceLoader.load(ruta.path_join(nombre), "", modo)
 			if r:
 				salida.append(r)
 	return salida

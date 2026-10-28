@@ -366,6 +366,66 @@ void FinDePiso(Caller* instance) {
 }
 
 // ==========================================
+// DEPURACIÓN (panel F10)
+// ==========================================
+
+Variant QuitarObjeto(Caller* instance, String heroe, int indice, int cantidad) {
+	Node* h = Heroe(heroe);
+	bool ok = h && inventario::Quitar(h, indice, cantidad);
+	if (ok && m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	return ok;
+}
+
+// Tira una tabla de botín y se la da al héroe. Devuelve lo que salió (y lo que no cupo).
+Variant DarBotinDebug(Caller* instance, String heroe, String tabla) {
+	Node* h = Heroe(heroe);
+	Node* cat = inventario::Catalogo(self);
+	if (!h || !cat) return String("No existe ese héroe");
+	Array botin = cat->call("tirar_botin", tabla, (int)self->get_meta("piso_actual", 1));
+	Vector3 pos(0, 0, 0);
+	if (m_dungeon_manager && h->has_meta("grid_pos")) {
+		Vector2i g = h->get_meta("grid_pos");
+		pos = Vector3(g.x + 0.5f, 0.6f, g.y + 0.5f);
+	}
+	Array restos = inventario::EntregarBotin(h, botin, pos);
+	String texto;
+	for (int i = 0; i < botin.size(); i++) {
+		Dictionary b = botin[i];
+		int r = b["recurso"];
+		String que = r == inventario::B_ORO ? String("oro") : (r == inventario::B_COMIDA ? String("comida") : String(b["id"]));
+		texto += (texto.is_empty() ? String("") : String(", ")) + String::num_int64((int)b["cantidad"]) + " " + que;
+	}
+	if (texto.is_empty()) texto = "nada";
+	if (!restos.is_empty()) texto += String(" (no cupo todo)");
+	TrasCambiarEquipo(h);
+	return texto;
+}
+
+// Tras editar un .tres con el juego en marcha (Catalogo.recargar): stats al día
+void RecalcularTodo(Caller* instance) {
+	for (Node* h : Heroes()) inventario::RecalcularStats(h);
+	TrasCambiarEquipo(nullptr);
+}
+
+// Pasa un día solo para los efectos temporales (para probarlos sin jugar el turno)
+void AvanzarDiaEfectos(Caller* instance, String heroe) {
+	Node* h = Heroe(heroe);
+	if (!h) return;
+	inventario::AvanzarDia(h);
+	TrasCambiarEquipo(h);
+}
+
+// Aplica los efectos al usar de un objeto sin gastarlo (probar consumibles y eventos)
+Variant ProbarEfectos(Caller* instance, String heroe, String id) {
+	Node* h = Heroe(heroe);
+	Ref<Resource> def = inventario::Definicion(self, id);
+	if (!h || def.is_null()) return String("No existe");
+	String texto = inventario::AplicarEfectos(def->get("efectos_al_usar"), h);
+	TrasCambiarEquipo(h);
+	return texto.is_empty() ? String("sin efecto") : texto;
+}
+
+// ==========================================
 // INITIALIZATION
 // ==========================================
 

@@ -248,7 +248,30 @@ func _definir_pasos():
 			return 0.2,
 		func():
 			_check_inventario()
-			return 0.3,
+			# Panel de depuración (F10)
+			var dbg: CanvasLayer = null
+			for c in root.get_node("Main").get_children():
+				if c.get_script() and str(c.get_script().resource_path).ends_with("debug_inventario.gd"):
+					dbg = c
+			memo["debug"] = dbg
+			check(dbg != null, "existe el panel de depuración de inventario")
+			if dbg:
+				dbg.alternar()
+				dbg.heroe = str(activo().name)
+				for i in dbg.opt_tabla.item_count:
+					if dbg.opt_tabla.get_item_text(i) == "enemigo":
+						dbg.opt_tabla.select(i)
+				dbg._on_botin()
+				check(dbg.lbl_log.text.begins_with("Tabla 'enemigo'"), "el panel tira una tabla de botín: %s" % dbg.lbl_log.text)
+			return 0.4,
+		func():
+			var dbg = memo.get("debug")
+			if dbg:
+				check(dbg.visible and dbg.caja_equipo.get_child_count() == 8, "F10 abre el panel con las 8 ranuras de equipo")
+				check(dbg.caja_inv.get_child_count() > 0, "el panel lista el inventario (%d filas)" % dbg.caja_inv.get_child_count())
+				captura("01c_panel_debug")
+				dbg.alternar()
+			return 0.2,
 		func():
 			# Hover sobre la casilla alcanzable más lejana: debe salir la ruta y el coste
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
