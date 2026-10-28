@@ -6,9 +6,11 @@ extends Node
 
 const CARPETA_OBJETOS := "res://Data/Objetos"
 const CARPETA_BOTIN := "res://Data/Botin"
+const CARPETA_ENEMIGOS := "res://Data/Enemigos"
 
 var objetos: Dictionary = {} # id -> ObjetoData
 var tablas: Dictionary = {}  # id -> TablaBotin
+var enemigos: Dictionary = {} # id -> EnemigoData
 var avisos: PackedStringArray = []
 
 func _ready() -> void:
@@ -18,6 +20,7 @@ func _ready() -> void:
 func recargar(desde_disco: bool = false) -> void:
 	objetos.clear()
 	tablas.clear()
+	enemigos.clear()
 	avisos.clear()
 	for r in _cargar_carpeta(CARPETA_OBJETOS, desde_disco):
 		if r is ObjetoData:
@@ -25,9 +28,12 @@ func recargar(desde_disco: bool = false) -> void:
 	for r in _cargar_carpeta(CARPETA_BOTIN, desde_disco):
 		if r is TablaBotin:
 			tablas[r.obtener_id()] = r
+	for r in _cargar_carpeta(CARPETA_ENEMIGOS, desde_disco):
+		if r is EnemigoData:
+			_registrar_enemigo(r)
 	for a in avisos:
 		push_warning("[Catalogo] " + a)
-	print("[Catalogo] %d objetos, %d tablas de botín" % [objetos.size(), tablas.size()])
+	print("[Catalogo] %d objetos, %d tablas de botín, %d enemigos" % [objetos.size(), tablas.size(), enemigos.size()])
 
 func _registrar_objeto(o: ObjetoData) -> void:
 	var id := o.obtener_id()
@@ -41,6 +47,17 @@ func _registrar_objeto(o: ObjetoData) -> void:
 	if o is ArmaData and o.alcance_min > o.alcance_max:
 		avisos.append("'%s': alcance_min > alcance_max" % id)
 	objetos[id] = o
+
+func _registrar_enemigo(e: EnemigoData) -> void:
+	var id := e.obtener_id()
+	if enemigos.has(id):
+		avisos.append("enemigo con id repetido '%s'" % id)
+		return
+	if e.arma and not objetos.has(e.arma.obtener_id()):
+		avisos.append("el arma de '%s' no está en Data/Objetos" % id)
+	if e.botin and not tablas.has(e.botin.obtener_id()):
+		avisos.append("la tabla de botín de '%s' no está en Data/Botin" % id)
+	enemigos[id] = e
 
 func _cargar_carpeta(ruta: String, desde_disco: bool = false) -> Array:
 	var salida: Array = []
@@ -88,3 +105,26 @@ func tirar_botin(id_tabla: String, piso: int) -> Array:
 		push_warning("[Catalogo] no existe la tabla de botín '%s'" % id_tabla)
 		return []
 	return t.tirar(piso)
+
+func enemigo(id: String) -> EnemigoData:
+	return enemigos.get(id)
+
+# Un tipo de enemigo al azar entre los que valen para este piso (según su peso de aparición)
+func elegir_enemigo(piso: int) -> EnemigoData:
+	if enemigos.is_empty():
+		recargar()
+	var validos: Array = []
+	var total := 0
+	for id in enemigos:
+		var e: EnemigoData = enemigos[id]
+		if e.vale_en_piso(piso) and e.peso_aparicion > 0:
+			validos.append(e)
+			total += e.peso_aparicion
+	if total <= 0:
+		return null
+	var r := randi() % total
+	for e in validos:
+		r -= e.peso_aparicion
+		if r < 0:
+			return e
+	return validos[-1]

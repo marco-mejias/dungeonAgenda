@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemigoData" format=3]
+
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/chispa_fatua.tres" id="1_5qo5g"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/enemigo_data.gd" id="2_rm0q8"]
+
+[resource]
+script = ExtResource("2_rm0q8")
+nombre = "Fuego fatuo"
+frame = 7
+tinte = Color(0.8, 0.9, 1, 1)
+vida = 8
+fuerza = 2
+defensa = 0
+magia = 9
+arma = ExtResource("1_5qo5g")
+perfil = 2
+radio_deteccion = 7
+peso_aparicion = 12

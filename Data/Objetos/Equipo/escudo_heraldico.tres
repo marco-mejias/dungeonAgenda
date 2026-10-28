@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="EquipoData" format=3]
+[gd_resource type="Resource" script_class="EquipoData" format=3 uid="uid://c4ycxowttquqc"]
 
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_tocvv"]
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_3aqo2"]
-[ext_resource type="Texture2D" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_8sykj"]
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_thokg"]
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_0t8fc"]
+[ext_resource type="Script" uid="uid://bnfaefupynqmv" path="res://Scripts/GDD/Datos/efecto.gd" id="1_tocvv"]
+[ext_resource type="Script" uid="uid://p87mdf4h2v2w" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_3aqo2"]
+[ext_resource type="Texture2D" uid="uid://ciu6t8viq5o13" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_8sykj"]
+[ext_resource type="Script" uid="uid://c7sngciu4inmt" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_thokg"]
+[ext_resource type="Script" uid="uid://bdsxjy6gvr7ku" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_0t8fc"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_nu08l"]
 atlas = ExtResource("3_8sykj")

@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="ObjetoData" format=3]
+[gd_resource type="Resource" script_class="ObjetoData" format=3 uid="uid://b08qgaw1tdimn"]
 
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_nab0e"]
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_semgf"]
-[ext_resource type="Texture2D" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_2k0sa"]
-[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="4_ry1sp"]
+[ext_resource type="Script" uid="uid://bnfaefupynqmv" path="res://Scripts/GDD/Datos/efecto.gd" id="1_nab0e"]
+[ext_resource type="Script" uid="uid://p87mdf4h2v2w" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_semgf"]
+[ext_resource type="Texture2D" uid="uid://ciu6t8viq5o13" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="3_2k0sa"]
+[ext_resource type="Script" uid="uid://bdlgleubkkuph" path="res://Scripts/GDD/Datos/objeto_data.gd" id="4_ry1sp"]
 
 [sub_resource type="Resource" id="Resource_n6k8y"]
 script = ExtResource("1_nab0e")

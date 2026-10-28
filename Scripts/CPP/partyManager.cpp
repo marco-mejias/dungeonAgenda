@@ -101,6 +101,55 @@ namespace {
 		}
 	}
 
+	// CAE LA NOCHE: supervivencia y recarga de PA
+	void Noche() {
+		int turno = (int)self->get_meta("turno_actual", 1) + 1;
+		self->set_meta("turno_actual", turno);
+
+		std::vector<Node*> heroes = Heroes();
+		for (Node* h : heroes) {
+			if (MetaBool(h, "ha_escapado") || MetaBool(h, "esta_muerto")) continue;
+
+			// HAMBRE: -1 por día. Si queda poca y hay comida en la bolsa, se come sola.
+			int hambre = (int)h->get_meta("hambre_actual", 10) - 1;
+			int comida = h->get_meta("comida_bolsa", 0);
+			if (hambre <= 3 && comida > 0) {
+				hambre = UtilityFunctions::mini((int)h->get_meta("hambre_max", 10), hambre + 5);
+				h->set_meta("comida_bolsa", comida - 1);
+				UtilityFunctions::print("[Survival] ", h->get_name(), " come algo de la bolsa.");
+			}
+			h->set_meta("hambre_actual", UtilityFunctions::maxi(0, hambre));
+			if (hambre <= 0) {
+				Morir(h, "hambre");
+				continue;
+			}
+
+			// CORDURA: perder al grupo de vista asusta
+			Vector2i mi_pos = h->get_meta("grid_pos", Vector2i(0, 0));
+			int min_dist = 999;
+			for (Node* c : heroes) {
+				if (c == h || MetaBool(c, "ha_escapado") || MetaBool(c, "esta_muerto")) continue;
+				Vector2i p = c->get_meta("grid_pos", Vector2i(0, 0));
+				min_dist = UtilityFunctions::mini(min_dist, abs(mi_pos.x - p.x) + abs(mi_pos.y - p.y));
+			}
+			if (min_dist > 3 && min_dist != 999) {
+				int cordura = h->get_meta("sanidad_actual", 100);
+				h->set_meta("sanidad_actual", UtilityFunctions::maxi(0, cordura - 15));
+				UtilityFunctions::print("[Survival] ", h->get_name(), " loses 15 sanity due to isolation.");
+			}
+
+			inventario::AvanzarDia(h); // los efectos temporales duran X días
+			h->set_meta("ha_movido", false);
+			h->set_meta("pa_actual", h->get_meta("pa_max", 3));
+		}
+
+		UtilityFunctions::print("[PartyManager] New day. Current turn: ", turno);
+		if (m_ui_manager) {
+			m_ui_manager->call("ActualizarMarcadorTurno");
+			m_ui_manager->call("ActualizarStatsUI");
+		}
+	}
+
 	void ComprobarFinDelPiso() {
 		bool alguno_escapo = false;
 		for (Node* h : Heroes()) {
@@ -181,53 +230,17 @@ void TerminarTurnoPersonaje(Caller* instance) {
 		if (PuedeJugar(h)) { dia_terminado = false; break; }
 	}
 
-	// 2. CAE LA NOCHE: supervivencia y recarga
+	// 2. Si se acaba el día, antes de la noche juegan los enemigos despiertos;
+	//    al terminar, el EnemyManager llama a IniciarNuevoDia
 	if (dia_terminado) {
-		int turno = (int)self->get_meta("turno_actual", 1) + 1;
-		self->set_meta("turno_actual", turno);
-
-		std::vector<Node*> heroes = Heroes();
-		for (Node* h : heroes) {
-			if (MetaBool(h, "ha_escapado") || MetaBool(h, "esta_muerto")) continue;
-
-			// HAMBRE: -1 por día. Si queda poca y hay comida en la bolsa, se come sola.
-			int hambre = (int)h->get_meta("hambre_actual", 10) - 1;
-			int comida = h->get_meta("comida_bolsa", 0);
-			if (hambre <= 3 && comida > 0) {
-				hambre = UtilityFunctions::mini((int)h->get_meta("hambre_max", 10), hambre + 5);
-				h->set_meta("comida_bolsa", comida - 1);
-				UtilityFunctions::print("[Survival] ", h->get_name(), " come algo de la bolsa.");
-			}
-			h->set_meta("hambre_actual", UtilityFunctions::maxi(0, hambre));
-			if (hambre <= 0) {
-				Morir(h, "hambre");
-				continue;
-			}
-
-			// CORDURA: perder al grupo de vista asusta
-			Vector2i mi_pos = h->get_meta("grid_pos", Vector2i(0, 0));
-			int min_dist = 999;
-			for (Node* c : heroes) {
-				if (c == h || MetaBool(c, "ha_escapado") || MetaBool(c, "esta_muerto")) continue;
-				Vector2i p = c->get_meta("grid_pos", Vector2i(0, 0));
-				min_dist = UtilityFunctions::mini(min_dist, abs(mi_pos.x - p.x) + abs(mi_pos.y - p.y));
-			}
-			if (min_dist > 3 && min_dist != 999) {
-				int cordura = h->get_meta("sanidad_actual", 100);
-				h->set_meta("sanidad_actual", UtilityFunctions::maxi(0, cordura - 15));
-				UtilityFunctions::print("[Survival] ", h->get_name(), " loses 15 sanity due to isolation.");
-			}
-
-			inventario::AvanzarDia(h); // los efectos temporales duran X días
-			h->set_meta("ha_movido", false);
-			h->set_meta("pa_actual", h->get_meta("pa_max", 3));
+		Node* em = m_dungeon_manager ? m_dungeon_manager->get_node_or_null("EnemyManager") : nullptr;
+		if (em && (bool)em->call("HayEnemigosQueActuan")) {
+			act_char = nullptr;
+			if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+			em->call("IniciarTurnoEnemigos");
+			return;
 		}
-
-		UtilityFunctions::print("[PartyManager] New day. Current turn: ", turno);
-		if (m_ui_manager) {
-			m_ui_manager->call("ActualizarMarcadorTurno");
-			m_ui_manager->call("ActualizarStatsUI");
-		}
+		Noche();
 	}
 
 	// 3. SIGUIENTE PERSONAJE DISPONIBLE
@@ -235,6 +248,18 @@ void TerminarTurnoPersonaje(Caller* instance) {
 
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
+}
+
+// Lo llama el EnemyManager al terminar el turno enemigo
+void IniciarNuevoDia(Caller* instance) {
+	if (!self) return;
+	Noche();
+	SeleccionarSiguiente();
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	if (m_dungeon_manager) {
+		m_dungeon_manager->call("RefrescarLuces");
+		m_dungeon_manager->call("UpdateHighlightForWarrior");
+	}
 }
 
 void CambiarPersonajeActivo(Caller* instance, String new_name) {

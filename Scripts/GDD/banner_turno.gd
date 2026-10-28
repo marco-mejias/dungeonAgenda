@@ -12,6 +12,7 @@ var tween: Tween
 var ultimo_heroe := ""
 var ultimo_dia := -1
 var pendiente := ""
+var turno_enemigo := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -53,6 +54,13 @@ func _process(_delta: float) -> void:
 	var pm := get_node_or_null("/root/Main/PartyManager")
 	if not pm:
 		return
+	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
+	var enemigos: bool = dm.get_meta("turno_enemigo", false) if dm else false
+	if enemigos != turno_enemigo:
+		turno_enemigo = enemigos
+		if enemigos:
+			mostrar("TURNO ENEMIGO")
+			return
 	var dia: int = pm.get_meta("turno_actual", 1)
 	var act = pm.call("GetActiveCharacter")
 	var nombre := str(act.get_meta("nombre_display", act.name)) if act else ""

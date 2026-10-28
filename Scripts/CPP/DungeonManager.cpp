@@ -19,6 +19,7 @@
 #include <Godot/variant/utility_functions.hpp>
 #include "Scripts/CPP/Mazmorra/Mazmorra.hpp"
 #include "Scripts/CPP/Combate/Reglas.hpp"
+#include "Scripts/CPP/IA/Enemigos.hpp"
 #include <algorithm>
 #include <vector>
 #include <queue>
@@ -335,7 +336,6 @@ namespace {
 	bool ComprobarAggro(Node* act, Vector2i pos) {
 		if (!act || MetaBool(act, "in_combat")) return false;
 
-		const int RADIO_VISION = 6;
 		bool detectado = false;
 		for (int x = 0; x < GRID_SIZE; x++)
 			for (int y = 0; y < GRID_SIZE; y++) {
@@ -343,7 +343,8 @@ namespace {
 				Node* enemigo = self->get_node_or_null(NodePath(NombreEnemigo(Vector2i(x, y))));
 				if (!enemigo || MetaBool(enemigo, "in_combat")) continue;
 				int dist = std::abs(pos.x - x) + std::abs(pos.y - y);
-				if (dist <= RADIO_VISION && mapa.CheckLineOfSight(pos, Vector2i(x, y))) {
+				int radio = enemigo->get_meta("radio_deteccion", 6); // cada tipo ve hasta donde dice su ficha
+				if (dist <= radio && mapa.CheckLineOfSight(pos, Vector2i(x, y))) {
 					enemigo->set_meta("in_combat", true);
 					detectado = true;
 				}
@@ -449,11 +450,11 @@ void ConstruirVisual(Caller* instance) {
 	for (const EventInfo& e : mapa.m_eventos)
 		if (e.gatillo == 0 || debug_mode) m_renderer->call("CrearMarcadorEvento", e.pos.x, e.pos.y);
 
-	// ENEMIGOS
+	// ENEMIGOS: el Catálogo elige el tipo (Data/Enemigos) según el piso
 	Ref<PackedScene> escena = ResourceLoader::get_singleton()->load("res://Scenes/Enemy.tscn");
 	if (escena.is_valid()) {
 		int piso = (m_party_manager && m_party_manager->has_meta("piso_actual")) ? (int)m_party_manager->get_meta("piso_actual") : 1;
-		const int frames[] = { 8, 9, 11, 12, 13, 11 };
+		Node* catalogo = inventario::Catalogo(self);
 		for (int x = 0; x < GRID_SIZE; x++)
 			for (int y = 0; y < GRID_SIZE; y++) {
 				if (!mapa.map_data[x][y].has_enemy) continue;
@@ -461,17 +462,9 @@ void ConstruirVisual(Caller* instance) {
 				if (!enemigo) continue;
 				enemigo->set_name(NombreEnemigo(Vector2i(x, y)));
 				enemigo->set_position(GridToWorld(Vector2i(x, y)));
-				enemigo->set_meta("in_combat", false);
-				int frame = frames[UtilityFunctions::randi_range(0, 5)];
-				enemigo->set_meta("nombre_display", String(frame == 8 ? "Fantasma" : (frame <= 10 ? "Zombi" : "Esqueleto")));
-				enemigo->set_meta("frame", frame);
-				enemigo->set_meta("hp_max", 12 + 3 * piso);
-				enemigo->set_meta("hp_actual", 12 + 3 * piso);
-				enemigo->set_meta("fuerza", 5 + piso);
-				enemigo->set_meta("defensa", 2);
 				enemigo->set_visible(false);
-				Sprite3D* cuerpo = Object::cast_to<Sprite3D>(enemigo->get_node_or_null("Cuerpo"));
-				if (cuerpo) cuerpo->set_frame(frame);
+				Ref<Resource> tipo = catalogo ? Ref<Resource>(catalogo->call("elegir_enemigo", piso)) : Ref<Resource>();
+				enemigos::Configurar(enemigo, tipo, piso, Vector2i(x, y));
 				self->add_child(enemigo);
 			}
 	} else {
@@ -541,6 +534,51 @@ PackedInt32Array ObtenerObstaculosDinamicos(Caller* instance) {
 	for (Node* h : Heroes())
 		if (HeroeEnMapa(h)) obst.push_back(h->get_meta("grid_pos"));
 	return AParesInt(obst);
+}
+
+// ==========================================
+// PARA LA IA DE LOS ENEMIGOS (EnemyManager)
+// ==========================================
+
+// 1 = se puede pisar ahora mismo (suelo sin muros, puertas cerradas, cofres, braseros, enemigos ni héroes)
+PackedByteArray ObtenerTransitables(Caller* instance) {
+	PackedByteArray out;
+	out.resize(GRID_SIZE * GRID_SIZE);
+	out.fill(0);
+	if (mapa.map_data.empty()) return out;
+	for (int x = 0; x < GRID_SIZE; x++)
+		for (int y = 0; y < GRID_SIZE; y++) {
+			const Cell& c = mapa.map_data[x][y];
+			bool libre = !c.is_wall && !(c.is_door && !c.door_open) && !c.is_chest && !c.is_brasero && !c.has_enemy && Vector2i(x, y) != mapa.m_salida;
+			out[x * GRID_SIZE + y] = libre ? 1 : 0;
+		}
+	for (Node* h : Heroes())
+		if (HeroeEnMapa(h)) {
+			Vector2i p = h->get_meta("grid_pos");
+			if (Mazmorra::InBounds(p.x, p.y)) out[p.x * GRID_SIZE + p.y] = 0;
+		}
+	return out;
+}
+
+Variant HayLineaDeVision(Caller* instance, int x0, int y0, int x1, int y1) {
+	if (mapa.map_data.empty() || !Mazmorra::InBounds(x0, y0) || !Mazmorra::InBounds(x1, y1)) return false;
+	return mapa.CheckLineOfSight(Vector2i(x0, y0), Vector2i(x1, y1));
+}
+
+// El enemigo cambia de casilla: cuadrícula, nombre del nodo (va por posición) y visibilidad
+void MoverEnemigo(Caller* instance, int x0, int y0, int x1, int y1) {
+	if (!Mazmorra::InBounds(x0, y0) || !Mazmorra::InBounds(x1, y1)) return;
+	Cell& origen = mapa.map_data[x0][y0];
+	Cell& destino = mapa.map_data[x1][y1];
+	if (!origen.has_enemy || destino.has_enemy) return;
+	Node3D* e = Object::cast_to<Node3D>(self->get_node_or_null(NodePath(NombreEnemigo(Vector2i(x0, y0)))));
+	if (!e) return;
+	origen.has_enemy = false;
+	destino.has_enemy = true;
+	e->set_name(NombreEnemigo(Vector2i(x1, y1)));
+	e->set_meta("grid_pos", Vector2i(x1, y1));
+	self->set_meta("lista_enemigos", mapa.ListaEnemigos());
+	RefrescarVision();
 }
 
 // Para el minimapa del HUD: un código por casilla (ver minimapa.gd)

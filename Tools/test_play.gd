@@ -209,6 +209,30 @@ func _check_inventario() -> void:
 	ui.call("UpdateWarriorUI")
 	captura("01b_ficha_con_equipo")
 
+# Coloca al héroe activo a 3-4 casillas de un enemigo (con línea de visión) y lo despierta
+func _preparar_turno_enemigo() -> void:
+	var h := activo()
+	if h == null:
+		return
+	for pos in dm.get_meta("lista_enemigos", []):
+		var e := dm.get_node_or_null("Enemy_%d_%d" % [pos.x, pos.y])
+		if e == null:
+			continue
+		for d in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+			for k in [3, 4]:
+				var c: Vector2i = pos + d * k
+				dm.call("TeletransporteDebug", c.x, c.y)
+				if pos_activa() == c and bool(dm.call("HayLineaDeVision", c.x, c.y, pos.x, pos.y)):
+					dm.call("CalcularMapaDeLuces")
+					e.set_meta("in_combat", true)
+					memo["ia_enemigo"] = e
+					memo["ia_heroe"] = h
+					memo["ia_dist"] = k
+					memo["ia_hp"] = int(h.get_meta("hp_actual"))
+					memo["ia_nombre"] = str(e.get_meta("nombre_display"))
+					return
+	print("[test] AVISO no hay sitio para probar la IA")
+
 # Equipa un arco al héroe activo y lo coloca a 2-3 casillas en línea recta de un enemigo
 func _preparar_arco() -> void:
 	var h := activo()
@@ -496,6 +520,30 @@ func _definir_pasos():
 				var h: Node = memo["arquero"]
 				check(int(h.get_meta("hp_actual")) == int(memo["hp_h_arco"]), "a distancia no hay contraataque (%s sigue con %d PV)" % [h.name, h.get_meta("hp_actual")])
 				captura("11b_disparo")
+			_preparar_turno_enemigo()
+			return 0.5,
+		func():
+			# Se acaba el día: todos sin PA -> juegan los enemigos despiertos
+			memo["turno_antes"] = int(pm.get_meta("turno_actual"))
+			for h in _heroes():
+				h.set_meta("pa_actual", 0)
+			pm.call("TerminarTurnoPersonaje")
+			check(dm.get_meta("turno_enemigo", false), "al acabar el día empieza el turno enemigo")
+			return 0.3, # el guion espera solo a que acabe (el tablero está bloqueado mientras)
+		func():
+			check(not dm.get_meta("turno_enemigo", false) and int(pm.get_meta("turno_actual")) == int(memo["turno_antes"]) + 1, "tras el turno enemigo empieza el día %d" % pm.get_meta("turno_actual"))
+			if memo.has("ia_enemigo"):
+				var e = memo["ia_enemigo"]
+				var h: Node = memo["ia_heroe"]
+				var antes: int = memo["ia_dist"]
+				var ahora_d := -1
+				if is_instance_valid(e):
+					var ep: Vector2i = e.get_meta("grid_pos")
+					var hp: Vector2i = h.get_meta("grid_pos")
+					ahora_d = absi(ep.x - hp.x) + absi(ep.y - hp.y)
+				var herido := int(h.get_meta("hp_actual")) < int(memo["ia_hp"])
+				check(herido or (ahora_d >= 0 and ahora_d != antes), "el %s despierto actúa: distancia %d -> %d, %s" % [memo["ia_nombre"], antes, ahora_d, "ataca a %s" % h.name if herido else "sin atacar"])
+			captura("11c_turno_enemigo")
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			for i in 6:
 				if activo() == null:

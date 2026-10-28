@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemigoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/enemigo_data.gd" id="1_e7jvu"]
+
+[resource]
+script = ExtResource("1_e7jvu")
+nombre = "Segador"
+frame = 13
+vida = 22
+fuerza = 15
+defensa = 3
+suerte = 6
+fuerza_por_piso = 2
+piso_min = 2

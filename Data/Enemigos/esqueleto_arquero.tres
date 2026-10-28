@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemigoData" format=3]
+
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/arco_corto.tres" id="1_p8ejf"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/enemigo_data.gd" id="2_325cq"]
+
+[resource]
+script = ExtResource("2_325cq")
+nombre = "Esqueleto arquero"
+frame = 12
+vida = 10
+fuerza = 8
+defensa = 1
+arma = ExtResource("1_p8ejf")
+perfil = 2
+peso_aparicion = 15
