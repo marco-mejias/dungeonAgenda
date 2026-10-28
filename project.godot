@@ -64,3 +64,7 @@ ps1_jitter={
 "type": "float",
 "value": 1.5
 }
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/base_datos/plugin.cfg")

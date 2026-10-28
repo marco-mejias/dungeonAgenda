@@ -1,4 +1,5 @@
 @tool
+@icon("res://Assets/Iconos/Objetos/espada_corta.png")
 class_name ArmaData
 extends EquipoData
 

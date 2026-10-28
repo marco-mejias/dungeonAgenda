@@ -1,4 +1,5 @@
 @tool
+@icon("res://Assets/Iconos/Objetos/mochila_pequena.png")
 class_name MochilaData
 extends EquipoData
 

@@ -112,6 +112,12 @@ func _indice_de(heroe: String, id: String) -> int:
 			return int(e["indice"])
 	return -1
 
+func _nodo_con_script(archivo: String) -> Node:
+	for c in root.get_node("Main").get_children():
+		if c.get_script() and str(c.get_script().resource_path).ends_with(archivo):
+			return c
+	return null
+
 func _heroes() -> Array:
 	var out: Array = []
 	for h in pm.get_children():
@@ -295,6 +301,37 @@ func _definir_pasos():
 				check(dbg.caja_inv.get_child_count() > 0, "el panel lista el inventario (%d filas)" % dbg.caja_inv.get_child_count())
 				captura("01c_panel_debug")
 				dbg.alternar()
+			# Pantalla de inventario (I)
+			var inv = _nodo_con_script("pantalla_inventario.gd")
+			memo["inventario"] = inv
+			check(inv != null, "existe la pantalla de inventario")
+			if inv:
+				var n := str(activo().name)
+				pm.call("AnadirObjeto", n, "antorcha", 1)
+				pm.call("AnadirObjeto", n, "cota_malla", 1)
+				inv.abrir(n)
+				check(inv.esta_abierta() and inv.heroe == n, "la tecla I abre la mochila de %s" % n)
+			return 0.3,
+		func():
+			var inv = memo.get("inventario")
+			if inv:
+				var n: String = inv.heroe
+				check(inv.rejilla_eq.get_child_count() == 8, "la mochila muestra las 8 ranuras de equipo")
+				check(inv.rejilla_inv.get_child_count() >= 18, "y la rejilla del inventario (%d casillas)" % inv.rejilla_inv.get_child_count())
+				var i_cota := _indice_de(n, "cota_malla")
+				inv.seleccion = {"origen": "inv", "indice": i_cota}
+				inv._refrescar(true)
+				check(inv.det_texto.text.contains("Cota de malla") and inv.det_texto.text.contains("Frente a") or inv.det_texto.text.contains("vacía"), "la ficha del objeto compara con lo equipado")
+				var radio0 := int(activo().get_meta("radio_luz"))
+				inv._equipar(_indice_de(n, "antorcha"))
+				check(int(activo().get_meta("radio_luz")) == radio0 + 1 and inv.lbl_msg.text.ends_with("hecho"), "equipar desde la mochila: %s" % inv.lbl_msg.text)
+				captura("01d_inventario")
+				inv._quitar("luz")
+				check(int(activo().get_meta("radio_luz")) == radio0, "y quitarla: %s" % inv.lbl_msg.text)
+				pm.call("QuitarObjeto", n, _indice_de(n, "antorcha"), 1)
+				pm.call("QuitarObjeto", n, _indice_de(n, "cota_malla"), 1)
+				inv.cerrar()
+				check(not inv.esta_abierta(), "la mochila se cierra")
 			return 0.2,
 		func():
 			# Hover sobre la casilla alcanzable más lejana: debe salir la ruta y el coste
@@ -568,6 +605,23 @@ func _definir_pasos():
 				if inv_a.size() > 0:
 					var err: String = pm.call("DarObjeto", a, 0, b, 1)
 					check(err == "", "en la fogata %s le da %s a %s ('%s')" % [a, inv_a[0]["nombre"], b, err])
+			var repartir: Button = root.get_node_or_null("Main/CanvasLayer3/PantallaFogata/BtnRepartir")
+			check(repartir != null and repartir.is_visible_in_tree(), "en la fogata está el botón Repartir objetos")
+			if repartir:
+				repartir.pressed.emit()
+				var inv = memo.get("inventario")
+				check(inv != null and inv.esta_abierta(), "y abre la mochila")
+			return 0.3,
+		func():
+			var inv = memo.get("inventario")
+			if inv and inv.esta_abierta():
+				var lejos := 0
+				for b in inv.pestanas.get_children():
+					if b.modulate != Color.WHITE:
+						lejos += 1
+				check(lejos == 0, "en la fogata todos pueden intercambiar")
+				captura("12c_fogata_mochila")
+				inv.cerrar()
 			captura("12_fogata")
 			ui.call("DescansarYContinuar")
 			return 1.0,

@@ -6,6 +6,7 @@ extends CanvasLayer
 # tirar tablas de botín y recargar los .tres editados sin cerrar el juego.
 # Todo pasa por las mismas funciones del PartyManager que usará la interfaz de verdad.
 
+const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 const ANCHO := 500.0
 const STATS := [
 	["hp_max", "Vida máx"], ["velocidad", "Velocidad (PA)"], ["fuerza", "Fuerza"], ["defensa", "Defensa"],
@@ -325,16 +326,7 @@ func _pintar_equipo(h: Node) -> void:
 		caja_equipo.add_child(fila)
 
 func _describir(o) -> String:
-	var extra: PackedStringArray = []
-	if o is ArmaData:
-		extra.append("daño %d, %d PA, alc %d-%d" % [o.dano, o.coste_pa, o.alcance_min, o.alcance_max])
-	if o is MochilaData:
-		extra.append("%.0f kg" % o.capacidad)
-	if o is EquipoData:
-		for m in o.modificadores:
-			if m:
-				extra.append(m.describir())
-	return o.nombre_completo() + ("  [" + ", ".join(extra) + "]" if not extra.is_empty() else "")
+	return Textos.resumen(o)
 
 func _pintar_inventario(h: Node) -> void:
 	for c in caja_inv.get_children():

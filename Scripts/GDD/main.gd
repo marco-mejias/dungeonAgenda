@@ -13,7 +13,8 @@ var current_state: GameState = GameState.EXPLORING_MAP
 
 func _ready():
 	print("[Main GDScript] Iniciado. Jefe al mando.")
-	# Panel de depuración de inventario y equipo (F10)
+	# Pantalla de inventario (I) y panel de depuración de inventario y equipo (F10)
+	add_child(preload("res://Scripts/GDD/pantalla_inventario.gd").new())
 	add_child(preload("res://Scripts/GDD/debug_inventario.gd").new())
 
 func _process(_delta):

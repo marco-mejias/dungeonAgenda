@@ -1,4 +1,5 @@
 @tool
+@icon("res://Assets/Iconos/Objetos/anillo_suerte.png")
 class_name ObjetoData
 extends Resource
 

@@ -1,4 +1,5 @@
 @tool
+@icon("res://Assets/Iconos/Objetos/cota_malla.png")
 class_name EquipoData
 extends ObjetoData
 
