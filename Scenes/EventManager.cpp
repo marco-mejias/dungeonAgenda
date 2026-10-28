@@ -134,7 +134,8 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 
 	// Durante un evento el turno se cierra al terminarlo (FinalizarEvento)
 	bool en_evento = dungeon->has_meta("bloqueo_evento") && (bool)dungeon->get_meta("bloqueo_evento");
-	if (!en_evento && pa - coste <= 0) pm->call("TerminarTurnoPersonaje");
+	// El cambio de héroe espera a que acaben la puerta, el botín o el evento (DungeonManager)
+	if (!en_evento && pa - coste <= 0) dungeon->call("PedirFinDeTurno");
 	dungeon->call("RefrescarLuces");
 }
 

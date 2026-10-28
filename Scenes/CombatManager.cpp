@@ -124,7 +124,7 @@ void FinAtaque(Caller* instance) {
 
 	Node* heroe = HeroeActivo(self_node);
 	bool vivo = heroe && !(heroe->has_meta("esta_muerto") && (bool)heroe->get_meta("esta_muerto"));
-	if (!heroe || !vivo || (int)heroe->get_meta("pa_actual", 0) <= 0) pm->call("TerminarTurnoPersonaje");
+	if (!heroe || !vivo || (int)heroe->get_meta("pa_actual", 0) <= 0) dungeon->call("PedirFinDeTurno");
 	dungeon->call("RefrescarLuces");
 }
 

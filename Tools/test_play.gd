@@ -511,7 +511,14 @@ func _definir_pasos():
 			memo["puerta"] = null
 			if puertas.size() > 0 and junto_a(puertas[0]):
 				memo["puerta"] = puertas[0]
+				# Sin modo debug y con los PA justos: el cambio de héroe tiene que esperar a la puerta
+				memo["debug_puerta"] = dm.get_meta("debug_mode", false)
+				if memo["debug_puerta"]:
+					dm.call("ToggleModoDebug")
+				activo().set_meta("pa_actual", 2)
+				memo["heroe_puerta"] = activo()
 				dm.call("ProcesarClicEnCasilla", puertas[0].x, puertas[0].y)
+				check(activo() == memo["heroe_puerta"], "al abrir la puerta con los últimos PA no se cambia de héroe en el acto")
 			else:
 				print("[test] AVISO este piso no tiene puertas accesibles")
 			# Braseros: ocupan su casilla
@@ -524,6 +531,10 @@ func _definir_pasos():
 			check(not pisable, "los braseros (%d) no se pueden pisar" % braseros.size())
 			return 1.0,
 		func():
+			if memo.has("heroe_puerta"):
+				check(activo() != memo["heroe_puerta"], "cuando acaba la puerta pasa al siguiente héroe (%s)" % (activo().name if activo() else "nadie"))
+				if memo["debug_puerta"]:
+					dm.call("ToggleModoDebug")
 			if memo["puerta"] != null:
 				var p: Vector2i = memo["puerta"]
 				var bisagra: Node3D = dm.get_node_or_null("DungeonRenderer/Props/Puerta_%d_%d/Bisagra" % [p.x, p.y])
@@ -640,12 +651,31 @@ func _definir_pasos():
 				var herido := int(h.get_meta("hp_actual")) < int(memo["ia_hp"])
 				check(herido or (ahora_d >= 0 and ahora_d != antes), "el %s despierto actúa: distancia %d -> %d, %s" % [memo["ia_nombre"], antes, ahora_d, "ataca a %s" % h.name if herido else "sin atacar"])
 			captura("11c_turno_enemigo")
+			return 0.1,
+		func():
+			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
 			var salida: Vector2i = dm.get_meta("casilla_salida")
-			for i in 6:
-				if activo() == null:
-					break
+			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
 				dm.call("TeletransporteDebug", salida.x, salida.y)
-			return 1.2,
+			return 1.1,
+		func():
+			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			var salida: Vector2i = dm.get_meta("casilla_salida")
+			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
+				dm.call("TeletransporteDebug", salida.x, salida.y)
+			return 1.1,
+		func():
+			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			var salida: Vector2i = dm.get_meta("casilla_salida")
+			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
+				dm.call("TeletransporteDebug", salida.x, salida.y)
+			return 1.1,
+		func():
+			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			var salida: Vector2i = dm.get_meta("casilla_salida")
+			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
+				dm.call("TeletransporteDebug", salida.x, salida.y)
+			return 1.1,
 		func():
 			check(root.get_node("Main/CanvasLayer3").visible, "al escapar todos aparece la fogata")
 			var sentados := 0
@@ -695,6 +725,14 @@ func _definir_pasos():
 			check(root.get_node("Main/CapaTransicion/Negro").color.a < 0.05, "la transición termina")
 			check(int(pm.get_meta("piso_actual")) == 2, "estamos en el piso 2")
 			check(activo() != null, "hay personaje activo en el piso 2")
+			# Al llegar solo se conoce lo que se ve desde la entrada
+			var exploradas: PackedInt32Array = dm.call("DebugExploradas")
+			var inicio_p: Vector2i = dm.get_meta("casilla_inicio")
+			var lejos := 0
+			for i in range(0, exploradas.size(), 2):
+				if absi(exploradas[i] - inicio_p.x) + absi(exploradas[i + 1] - inicio_p.y) > 9:
+					lejos += 1
+			check(exploradas.size() > 0 and lejos == 0, "en el piso nuevo no hay salas reveladas lejos de la entrada (%d exploradas, %d lejos)" % [exploradas.size() / 2, lejos])
 			var inicio: Vector2i = dm.get_meta("casilla_inicio")
 			for h in pm.get_children():
 				if h.name == "DatosEquipo":

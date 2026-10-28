@@ -16,6 +16,7 @@
 #include <Godot/classes/tween.hpp>
 #include <Godot/classes/property_tweener.hpp>
 #include <Godot/classes/callback_tweener.hpp>
+#include <Godot/classes/interval_tweener.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include "Scripts/CPP/Mazmorra/Mazmorra.hpp"
 #include "Scripts/CPP/Combate/Reglas.hpp"
@@ -293,11 +294,25 @@ namespace {
 		act->set_meta("pa_actual", std::max(0, pa - cantidad));
 	}
 
+	// El cambio al siguiente héroe es lo ÚLTIMO del turno: se pide aquí y se hace cuando ya no
+	// queda nada en marcha (puerta girando, botín volando, evento abierto, ataque, turno enemigo).
+	const float ESPERA_FIN_TURNO = 0.85f; // lo que tardan la puerta (0.55) y el botín (0.77)
+
+	bool HeroeSinTurno(Node* act) {
+		return act && ((int)act->get_meta("pa_actual", 0) <= 0 || !HeroeEnMapa(act));
+	}
+
+	void ProgramarFinDeTurno(float espera) {
+		self->set_meta("fin_turno_pendiente", true);
+		Ref<Tween> tw = self->create_tween();
+		tw->tween_interval(espera);
+		tw->tween_callback(Callable(self, StringName("IntentarFinDeTurno")));
+	}
+
 	void ComprobarFinDeTurno() {
 		Node* act = ActiveChar();
-		if (!act || !m_party_manager) return;
-		int pa = act->has_meta("pa_actual") ? (int)act->get_meta("pa_actual") : 0;
-		if (pa <= 0 || !HeroeEnMapa(act)) m_party_manager->call("TerminarTurnoPersonaje");
+		if (!act || !m_party_manager || MetaBool(self, "fin_turno_pendiente")) return;
+		if (HeroeSinTurno(act)) ProgramarFinDeTurno(ESPERA_FIN_TURNO);
 	}
 
 	// Frenada de emergencia: mata el tween, coloca la ficha en su casilla y cobra los pasos dados
@@ -632,6 +647,15 @@ Variant TipoCursor(Caller* instance, int x, int y) {
 	return c.is_wall ? 0 : 3;
 }
 
+// Para tests/depuración: casillas exploradas de verdad (pares x,y), sin contar lo que revela el modo debug
+PackedInt32Array DebugExploradas(Caller* instance) {
+	std::vector<Vector2i> out;
+	for (int x = 0; x < GRID_SIZE && !mapa.map_data.empty(); x++)
+		for (int y = 0; y < GRID_SIZE; y++)
+			if (mapa.map_data[x][y].is_explored) out.push_back(Vector2i(x, y));
+	return AParesInt(out);
+}
+
 // Para tests/depuración: casillas iluminadas ahora mismo (pares x,y)
 PackedInt32Array DebugAlcance(Caller* instance) {
 	std::vector<Vector2i> out;
@@ -937,6 +961,23 @@ void EliminarEnemigo(Caller* instance, int x, int y) {
 		for (Node* h : Heroes()) h->set_meta("in_combat", false);
 }
 
+// Lo piden el EventManager y el CombatManager cuando el héroe se queda sin PA
+void PedirFinDeTurno(Caller* instance) {
+	if (self) ComprobarFinDeTurno();
+}
+
+void IntentarFinDeTurno(Caller* instance) {
+	if (!self || !m_party_manager) return;
+	// ¿Algo sigue en marcha? Esperamos un poco más
+	if (MetaBool(self, "is_moving") || MetaBool(self, "bloqueo_evento") || MetaBool(self, "turno_enemigo")) {
+		ProgramarFinDeTurno(0.2f);
+		return;
+	}
+	self->set_meta("fin_turno_pendiente", false);
+	// Si mientras tanto el jugador eligió a otro héroe con PA, no hay nada que cambiar
+	if (HeroeSinTurno(ActiveChar())) m_party_manager->call("TerminarTurnoPersonaje");
+}
+
 void FinalizarEvento(Caller* instance) {
 	if (!self) return;
 	self->set_meta("bloqueo_evento", false);
@@ -1028,9 +1069,12 @@ void AvanzarAlSiguientePiso(Caller* instance) {
 		}
 	}
 
+	self->set_meta("fin_turno_pendiente", false);
 	ConstruirLogica(instance);
-	ConstruirVisual(instance);
+	// Antes de ConstruirVisual (que calcula la visión): si no, los héroes "verían" el piso nuevo
+	// desde donde estaban en el anterior y revelarían salas que nadie ha visitado
 	ColocarHeroesEnSpawn();
+	ConstruirVisual(instance);
 
 	if (m_party_manager) m_party_manager->call("SeleccionarPrimerDisponible");
 	UpdateUI();
