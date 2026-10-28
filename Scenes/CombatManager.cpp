@@ -170,7 +170,7 @@ void Contraataque(Caller* instance, int x, int y) {
 	tw->tween_callback(Callable(self_node, StringName("ImpactoContra")).bind(x, y, dano));
 }
 
-void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico, int cuerpo_a_cuerpo) {
+void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
 	Node* heroe = HeroeActivo(self_node);
@@ -210,7 +210,8 @@ void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico, int cu
 		dungeon->call("EliminarEnemigo", x, y);
 		tw->tween_interval(0.45);
 		tw->tween_callback(Callable(self_node, StringName("FinAtaque")));
-	} else if (cuerpo_a_cuerpo && PuedeContraatacar(enemigo, heroe)) {
+	} else if (CuerpoACuerpo(heroe, x, y) && PuedeContraatacar(enemigo, heroe)) {
+		// Pegados: el enemigo devuelve el golpe (si su arma llega)
 		tw->tween_interval(0.32);
 		tw->tween_callback(Callable(self_node, StringName("Contraataque")).bind(x, y));
 	} else {
@@ -279,7 +280,7 @@ void AtacarEnemigo(Caller* instance, int x, int y) {
 
 	Ref<Tween> tw = self_node->create_tween();
 	tw->tween_interval(espera);
-	tw->tween_callback(Callable(self_node, StringName("ImpactoAtaque")).bind(x, y, dano, critico ? 1 : 0, cuerpo ? 1 : 0));
+	tw->tween_callback(Callable(self_node, StringName("ImpactoAtaque")).bind(x, y, dano, critico ? 1 : 0)); // si es cuerpo a cuerpo lo calcula ImpactoAtaque
 }
 
 // ==========================================

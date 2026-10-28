@@ -259,11 +259,24 @@ func _crear_botones_de_acceso() -> void:
 		boton_fogata.offset_bottom = -108
 		fogata.add_child(boton_fogata)
 
+func _marcar(c: Control, resaltada: bool) -> void:
+	c.add_theme_stylebox_override("panel", _estilo(Color(0.09, 0.1, 0.25), ORO if resaltada else Color(0.3, 0.33, 0.6), 2 if resaltada else 1))
+
+# Elegir un objeto: marca su casilla y rellena la ficha (sin tocar el resto)
+func _seleccionar(sel: Dictionary) -> void:
+	seleccion = sel
+	for rejilla in [rejilla_eq, rejilla_inv]:
+		for c in rejilla.get_children():
+			var casilla: Control = c.get_child(1) if rejilla == rejilla_eq and c.get_child_count() > 1 else c
+			if casilla.has_meta("clave"):
+				_marcar(casilla, casilla.get_meta("clave") == sel)
+	_pintar_detalle()
+
 # Una casilla de 46x46 con icono y cantidad
 func _casilla(icono: Texture2D, cantidad: int, resaltada: bool) -> PanelContainer:
 	var c := PanelContainer.new()
 	c.custom_minimum_size = Vector2(TAM, TAM)
-	c.add_theme_stylebox_override("panel", _estilo(Color(0.09, 0.1, 0.25), ORO if resaltada else Color(0.3, 0.33, 0.6), 2 if resaltada else 1))
+	_marcar(c, resaltada)
 	c.mouse_filter = Control.MOUSE_FILTER_STOP
 	var t := TextureRect.new()
 	t.texture = icono
@@ -340,7 +353,7 @@ func _refrescar(forzar: bool) -> void:
 	var h := _nodo(heroe)
 	if not h:
 		return
-	var nueva := var_to_str([heroe, h.get_meta("inventario", []), h.get_meta("equipo", {}), h.get_meta("hp_actual", 0), seleccion, _heroes().size()])
+	var nueva := var_to_str([heroe, h.get_meta("inventario", []), h.get_meta("equipo", {}), h.get_meta("hp_actual", 0), _heroes().size()])
 	if not forzar and nueva == firma:
 		return
 	firma = nueva
@@ -382,11 +395,11 @@ func _pintar_equipo(h: Node) -> void:
 		caja.add_child(_etiqueta(r[1], 10, AZUL))
 		var sel: bool = seleccion.get("origen", "") == "eq" and seleccion.get("ranura", "") == ranura
 		var casilla := _casilla(o.icono if o else null, 1, sel)
+		casilla.set_meta("clave", {"origen": "eq", "ranura": ranura})
 		casilla.tooltip_text = Textos.resumen(o) if o else "Vacía"
 		casilla.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT and o:
-				seleccion = {"origen": "eq", "ranura": ranura}
-				_refrescar(true))
+				_seleccionar({"origen": "eq", "ranura": ranura}))
 		casilla.set_drag_forwarding(
 			func(_p):
 				if not o:
@@ -426,18 +439,18 @@ func _pintar_inventario(_h: Node) -> void:
 		var o := _def(e["id"])
 		var sel: bool = seleccion.get("origen", "") == "inv" and int(seleccion.get("indice", -1)) == indice
 		var casilla := _casilla(e["icono"], int(e["cantidad"]), sel)
+		casilla.set_meta("clave", {"origen": "inv", "indice": indice})
 		var tip := Textos.resumen(o)
 		var comp := Textos.comparar_plano(o, _equipado_para(o))
 		casilla.tooltip_text = tip + ("\n" + comp if comp != "" else "")
 		casilla.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				seleccion = {"origen": "inv", "indice": indice}
 				if ev.double_click and e["equipable"]:
 					_equipar(indice)
 				elif ev.double_click and e["usable"]:
 					_usar(indice)
 				else:
-					_refrescar(true))
+					_seleccionar({"origen": "inv", "indice": indice}))
 		casilla.set_drag_forwarding(
 			func(_p):
 				casilla.set_drag_preview(_vista_arrastre(e["icono"]))

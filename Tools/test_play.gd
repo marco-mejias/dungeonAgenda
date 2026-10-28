@@ -112,6 +112,24 @@ func _indice_de(heroe: String, id: String) -> int:
 			return int(e["indice"])
 	return -1
 
+# Ratón simulado en coordenadas del lienzo (pulsar/soltar si 'boton', o solo mover)
+func _raton(pos: Vector2, pulsado: bool, boton: bool) -> void:
+	var ventana := root.get_final_transform() * pos
+	if boton:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = pulsado
+		ev.position = ventana
+		ev.global_position = ventana
+		Input.parse_input_event(ev)
+	else:
+		var m := InputEventMouseMotion.new()
+		m.position = ventana
+		m.global_position = ventana
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT
+		m.relative = Vector2(8, 8)
+		Input.parse_input_event(m)
+
 func _nodo_con_script(archivo: String) -> Node:
 	for c in root.get_node("Main").get_children():
 		if c.get_script() and str(c.get_script().resource_path).ends_with(archivo):
@@ -328,6 +346,37 @@ func _definir_pasos():
 				captura("01d_inventario")
 				inv._quitar("luz")
 				check(int(activo().get_meta("radio_luz")) == radio0, "y quitarla: %s" % inv.lbl_msg.text)
+				memo["radio_arrastre"] = radio0
+				inv._refrescar(true)
+			return 0.3,
+		func():
+			# Arrastrar con el ratón la antorcha de la mochila a la ranura de luz
+			var inv = memo.get("inventario")
+			if inv:
+				var n: String = inv.heroe
+				var origen: Control = inv.rejilla_inv.get_child(_indice_de(n, "antorcha"))
+				var destino: Control = inv.rejilla_eq.get_child(6).get_child(1) # ranura "luz"
+				memo["arrastre"] = [origen.get_global_rect().get_center(), destino.get_global_rect().get_center()]
+				_raton(memo["arrastre"][0], true, true)
+			return 0.1,
+		func():
+			if memo.has("arrastre"):
+				var a: Vector2 = memo["arrastre"][0]
+				var b: Vector2 = memo["arrastre"][1]
+				for k in range(1, 6):
+					_raton(a.lerp(b, k / 5.0), true, false)
+			return 0.2,
+		func():
+			if memo.has("arrastre"):
+				_raton(memo["arrastre"][1], false, true)
+			return 0.3,
+		func():
+			var inv = memo.get("inventario")
+			if inv:
+				var n: String = inv.heroe
+				check(int(activo().get_meta("radio_luz")) == int(memo["radio_arrastre"]) + 1, "arrastrar la antorcha a la ranura de luz la equipa (%s)" % inv.lbl_msg.text)
+				captura("01e_arrastrar")
+				inv._quitar("luz")
 				pm.call("QuitarObjeto", n, _indice_de(n, "antorcha"), 1)
 				pm.call("QuitarObjeto", n, _indice_de(n, "cota_malla"), 1)
 				inv.cerrar()
@@ -521,8 +570,14 @@ func _definir_pasos():
 				check(int(prevision["dano"]) == esperado and int(prevision["coste"]) == coste_esperado, "la previsión usa el arma (%s: %d de daño, %d PA)" % [arma.nombre, prevision["dano"], prevision["coste"]])
 			captura("10_bocadillo_enemigo")
 			var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
+			if nodo:
+				# Que aguante el golpe: así se ve el contraataque
+				nodo.set_meta("hp_max", 999)
+				nodo.set_meta("hp_actual", 999)
 			memo["hp0"] = int(nodo.get_meta("hp_actual")) if nodo else -1
 			memo["nodo"] = nodo
+			memo["atacante"] = activo()
+			memo["hp_atacante"] = int(activo().get_meta("hp_actual"))
 			dm.call("ProcesarClicEnCasilla", e.x, e.y)
 			check(dm.get_meta("is_moving", false), "el ataque es una secuencia animada (tablero bloqueado)")
 			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_INHERIT
@@ -534,6 +589,10 @@ func _definir_pasos():
 			var nodo = memo.get("nodo")
 			var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) and not str(nodo.name).ends_with("_muerto") else -999
 			check(hp1 < int(memo["hp0"]), "el ataque quita vida (%d -> %d)" % [memo["hp0"], hp1])
+			var atacante: Node = memo["atacante"]
+			check(int(atacante.get_meta("hp_actual")) < int(memo["hp_atacante"]), "el enemigo contraataca cuerpo a cuerpo (%s: %d -> %d PV)" % [atacante.name, memo["hp_atacante"], atacante.get_meta("hp_actual")])
+			if is_instance_valid(nodo):
+				nodo.set_meta("hp_actual", 5) # que el resto del guion no tenga que pelear con él
 			check(not dm.get_meta("is_moving", false), "al acabar la secuencia el tablero se desbloquea")
 			captura("11_combate")
 			_preparar_arco()
