@@ -9,7 +9,7 @@ const Iconos := preload("res://Scripts/GDD/iconos_pixel.gd")
 const ESCALA_BASE := 0.5
 const OFFSET_PANTALLA := Vector2(26, -70) # a la derecha y por encima de la cabeza
 const COSTE_ATAQUE := 2
-const ORO := Color(1.0, 0.8, 0.3)
+var ORO: Color = Estilo.color("oro")
 
 var combat_manager: Node = null
 var dungeon: Node = null
@@ -47,15 +47,7 @@ func _ready() -> void:
 func _construir() -> void:
 	ventana = PanelContainer.new()
 	ventana.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var estilo := StyleBoxFlat.new()
-	estilo.bg_color = Color(0.04, 0.05, 0.16, 0.95)
-	estilo.set_border_width_all(2)
-	estilo.border_color = Color(0.55, 0.6, 0.85)
-	estilo.corner_detail = 1
-	estilo.set_content_margin_all(4)
-	estilo.shadow_color = Color(0, 0, 0, 0.55)
-	estilo.shadow_size = 3
-	ventana.add_theme_stylebox_override("panel", estilo)
+	ventana.add_theme_stylebox_override("panel", Estilo.caja("panel"))
 	add_child(ventana)
 
 	var v := VBoxContainer.new()
@@ -76,23 +68,25 @@ func _estado_ataque() -> Array:
 	var debug: bool = dungeon.get_meta("debug_mode", false) if dungeon else false
 	var objetivo: Vector2i = dungeon.call("BuscarEnemigoAdyacente") if dungeon else Vector2i(-1, -1)
 	if objetivo.x < 0:
-		return [false, "Nadie al lado"]
-	if pa < COSTE_ATAQUE and not debug:
+		return [false, "Nadie al alcance"]
+	# El coste lo pone el arma (la daga cuesta 1 PA, la mayoría 2)
+	var combate := dungeon.get_node_or_null("CombatManager")
+	var prevision: Dictionary = combate.call("PrevisionAtaque", objetivo.x, objetivo.y) if combate else {}
+	var coste: int = int(prevision.get("coste", COSTE_ATAQUE))
+	if pa < coste and not debug:
 		return [false, "Faltan PA"]
-	return [true, "%d PA" % (0 if debug else COSTE_ATAQUE)]
+	return [true, "%d PA" % coste]
 
 func _fila(padre: Control, id: String, icono: String, texto: String, tecla: String, disponible: bool, detalle: String) -> void:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(168, 26)
 	b.disabled = not disponible
-	for nombre_estilo in ["normal", "hover", "pressed", "disabled"]:
-		var s := StyleBoxFlat.new()
-		s.bg_color = Color(0.14, 0.13, 0.32) if nombre_estilo in ["hover", "pressed"] else Color(0, 0, 0, 0)
-		s.set_border_width_all(1 if nombre_estilo == "hover" else 0)
-		s.border_color = ORO
-		s.corner_detail = 1
-		b.add_theme_stylebox_override(nombre_estilo, s)
+	# Filas planas dentro de la ventana de piedra: el hueco tallado solo aparece al pasar el ratón
+	b.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("hover", Estilo.caja("hueco_oro"))
+	b.add_theme_stylebox_override("pressed", Estilo.caja("hueco"))
 	padre.add_child(b)
 
 	var h := HBoxContainer.new()
@@ -106,7 +100,7 @@ func _fila(padre: Control, id: String, icono: String, texto: String, tecla: Stri
 	var t := Label.new()
 	t.text = tecla
 	t.add_theme_font_size_override("font_size", 9)
-	t.add_theme_color_override("font_color", Color(0.55, 0.6, 0.85))
+	t.add_theme_color_override("font_color", Estilo.color("texto_suave"))
 	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(t)
 
@@ -130,12 +124,12 @@ func _fila(padre: Control, id: String, icono: String, texto: String, tecla: Stri
 	var d := Label.new()
 	d.text = detalle
 	d.add_theme_font_size_override("font_size", 9)
-	d.add_theme_color_override("font_color", ORO if disponible else Color(0.6, 0.45, 0.45))
+	d.add_theme_color_override("font_color", ORO if disponible else Estilo.color("mal"))
 	d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(d)
 
 	if not disponible:
-		b.modulate = Color(0.6, 0.6, 0.7)
+		b.modulate = Color(0.7, 0.7, 0.75)
 	b.pressed.connect(_pulsar.bind(id))
 	if id == "atacar":
 		b.mouse_entered.connect(_previsualizar.bind(true))

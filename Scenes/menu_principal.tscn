@@ -59,8 +59,6 @@ text = "DUNGEON AGENDA"
 [node name="BtnJugar" type="Button" parent="VBoxContainer" unique_id=1627967753]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
-theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
 text = "PLAY"
 
 [node name="BtnOpciones" type="Button" parent="VBoxContainer" unique_id=2059322123]
@@ -70,8 +68,6 @@ text = "OPTIONS"
 
 [node name="BtnSalir" type="Button" parent="VBoxContainer" unique_id=1053048356]
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
-theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
 text = "QUIT"
 
 [node name="PanelOpciones" type="Panel" parent="." unique_id=933424563]
@@ -127,8 +123,6 @@ value = 1.0
 [node name="BtnVolver" type="Button" parent="PanelOpciones/VBoxContainer" unique_id=1882410007]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_gjtjt")
-theme_override_styles/hover = SubResource("StyleBoxFlat_crked")
 text = "RETURN"
 
 [connection signal="mouse_entered" from="VBoxContainer/BtnJugar" to="." method="_on_btn_jugar_mouse_entered"]

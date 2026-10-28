@@ -23,7 +23,7 @@ func _ready() -> void:
 	# El menú empieza oculto cuando estás jugando
 	self.visible = false
 	panel_opciones.visible = true
-	$ColorRect.color = Color(0, 0, 0, 0.55)
+	$ColorRect.color = Estilo.color("velo")
 	_traducir()
 	_crear_opciones_visuales()
 	_cargar_ajustes()
@@ -44,7 +44,7 @@ func _traducir() -> void:
 func _estilo_etiqueta(l: Label, texto: String) -> Label:
 	l.text = texto
 	l.add_theme_font_size_override("font_size", 11)
-	l.add_theme_color_override("font_color", Color(0.75, 0.8, 0.95))
+	l.add_theme_color_override("font_color", Estilo.color("texto_suave"))
 	return l
 
 # Esta función lee las teclas que pulsas en todo momento

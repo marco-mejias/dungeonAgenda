@@ -22,7 +22,7 @@ func _ready() -> void:
 
 	titulo.text = "LA HOGUERA"
 	titulo.add_theme_font_size_override("font_size", 30)
-	titulo.add_theme_color_override("font_color", Color(1.0, 0.8, 0.35))
+	titulo.add_theme_color_override("font_color", Estilo.color("oro"))
 	titulo.offset_left = -300
 	titulo.offset_right = 300
 	titulo.offset_top = 40
@@ -33,7 +33,7 @@ func _ready() -> void:
 	sub.name = "Recuperacion"
 	sub.text = "El grupo recupera fuerzas:  +10 PV   +3 hambre   +50 cordura"
 	sub.add_theme_font_size_override("font_size", 13)
-	sub.add_theme_color_override("font_color", Color(0.85, 0.8, 0.95))
+	sub.add_theme_color_override("font_color", Estilo.color("hueso"))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	sub.offset_left = -300
@@ -51,14 +51,8 @@ func _ready() -> void:
 	boton.offset_top = -96
 	boton.offset_bottom = -52
 	boton.focus_mode = Control.FOCUS_NONE
-	for estado in ["normal", "hover", "pressed"]:
-		var s := StyleBoxFlat.new()
-		s.bg_color = Color(0.07, 0.08, 0.22) if estado == "normal" else Color(0.14, 0.12, 0.3)
-		s.set_border_width_all(2)
-		s.border_color = Color(0.4, 0.45, 0.7) if estado == "normal" else Color(1, 0.8, 0.3)
-		s.corner_detail = 1
-		boton.add_theme_stylebox_override(estado, s)
-	boton.add_theme_color_override("font_hover_color", Color(1, 0.85, 0.35))
+	# El botón usa los bloques de piedra del tema; solo le damos algo más de tamaño de letra
+	boton.add_theme_font_size_override("font_size", 16)
 	move_child(boton, get_child_count() - 1)
 
 	var capa := get_parent() as CanvasLayer

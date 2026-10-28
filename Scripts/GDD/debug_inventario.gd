@@ -80,12 +80,7 @@ func _construir() -> void:
 	panel.offset_right = -12
 	panel.offset_top = 200
 	panel.offset_bottom = -12
-	var estilo := StyleBoxFlat.new()
-	estilo.bg_color = Color(0.03, 0.04, 0.12, 0.93)
-	estilo.border_color = Color(1.0, 0.8, 0.25)
-	estilo.set_border_width_all(2)
-	estilo.set_content_margin_all(8)
-	panel.add_theme_stylebox_override("panel", estilo)
+	panel.add_theme_stylebox_override("panel", Estilo.caja("panel_oro"))
 	add_child(panel)
 
 	var scroll := ScrollContainer.new()

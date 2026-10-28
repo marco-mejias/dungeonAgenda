@@ -334,7 +334,7 @@ func _definir_pasos():
 			var inv = memo.get("inventario")
 			if inv:
 				var n: String = inv.heroe
-				check(inv.rejilla_eq.get_child_count() == 8, "la mochila muestra las 8 ranuras de equipo")
+				check(inv.casillas_eq.size() == 8, "la mochila muestra las 8 ranuras de equipo")
 				check(inv.rejilla_inv.get_child_count() >= 18, "y la rejilla del inventario (%d casillas)" % inv.rejilla_inv.get_child_count())
 				var i_cota := _indice_de(n, "cota_malla")
 				inv.seleccion = {"origen": "inv", "indice": i_cota}
@@ -355,7 +355,7 @@ func _definir_pasos():
 			if inv:
 				var n: String = inv.heroe
 				var origen: Control = inv.rejilla_inv.get_child(_indice_de(n, "antorcha"))
-				var destino: Control = inv.rejilla_eq.get_child(6).get_child(1) # ranura "luz"
+				var destino: Control = inv.casillas_eq["luz"]
 				memo["arrastre"] = [origen.get_global_rect().get_center(), destino.get_global_rect().get_center()]
 				_raton(memo["arrastre"][0], true, true)
 			return 0.1,
@@ -675,7 +675,7 @@ func _definir_pasos():
 			var inv = memo.get("inventario")
 			if inv and inv.esta_abierta():
 				var lejos := 0
-				for b in inv.pestanas.get_children():
+				for b in inv.retratos.get_children():
 					if b.modulate != Color.WHITE:
 						lejos += 1
 				check(lejos == 0, "en la fogata todos pueden intercambiar")

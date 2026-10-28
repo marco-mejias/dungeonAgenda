@@ -28,10 +28,6 @@ namespace ui {
 using namespace godot;
 
 const int MAX_FICHAS_ENEMIGO = 4;
-const Color BORDE_NORMAL = Color(0.55, 0.6, 0.85);
-const Color BORDE_ACTIVO = Color(1.0, 0.8, 0.25);
-const Color BORDE_ENEMIGO = Color(0.6, 0.18, 0.16);
-const Color BORDE_ENEMIGO_ALERTA = Color(1.0, 0.3, 0.2);
 
 inline bool EstaFijada(const std::vector<String>& fijadas, const String& nombre) {
 	for (const String& n : fijadas) if (n == nombre) return true;
@@ -62,28 +58,40 @@ inline String GenerarTextoStats(Node* character) {
 	return texto;
 }
 
-inline Ref<StyleBoxFlat> EstiloFicha(Color borde) {
-	Ref<StyleBoxFlat> s;
-	s.instantiate();
-	s->set_bg_color(Color(0.04, 0.05, 0.16, 0.9));
-	s->set_border_width_all(2);
-	s->set_border_color(borde);
-	s->set_corner_radius_all(3);
-	s->set_corner_detail(1);
-	s->set_shadow_color(Color(0, 0, 0, 0.5));
-	s->set_shadow_size(2);
-	s->set_shadow_offset(Vector2(2, 2));
-	s->set_content_margin(SIDE_LEFT, 5);
-	s->set_content_margin(SIDE_RIGHT, 5);
-	s->set_content_margin(SIDE_TOP, 4);
-	s->set_content_margin(SIDE_BOTTOM, 4);
-	return s;
+// Estilo "piedra tallada": las cajas y colores salen del autoload Estilo (Scripts/GDD/estilo.gd)
+inline Node* Estilo(Node* ctx) { return ctx ? ctx->get_node_or_null("/root/Estilo") : nullptr; }
+
+inline Ref<StyleBox> Caja(Node* ctx, const char* nombre) {
+	Node* e = Estilo(ctx);
+	return e ? Ref<StyleBox>(e->call("caja", String(nombre))) : Ref<StyleBox>();
 }
 
-inline void PintarBorde(Control* ficha, Color borde) {
-	if (ficha->has_meta("borde") && (Color)ficha->get_meta("borde") == borde) return;
-	ficha->set_meta("borde", borde);
-	ficha->add_theme_stylebox_override("panel", EstiloFicha(borde));
+inline Color ColorEstilo(Node* ctx, const char* nombre, Color si_falta) {
+	Node* e = Estilo(ctx);
+	return e ? Color(e->call("color", String(nombre))) : si_falta;
+}
+
+// Cada barra con su color fijo (vida roja, hambre verde, cordura violeta); se hace una vez por ficha
+inline void EstilarBarras(Control* ficha) {
+	if (ficha->has_meta("barras_estiladas")) return;
+	const char* filas[3] = { "Vida", "Hambre", "Cordura" };
+	const char* cajas[3] = { "barra_vida", "barra_hambre", "barra_cordura" };
+	for (int i = 0; i < 3; i++) {
+		ProgressBar* barra = Object::cast_to<ProgressBar>(ficha->get_node_or_null(NodePath(String("V/Cabecera/Info/") + filas[i] + "/Barra")));
+		Ref<StyleBox> relleno = Caja(ficha, cajas[i]);
+		if (barra && relleno.is_valid()) barra->add_theme_stylebox_override("fill", relleno);
+	}
+	ficha->set_meta("barras_estiladas", true);
+}
+
+// Marco de la ficha: "ficha", "ficha_activa" (oro), "ficha_enemigo" (rojo) o "ficha_alerta"
+inline void PintarMarco(Control* ficha, const char* nombre) {
+	EstilarBarras(ficha);
+	if (ficha->has_meta("marco") && String(ficha->get_meta("marco")) == String(nombre)) return;
+	Ref<StyleBox> caja = Caja(ficha, nombre);
+	if (caja.is_null()) return;
+	ficha->set_meta("marco", String(nombre));
+	ficha->add_theme_stylebox_override("panel", caja);
 }
 
 inline void FijarTexto(Control* ficha, const char* ruta, const String& texto) {
@@ -109,8 +117,8 @@ inline void PintarPA(Control* ficha, int pa, int pa_max) {
 	caja->set_meta("pintado", clave);
 	caja->set_meta("pa_antes", pa);
 
-	const Color LLENO(0.4, 0.8, 1.0);
-	const Color VACIO(0.16, 0.18, 0.32);
+	const Color LLENO = ColorEstilo(ficha, "pa", Color(0.84, 0.7, 0.29));
+	const Color VACIO = ColorEstilo(ficha, "piedra_oscura", Color(0.13, 0.14, 0.17));
 	TypedArray<Node> viejos = caja->get_children();
 	for (int i = 0; i < viejos.size(); i++) {
 		Node* n = Object::cast_to<Node>(viejos[i]);
@@ -171,7 +179,7 @@ inline void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
 	else if (escapado) f->set_modulate(Color(0.6, 0.6, 0.7, 0.55));
 	else if (agotado && p != activo) f->set_modulate(Color(0.6, 0.6, 0.65, 1.0));
 	else f->set_modulate(Color(1, 1, 1, 1));
-	PintarBorde(f, p == activo ? BORDE_ACTIVO : BORDE_NORMAL);
+	PintarMarco(f, p == activo ? "ficha_activa" : "ficha");
 }
 
 inline void RellenarFichaEnemigo(Control* f, Node3D* e) {
@@ -194,7 +202,7 @@ inline void RellenarFichaEnemigo(Control* f, Node3D* e) {
 		if (r) r->set_texture(retrato);
 	}
 	bool alerta = e->get_meta("in_combat", false);
-	PintarBorde(f, alerta ? BORDE_ENEMIGO_ALERTA : BORDE_ENEMIGO);
+	PintarMarco(f, alerta ? "ficha_alerta" : "ficha_enemigo");
 }
 
 // Qué fichas se ven: fijadas, el activo y lo que hay en pantalla (en AUTO) y el enemigo bajo el cursor

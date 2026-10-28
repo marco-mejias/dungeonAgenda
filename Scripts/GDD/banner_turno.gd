@@ -2,7 +2,7 @@ extends Control
 
 # Franja que cruza la pantalla al cambiar de héroe ("TURNO DE IRONCAT") o de día ("DÍA 2").
 
-const ORO := Color(1.0, 0.8, 0.3)
+var ORO: Color = Estilo.color("oro")
 
 var banda: ColorRect
 var linea_sup: ColorRect
@@ -22,7 +22,7 @@ func _ready() -> void:
 	modulate.a = 0.0
 
 	banda = ColorRect.new()
-	banda.color = Color(0.03, 0.035, 0.11, 0.88)
+	banda.color = Color(Estilo.color("piedra_oscura"), 0.9)
 	banda.set_anchors_preset(Control.PRESET_FULL_RECT)
 	banda.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(banda)

@@ -46,9 +46,9 @@ func _ready() -> void:
 	var marco := Panel.new()
 	marco.name = "Marco"
 	var s := StyleBoxFlat.new()
-	s.bg_color = Color(0.02, 0.02, 0.06, 0.75)
+	s.bg_color = Color(0.08, 0.085, 0.1, 0.82)
 	s.set_border_width_all(2)
-	s.border_color = Color(0.55, 0.6, 0.85)
+	s.border_color = Estilo.color("piedra_clara")
 	s.set_corner_radius_all(int(size.x * 0.5))
 	s.corner_detail = 6
 	marco.add_theme_stylebox_override("panel", s)

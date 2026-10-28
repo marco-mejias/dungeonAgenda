@@ -80,17 +80,9 @@ corner_radius_bottom_left = 2
 corner_detail = 1
 
 [sub_resource type="Theme" id="Theme_evento"]
-Button/colors/font_color = Color(0.92, 0.9, 0.82, 1)
-Button/colors/font_hover_color = Color(1, 0.85, 0.35, 1)
-Button/colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
-Button/font_sizes/font_size = 14
-Button/styles/focus = SubResource("StyleBoxEmpty_ev_focus")
-Button/styles/hover = SubResource("StyleBoxFlat_ev_btn_hover")
-Button/styles/normal = SubResource("StyleBoxFlat_ev_btn")
-Button/styles/pressed = SubResource("StyleBoxFlat_ev_btn_hover")
-Label/colors/font_color = Color(1, 0.82, 0.35, 1)
+Label/colors/font_color = Color(0.84313726, 0.69803923, 0.2901961, 1)
 Label/font_sizes/font_size = 22
-RichTextLabel/colors/default_color = Color(0.9, 0.9, 0.95, 1)
+RichTextLabel/colors/default_color = Color(0.8509804, 0.8392157, 0.8, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ev_panel"]
 content_margin_left = 0.0
@@ -109,7 +101,7 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.75, 0.62, 0.3, 1)
+border_color = Color(0.42352942, 0.43529412, 0.5019608, 1)
 corner_detail = 1
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fdnlq"]
@@ -257,7 +249,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme = SubResource("Theme_evento")
-theme_override_styles/panel = SubResource("StyleBoxFlat_ev_panel")
 
 [node name="Titulo" type="Label" parent="CanvasLayer2/PantallaEvento" unique_id=826220811]
 layout_mode = 0
@@ -494,7 +485,6 @@ offset_bottom = 270.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = SubResource("Theme_evento")
-theme_override_styles/panel = SubResource("StyleBoxFlat_ev_panel")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CanvasMenuPausa/ColorRect/PanelOpciones" unique_id=1778706349]
 layout_mode = 1
@@ -539,8 +529,6 @@ value = 1.0
 [node name="BtnVolver" type="Button" parent="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer" unique_id=1298233690]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_fdnlq")
-theme_override_styles/hover = SubResource("StyleBoxFlat_jkdf5")
 text = "RETURN"
 
 [connection signal="value_changed" from="CanvasMenuPausa/ColorRect/PanelOpciones/VBoxContainer/SliderMusica" to="CanvasMenuPausa" method="_on_slider_musica_value_changed"]

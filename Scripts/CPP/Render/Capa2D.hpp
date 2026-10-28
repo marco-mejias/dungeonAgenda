@@ -30,9 +30,10 @@ const int B_HOVER = 2;
 inline Ref<StyleBoxFlat> EstiloGlobo(int estilo) {
 	Ref<StyleBoxFlat> s;
 	s.instantiate();
-	Color fondo = estilo == B_SIN_PA ? Color(1.0, 0.86, 0.84) : (estilo == B_HOVER ? Color(0.9, 0.92, 1.0, 0.94) : Color(0.98, 0.96, 0.88));
+	// Papel hueso (paleta de piedra); sin PA rosado, en hover con un toque de oro
+	Color fondo = estilo == B_SIN_PA ? Color(0.93, 0.78, 0.74) : (estilo == B_HOVER ? Color(0.96, 0.9, 0.72, 0.96) : Color(0.85, 0.84, 0.8));
 	s->set_bg_color(fondo);
-	s->set_border_color(Color(0.05, 0.04, 0.06));
+	s->set_border_color(Color(0.08, 0.09, 0.11));
 	s->set_border_width_all(1);
 	s->set_corner_radius_all(3);
 	s->set_corner_detail(2);
@@ -80,7 +81,7 @@ inline Control* CrearBocadillo(const String& nombre, const String& texto, int es
 	label->set_text(texto);
 	label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 	label->add_theme_font_size_override("font_size", estilo == B_HOVER ? 7 : 8);
-	label->add_theme_color_override("font_color", estilo == B_SIN_PA ? Color(0.6, 0.05, 0.05) : Color(0.08, 0.06, 0.1));
+	label->add_theme_color_override("font_color", estilo == B_SIN_PA ? Color(0.55, 0.13, 0.1) : Color(0.13, 0.14, 0.17));
 	label->add_theme_constant_override("line_spacing", -2);
 	globo->add_child(label);
 

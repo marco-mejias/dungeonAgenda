@@ -58,7 +58,6 @@ region = Rect2(96, 128, 16, 16)
 [node name="Ficha" type="PanelContainer"]
 custom_minimum_size = Vector2(190, 0)
 texture_filter = 1
-theme_override_styles/panel = SubResource("StyleBoxFlat_ventana")
 
 [node name="V" type="VBoxContainer" parent="."]
 layout_mode = 2
@@ -119,8 +118,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
-theme_override_styles/fill = SubResource("StyleBoxFlat_vida")
 value = 100.0
 show_percentage = false
 
@@ -150,8 +147,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
-theme_override_styles/fill = SubResource("StyleBoxFlat_hambre")
 max_value = 10.0
 value = 10.0
 show_percentage = false
@@ -182,8 +177,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_styles/background = SubResource("StyleBoxFlat_fondo_barra")
-theme_override_styles/fill = SubResource("StyleBoxFlat_cordura")
 value = 100.0
 show_percentage = false
 

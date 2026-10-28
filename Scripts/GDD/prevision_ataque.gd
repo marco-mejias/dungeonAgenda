@@ -4,7 +4,7 @@ extends PanelContainer
 # Sale al pasar el ratón sobre un enemigo visible o sobre ATAQUE en el menú táctico
 # (que deja su objetivo en la meta "prevision_objetivo" del HUD).
 
-const ORO := Color(1.0, 0.8, 0.3)
+var ORO: Color = Estilo.color("oro")
 
 var titulo: Label
 var linea_dano: Label
@@ -19,15 +19,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	custom_minimum_size = Vector2(240, 0)
-	var estilo := StyleBoxFlat.new()
-	estilo.bg_color = Color(0.04, 0.05, 0.16, 0.94)
-	estilo.set_border_width_all(2)
-	estilo.border_color = Color(0.85, 0.3, 0.25)
-	estilo.corner_detail = 1
-	estilo.set_content_margin_all(8)
-	estilo.shadow_color = Color(0, 0, 0, 0.5)
-	estilo.shadow_size = 3
-	add_theme_stylebox_override("panel", estilo)
+	add_theme_stylebox_override("panel", Estilo.caja("panel_rojo"))
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 3)
@@ -35,19 +27,19 @@ func _ready() -> void:
 	add_child(v)
 
 	titulo = _label(v, 13, ORO)
-	linea_dano = _label(v, 12, Color(0.95, 0.95, 1.0))
-	linea_critico = _label(v, 10, Color(1.0, 0.7, 0.3))
+	linea_dano = _label(v, 12, Estilo.color("hueso"))
+	linea_critico = _label(v, 10, Estilo.color("oro"))
 
 	# Vida del objetivo: fondo = vida actual, encima = lo que le quedará
 	var barras := Control.new()
 	barras.custom_minimum_size = Vector2(0, 8)
 	barras.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(barras)
-	barra_antes = _barra(barras, Color(0.45, 0.1, 0.1))
-	barra_despues = _barra(barras, Color(0.92, 0.2, 0.15))
+	barra_antes = _barra(barras, Estilo.color("vida").darkened(0.55))
+	barra_despues = _barra(barras, Estilo.color("vida"))
 
 	resultado = _label(v, 12, Color(1, 1, 1))
-	coste = _label(v, 10, Color(0.7, 0.75, 0.9))
+	coste = _label(v, 10, Estilo.color("texto_suave"))
 
 func _label(padre: Control, tam: int, color: Color) -> Label:
 	var l := Label.new()
@@ -63,7 +55,7 @@ func _barra(padre: Control, color: Color) -> ProgressBar:
 	b.set_anchors_preset(Control.PRESET_FULL_RECT)
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fondo := StyleBoxFlat.new()
-	fondo.bg_color = Color(0.02, 0.02, 0.05) if padre.get_child_count() == 0 else Color(0, 0, 0, 0)
+	fondo.bg_color = Estilo.color("sombra") if padre.get_child_count() == 0 else Color(0, 0, 0, 0)
 	var relleno := StyleBoxFlat.new()
 	relleno.bg_color = color
 	b.add_theme_stylebox_override("background", fondo)
@@ -111,21 +103,21 @@ func _rellenar(d: Dictionary, objetivo: Vector2i, dm: Node) -> void:
 		resultado.add_theme_color_override("font_color", ORO)
 	elif d["mata_critico"]:
 		resultado.text = "Le quedan %d PV (con crítico, cae)" % (hp - int(d["dano"]))
-		resultado.add_theme_color_override("font_color", Color(1, 1, 1))
+		resultado.add_theme_color_override("font_color", Estilo.color("hueso"))
 	elif d.get("a_distancia", false):
 		resultado.text = "A distancia: sin contraataque"
-		resultado.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
+		resultado.add_theme_color_override("font_color", Estilo.color("bien"))
 	else:
 		resultado.text = "Contraataque: -%d PV" % d["contra"]
-		resultado.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
+		resultado.add_theme_color_override("font_color", Estilo.color("mal"))
 
 	var falta_pa := int(d["pa"]) < int(d["coste"])
 	if not d.get("en_alcance", false):
 		coste.text = "Acércate para atacar · %d PA" % d["coste"]
-		coste.add_theme_color_override("font_color", Color(0.7, 0.75, 0.9))
+		coste.add_theme_color_override("font_color", Estilo.color("texto_suave"))
 	elif falta_pa:
 		coste.text = "Coste: %d PA (tienes %d)" % [d["coste"], d["pa"]]
-		coste.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
+		coste.add_theme_color_override("font_color", Estilo.color("mal"))
 	else:
 		coste.text = "Coste: %d PA (te quedan %d)" % [d["coste"], int(d["pa"]) - int(d["coste"])]
-		coste.add_theme_color_override("font_color", Color(0.7, 0.75, 0.9))
+		coste.add_theme_color_override("font_color", Estilo.color("texto_suave"))

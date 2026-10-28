@@ -21,6 +21,7 @@ config/icon="res://Assets/icon.svg"
 AudioManager="*uid://7alit7602tr"
 Feel="*res://Scripts/GDD/feel.gd"
 Catalogo="*res://Scripts/GDD/catalogo.gd"
+Estilo="*res://Scripts/GDD/estilo.gd"
 
 [display]
 
@@ -28,8 +29,13 @@ window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/base_datos/plugin.cfg")
+
 [gui]
 
+theme/custom="res://Assets/UI/Piedra/tema_piedra.tres"
 theme/custom_font="uid://o56g6df03otk"
 
 [input]
@@ -64,7 +70,3 @@ ps1_jitter={
 "type": "float",
 "value": 1.5
 }
-
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/base_datos/plugin.cfg")

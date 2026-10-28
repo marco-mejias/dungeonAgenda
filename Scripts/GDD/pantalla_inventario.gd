@@ -1,43 +1,58 @@
 extends CanvasLayer
 
-# Pantalla de inventario y equipo (tecla I, botón MOCHILA del HUD o "Repartir objetos" en la fogata).
-#   Izquierda: las 8 ranuras de equipo. Centro: stats finales. Derecha: la mochila (rejilla) y su carga.
-#   Abajo: la ficha del objeto elegido, la comparación con lo que llevas puesto y las acciones.
-# Arrastrar: de la mochila a una ranura = equipar; de una ranura a la mochila = quitar;
-# de la mochila a la pestaña de otro héroe = dárselo (pegados en la mazmorra, o en la fogata).
+# Mochila: inventario y equipo (tecla I, botón MOCHILA del HUD o "Repartir objetos" en la fogata).
+#   Izquierda: retratos de los héroes (clic = ver su mochila; soltar un objeto encima = dárselo).
+#   Centro: el retrato grande con las 8 ranuras de equipo alrededor del cuerpo y sus stats debajo.
+#   Derecha: la rejilla de la mochila y la carga dibujada dentro del icono de la mochila.
+#   Al pasar el ratón por un objeto, una ficha flotante lo describe y lo compara con lo puesto.
+# Arrastrar: mochila -> ranura = equipar; ranura -> mochila = quitar; mochila -> retrato = dar.
+# Doble clic = equipar o usar. Clic derecho = menú (usar, equipar, dar, tirar, quitar).
 # Nada de esto cuesta PA. Todo pasa por las funciones del PartyManager (Inventario.hpp).
+# Estilo "piedra tallada": cajas y colores del autoload Estilo.
 
 const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 
-const RANURAS := [
-	["mano_principal", "Mano princ."], ["mano_secundaria", "Mano secun."], ["cabeza", "Cabeza"], ["cuerpo", "Cuerpo"],
-	["accesorio_1", "Accesorio"], ["accesorio_2", "Accesorio"], ["luz", "Luz"], ["mochila", "Mochila"],
-]
-const TAM := 46
+const TAM := 48           # casilla
 const COLUMNAS := 6
-const ORO := Color(1.0, 0.8, 0.3)
-const AZUL := Color(0.55, 0.6, 0.85)
-const FONDO := Color(0.04, 0.05, 0.16, 0.96)
+const FILAS_MINIMAS := 4
+const LADO_MUNECO := Vector2(312, 300)
+# Ranura -> [nombre, posición en el muñeco]
+const RANURAS := {
+	"cabeza": ["Cabeza", Vector2(123, 4)],
+	"luz": ["Luz", Vector2(18, 26)],
+	"mochila": ["Mochila", Vector2(228, 26)],
+	"mano_principal": ["Mano princ.", Vector2(18, 118)],
+	"mano_secundaria": ["Mano secun.", Vector2(228, 118)],
+	"cuerpo": ["Cuerpo", Vector2(123, 196)],
+	"accesorio_1": ["Accesorio", Vector2(18, 210)],
+	"accesorio_2": ["Accesorio", Vector2(228, 210)],
+}
 
 var pm: Node
 var cat: Node
 var heroe := ""
 var seleccion := {} # {"origen": "inv", "indice": i} o {"origen": "eq", "ranura": r}
 var firma := ""
+var bajo_raton := {}  # casilla bajo el ratón (para la ficha flotante)
 
 var fondo: ColorRect
 var marco: PanelContainer
-var pestanas: HBoxContainer
-var rejilla_eq: GridContainer
-var rejilla_inv: GridContainer
-var zona_inv: PanelContainer
+var retratos: VBoxContainer
+var muneco: Control
+var retrato_grande: TextureRect
+var casillas_eq := {} # ranura -> casilla
 var lbl_stats: RichTextLabel
+var rejilla_inv: GridContainer
+var carga_barra: ProgressBar
+var carga_icono: TextureRect
 var lbl_carga: Label
-var barra_carga: ProgressBar
 var det_icono: TextureRect
 var det_texto: RichTextLabel
-var caja_acciones: HBoxContainer
 var lbl_msg: Label
+var flotante: PanelContainer
+var flotante_texto: RichTextLabel
+var menu: PopupMenu
+var menu_acciones := {} # id -> Callable
 var boton_hud: Button
 var boton_fogata: Button
 
@@ -56,9 +71,12 @@ func _input(event: InputEvent) -> void:
 
 func _process(_delta: float) -> void:
 	if boton_hud:
-		boton_hud.visible = not get_tree().paused and puede_abrir()
-	if marco.visible:
-		_refrescar(false)
+		boton_hud.visible = not get_tree().paused and puede_abrir() and not marco.visible
+	if not marco.visible:
+		return
+	_refrescar(false)
+	if flotante.visible:
+		_colocar_flotante()
 
 func esta_abierta() -> bool:
 	return marco.visible
@@ -93,38 +111,34 @@ func abrir(nombre: String = "") -> void:
 func cerrar() -> void:
 	fondo.visible = false
 	marco.visible = false
+	flotante.visible = false
 
 # ==========================================
 # CONSTRUCCIÓN
 # ==========================================
 
-func _estilo(bg: Color, borde: Color, ancho: int = 2) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = bg
-	s.border_color = borde
-	s.set_border_width_all(ancho)
-	s.set_corner_radius_all(3)
-	s.set_content_margin_all(6)
-	return s
-
-func _etiqueta(texto: String, tamano: int, color: Color) -> Label:
-	var l := Label.new()
-	l.text = texto
-	l.add_theme_font_size_override("font_size", tamano)
-	l.add_theme_color_override("font_color", color)
-	return l
-
 func _boton(texto: String, accion: Callable) -> Button:
 	var b := Button.new()
 	b.text = texto
-	b.add_theme_font_size_override("font_size", 12)
+	b.add_theme_font_size_override("font_size", 14)
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(accion)
 	return b
 
+func _texto_rico(tamano: int) -> RichTextLabel:
+	var r := RichTextLabel.new()
+	r.bbcode_enabled = true
+	r.fit_content = true
+	r.scroll_active = false
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.add_theme_font_size_override("normal_font_size", tamano)
+	r.add_theme_font_size_override("bold_font_size", tamano + 2)
+	r.add_theme_font_size_override("italics_font_size", tamano)
+	return r
+
 func _construir() -> void:
 	fondo = ColorRect.new()
-	fondo.color = Color(0, 0, 0, 0.55)
+	fondo.color = Estilo.color("velo")
 	fondo.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fondo.gui_input.connect(func(ev):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
@@ -137,109 +151,158 @@ func _construir() -> void:
 	marco.anchor_right = 0.5
 	marco.anchor_top = 0.5
 	marco.anchor_bottom = 0.5
-	marco.offset_left = -470
-	marco.offset_right = 470
+	marco.offset_left = -480
+	marco.offset_right = 480
 	marco.offset_top = -300
 	marco.offset_bottom = 300
-	marco.add_theme_stylebox_override("panel", _estilo(FONDO, ORO, 3))
+	marco.add_theme_stylebox_override("panel", Estilo.caja("panel_oro"))
 	add_child(marco)
 
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 10)
 	marco.add_child(v)
 
-	# Cabecera: título, pestañas de héroes y cerrar
+	# Cabecera: título, último mensaje y cerrar
 	var cab := HBoxContainer.new()
-	cab.add_child(_etiqueta("MOCHILA", 22, ORO))
-	pestanas = HBoxContainer.new()
-	pestanas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pestanas.alignment = BoxContainer.ALIGNMENT_CENTER
-	cab.add_child(pestanas)
-	cab.add_child(_boton("X", cerrar))
+	cab.add_child(Estilo.etiqueta("MOCHILA", "titulo", "oro"))
+	lbl_msg = Estilo.etiqueta("", "pequeno", "oro")
+	lbl_msg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cab.add_child(lbl_msg)
+	cab.add_child(_boton(" X ", cerrar))
 	v.add_child(cab)
 
 	var cuerpo := HBoxContainer.new()
-	cuerpo.add_theme_constant_override("separation", 16)
+	cuerpo.add_theme_constant_override("separation", 14)
 	cuerpo.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(cuerpo)
 
-	# Equipo
+	# 1. Retratos
+	retratos = VBoxContainer.new()
+	retratos.add_theme_constant_override("separation", 8)
+	cuerpo.add_child(retratos)
+
+	# 2. Muñeco con las ranuras alrededor + stats
 	var col_eq := VBoxContainer.new()
-	col_eq.add_child(_etiqueta("EQUIPO", 13, AZUL))
-	rejilla_eq = GridContainer.new()
-	rejilla_eq.columns = 2
-	rejilla_eq.add_theme_constant_override("h_separation", 10)
-	rejilla_eq.add_theme_constant_override("v_separation", 6)
-	col_eq.add_child(rejilla_eq)
+	col_eq.add_theme_constant_override("separation", 8)
+	muneco = PanelContainer.new()
+	muneco.custom_minimum_size = LADO_MUNECO
+	muneco.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
+	var lienzo := Control.new()
+	lienzo.mouse_filter = Control.MOUSE_FILTER_PASS
+	muneco.add_child(lienzo)
+	retrato_grande = TextureRect.new()
+	retrato_grande.position = Vector2(87, 66)
+	retrato_grande.size = Vector2(120, 120)
+	retrato_grande.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	retrato_grande.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	retrato_grande.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	retrato_grande.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	retrato_grande.modulate = Color(1, 1, 1, 0.9)
+	lienzo.add_child(retrato_grande)
+	for ranura in RANURAS:
+		var pos: Vector2 = RANURAS[ranura][1]
+		var casilla := _casilla()
+		casilla.position = pos
+		casilla.set_meta("clave", {"origen": "eq", "ranura": ranura})
+		_conectar_casilla(casilla)
+		lienzo.add_child(casilla)
+		casillas_eq[ranura] = casilla
+		var l := Estilo.etiqueta(RANURAS[ranura][0], "pequeno", "texto_suave")
+		l.position = pos + Vector2(-18, TAM + 1)
+		l.size = Vector2(TAM + 36, 14)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lienzo.add_child(l)
+	col_eq.add_child(muneco)
+	lbl_stats = _texto_rico(13)
+	lbl_stats.custom_minimum_size = Vector2(LADO_MUNECO.x, 0)
+	col_eq.add_child(lbl_stats)
 	cuerpo.add_child(col_eq)
 
-	# Stats
-	var col_st := VBoxContainer.new()
-	col_st.custom_minimum_size = Vector2(250, 0)
-	col_st.add_child(_etiqueta("ESTADÍSTICAS", 13, AZUL))
-	lbl_stats = RichTextLabel.new()
-	lbl_stats.bbcode_enabled = true
-	lbl_stats.fit_content = true
-	lbl_stats.scroll_active = false
-	lbl_stats.add_theme_font_size_override("normal_font_size", 12)
-	lbl_stats.add_theme_font_size_override("bold_font_size", 12)
-	col_st.add_child(lbl_stats)
-	cuerpo.add_child(col_st)
-
-	# Mochila
+	# 3. Mochila
 	var col_inv := VBoxContainer.new()
 	col_inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col_inv.add_child(_etiqueta("INVENTARIO  (arrastra a una ranura para equipar)", 13, AZUL))
-	zona_inv = PanelContainer.new()
-	zona_inv.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	zona_inv.add_theme_stylebox_override("panel", _estilo(Color(0.02, 0.03, 0.1, 0.8), Color(0.25, 0.28, 0.5), 1))
-	zona_inv.set_drag_forwarding(Callable(), _puede_soltar_en_mochila, _soltar_en_mochila)
+	col_inv.add_theme_constant_override("separation", 8)
+	var fila_carga := HBoxContainer.new()
+	fila_carga.add_theme_constant_override("separation", 8)
+	var hueco_carga := Control.new()
+	hueco_carga.custom_minimum_size = Vector2(40, 40)
+	carga_barra = ProgressBar.new()
+	carga_barra.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
+	carga_barra.show_percentage = false
+	carga_barra.set_anchors_preset(Control.PRESET_FULL_RECT)
+	carga_barra.add_theme_stylebox_override("background", Estilo.caja("hueco"))
+	hueco_carga.add_child(carga_barra)
+	carga_icono = TextureRect.new()
+	carga_icono.set_anchors_preset(Control.PRESET_FULL_RECT)
+	carga_icono.offset_left = 6
+	carga_icono.offset_top = 6
+	carga_icono.offset_right = -6
+	carga_icono.offset_bottom = -6
+	carga_icono.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	carga_icono.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	carga_icono.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	hueco_carga.add_child(carga_icono)
+	fila_carga.add_child(hueco_carga)
+	var textos_carga := VBoxContainer.new()
+	textos_carga.add_child(Estilo.etiqueta("INVENTARIO", "normal", "oro"))
+	lbl_carga = Estilo.etiqueta("", "pequeno", "texto_suave")
+	textos_carga.add_child(lbl_carga)
+	fila_carga.add_child(textos_carga)
+	col_inv.add_child(fila_carga)
+
+	var zona := PanelContainer.new()
+	zona.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	zona.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
+	zona.set_drag_forwarding(Callable(), _puede_soltar_en_mochila, _soltar_en_mochila)
 	rejilla_inv = GridContainer.new()
 	rejilla_inv.columns = COLUMNAS
 	rejilla_inv.add_theme_constant_override("h_separation", 6)
 	rejilla_inv.add_theme_constant_override("v_separation", 6)
-	zona_inv.add_child(rejilla_inv)
-	col_inv.add_child(zona_inv)
-	lbl_carga = _etiqueta("", 12, AZUL)
-	col_inv.add_child(lbl_carga)
-	barra_carga = ProgressBar.new()
-	barra_carga.custom_minimum_size = Vector2(0, 10)
-	barra_carga.show_percentage = false
-	col_inv.add_child(barra_carga)
+	zona.add_child(rejilla_inv)
+	col_inv.add_child(zona)
 	cuerpo.add_child(col_inv)
 
 	# Ficha del objeto elegido
 	var det := PanelContainer.new()
-	det.custom_minimum_size = Vector2(0, 130)
-	det.add_theme_stylebox_override("panel", _estilo(Color(0.06, 0.07, 0.2, 0.9), Color(0.3, 0.33, 0.6), 1))
+	det.custom_minimum_size = Vector2(0, 92)
+	det.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
 	var dh := HBoxContainer.new()
 	dh.add_theme_constant_override("separation", 12)
 	det_icono = TextureRect.new()
-	det_icono.custom_minimum_size = Vector2(64, 64)
+	det_icono.custom_minimum_size = Vector2(56, 56)
 	det_icono.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	det_icono.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	det_icono.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	dh.add_child(det_icono)
-	var dv := VBoxContainer.new()
-	dv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	det_texto = RichTextLabel.new()
-	det_texto.bbcode_enabled = true
-	det_texto.fit_content = true
-	det_texto.scroll_active = false
-	det_texto.add_theme_font_size_override("normal_font_size", 12)
-	det_texto.add_theme_font_size_override("bold_font_size", 14)
-	dv.add_child(det_texto)
-	caja_acciones = HBoxContainer.new()
-	dv.add_child(caja_acciones)
-	dh.add_child(dv)
+	det_texto = _texto_rico(13)
+	det_texto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dh.add_child(det_texto)
 	det.add_child(dh)
 	v.add_child(det)
 
-	lbl_msg = _etiqueta("", 12, ORO)
-	v.add_child(lbl_msg)
+	# Ficha flotante (al pasar el ratón) y menú de clic derecho
+	flotante = PanelContainer.new()
+	flotante.add_theme_stylebox_override("panel", Estilo.caja("tooltip"))
+	flotante.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flotante.custom_minimum_size = Vector2(280, 0)
+	flotante_texto = _texto_rico(13)
+	flotante_texto.custom_minimum_size = Vector2(268, 0)
+	flotante.add_child(flotante_texto)
+	flotante.visible = false
+	add_child(flotante)
+
+	menu = PopupMenu.new()
+	menu.add_theme_font_size_override("font_size", 14)
+	menu.id_pressed.connect(func(id):
+		if menu_acciones.has(id):
+			menu_acciones[id].call())
+	add_child(menu)
 
 func _crear_botones_de_acceso() -> void:
 	boton_hud = _boton("MOCHILA (I)", alternar)
+	boton_hud.add_theme_font_size_override("font_size", 12)
 	boton_hud.position = Vector2(186, 8)
 	boton_hud.size = Vector2(130, 30)
 	add_child(boton_hud)
@@ -259,40 +322,48 @@ func _crear_botones_de_acceso() -> void:
 		boton_fogata.offset_bottom = -108
 		fogata.add_child(boton_fogata)
 
-func _marcar(c: Control, resaltada: bool) -> void:
-	c.add_theme_stylebox_override("panel", _estilo(Color(0.09, 0.1, 0.25), ORO if resaltada else Color(0.3, 0.33, 0.6), 2 if resaltada else 1))
-
-# Elegir un objeto: marca su casilla y rellena la ficha (sin tocar el resto)
-func _seleccionar(sel: Dictionary) -> void:
-	seleccion = sel
-	for rejilla in [rejilla_eq, rejilla_inv]:
-		for c in rejilla.get_children():
-			var casilla: Control = c.get_child(1) if rejilla == rejilla_eq and c.get_child_count() > 1 else c
-			if casilla.has_meta("clave"):
-				_marcar(casilla, casilla.get_meta("clave") == sel)
-	_pintar_detalle()
-
-# Una casilla de 46x46 con icono y cantidad
-func _casilla(icono: Texture2D, cantidad: int, resaltada: bool) -> PanelContainer:
+# Una casilla tallada de 48x48 con icono y cantidad
+func _casilla() -> PanelContainer:
 	var c := PanelContainer.new()
 	c.custom_minimum_size = Vector2(TAM, TAM)
-	_marcar(c, resaltada)
+	c.size = Vector2(TAM, TAM)
 	c.mouse_filter = Control.MOUSE_FILTER_STOP
 	var t := TextureRect.new()
-	t.texture = icono
+	t.name = "Icono"
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.add_child(t)
-	if cantidad > 1:
-		var l := _etiqueta(str(cantidad), 11, Color.WHITE)
-		l.size_flags_horizontal = Control.SIZE_SHRINK_END
-		l.size_flags_vertical = Control.SIZE_SHRINK_END
-		l.add_theme_color_override("font_outline_color", Color.BLACK)
-		l.add_theme_constant_override("outline_size", 4)
-		c.add_child(l)
+	var l := Estilo.etiqueta("", "pequeno", "hueso")
+	l.name = "Cantidad"
+	l.size_flags_horizontal = Control.SIZE_SHRINK_END
+	l.size_flags_vertical = Control.SIZE_SHRINK_END
+	l.add_theme_constant_override("outline_size", 4)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(l)
+	_marcar(c)
 	return c
+
+func _rellenar_casilla(c: PanelContainer, icono: Texture2D, cantidad: int) -> void:
+	(c.get_node("Icono") as TextureRect).texture = icono
+	(c.get_node("Cantidad") as Label).text = str(cantidad) if cantidad > 1 else ""
+
+# Hueco normal, con el ratón encima (borde claro) o elegido (borde de oro)
+func _marcar(c: Control) -> void:
+	var clave: Dictionary = c.get_meta("clave", {})
+	var nombre := "hueco"
+	if not clave.is_empty() and clave == seleccion:
+		nombre = "hueco_oro"
+	elif not clave.is_empty() and clave == bajo_raton:
+		nombre = "hueco_hover"
+	c.add_theme_stylebox_override("panel", Estilo.caja(nombre))
+
+func _remarcar_todo() -> void:
+	for c in casillas_eq.values():
+		_marcar(c)
+	for c in rejilla_inv.get_children():
+		_marcar(c)
 
 func _vista_arrastre(icono: Texture2D) -> Control:
 	var t := TextureRect.new()
@@ -300,8 +371,63 @@ func _vista_arrastre(icono: Texture2D) -> Control:
 	t.size = Vector2(TAM, TAM)
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	t.modulate.a = 0.8
+	t.modulate.a = 0.85
 	return t
+
+# Ratón, arrastre y menú de una casilla (de equipo o de mochila); lo que contiene se lee de su 'clave'
+func _conectar_casilla(c: PanelContainer) -> void:
+	c.mouse_entered.connect(func():
+		bajo_raton = c.get_meta("clave", {})
+		_marcar(c)
+		_mostrar_flotante(_objeto_de(bajo_raton)))
+	c.mouse_exited.connect(func():
+		if bajo_raton == c.get_meta("clave", {}):
+			bajo_raton = {}
+		_marcar(c)
+		flotante.visible = false)
+	c.gui_input.connect(func(ev): _al_pulsar(c, ev))
+	c.set_drag_forwarding(
+		func(_p):
+			var clave: Dictionary = c.get_meta("clave", {})
+			var o := _objeto_de(clave)
+			if o == null:
+				return null
+			flotante.visible = false
+			c.set_drag_preview(_vista_arrastre(o.icono))
+			var datos := clave.duplicate()
+			datos["id"] = o.obtener_id()
+			return datos,
+		# Soltar en una ranura de equipo = equipar; en una casilla de la mochila = quitar lo equipado
+		func(_p, d): return _puede_equipar(d) if _es_ranura(c) else _puede_soltar_en_mochila(_p, d),
+		func(_p, d):
+			if _es_ranura(c):
+				_equipar(int(d["indice"]))
+			else:
+				_soltar_en_mochila(_p, d))
+
+func _es_ranura(c: Control) -> bool:
+	return c in casillas_eq.values()
+
+func _al_pulsar(c: Control, ev: InputEvent) -> void:
+	if not (ev is InputEventMouseButton and ev.pressed):
+		return
+	var clave: Dictionary = c.get_meta("clave", {})
+	var o := _objeto_de(clave)
+	if o == null:
+		return
+	if ev.button_index == MOUSE_BUTTON_LEFT:
+		if ev.double_click:
+			if clave["origen"] == "eq":
+				_quitar(clave["ranura"])
+			elif o is EquipoData:
+				_equipar(int(clave["indice"]))
+			elif not o.efectos_al_usar.is_empty():
+				_usar(int(clave["indice"]))
+		else:
+			_seleccionar(clave)
+	elif ev.button_index == MOUSE_BUTTON_RIGHT:
+		_seleccionar(clave)
+		_abrir_menu(clave, o)
 
 # ==========================================
 # DATOS
@@ -328,11 +454,24 @@ func _equipado(ranura: String) -> ObjetoData:
 	var h := _nodo(heroe)
 	return _def(h.get_meta("equipo", {}).get(ranura, "")) if h else null
 
-# Lo que lleva en la ranura donde iría este objeto (para comparar)
 func _equipado_para(o: ObjetoData) -> ObjetoData:
 	if not (o is EquipoData):
 		return null
 	return _equipado(Textos.RANURA_DE[o.ranura])
+
+func _objeto_de(clave: Dictionary) -> ObjetoData:
+	match clave.get("origen", ""):
+		"eq":
+			return _equipado(clave["ranura"])
+		"inv":
+			var inv := _inventario()
+			var i := int(clave["indice"])
+			return _def(inv[i]["id"]) if i < inv.size() else null
+	return null
+
+func _retrato(h: Node) -> Texture2D:
+	var ruta := str(h.get_meta("retrato_path", ""))
+	return load(ruta) if ruta != "" and ResourceLoader.exists(ruta) else null
 
 func _sonido(nombre: String) -> void:
 	var audio := get_node_or_null("/root/AudioManager")
@@ -341,7 +480,7 @@ func _sonido(nombre: String) -> void:
 
 func _resultado(accion: String, error: String) -> void:
 	lbl_msg.text = accion + (": hecho" if error == "" else ": " + error)
-	lbl_msg.add_theme_color_override("font_color", ORO if error == "" else Color(1.0, 0.5, 0.4))
+	lbl_msg.add_theme_color_override("font_color", Estilo.color("oro") if error == "" else Estilo.color("mal"))
 	_sonido("clic" if error == "" else "no")
 	_refrescar(true)
 
@@ -353,171 +492,165 @@ func _refrescar(forzar: bool) -> void:
 	var h := _nodo(heroe)
 	if not h:
 		return
-	var nueva := var_to_str([heroe, h.get_meta("inventario", []), h.get_meta("equipo", {}), h.get_meta("hp_actual", 0), _heroes().size()])
+	# La selección no entra en la firma: elegir un objeto no reconstruye nada (si no, se perdería el arrastre)
+	var nueva := var_to_str([heroe, h.get_meta("inventario", []), h.get_meta("equipo", {}), h.get_meta("hp_actual", 0), h.get_meta("pa_actual", 0), _heroes().size()])
 	if not forzar and nueva == firma:
 		return
 	firma = nueva
-	_pintar_pestanas()
+	_pintar_retratos()
 	_pintar_equipo(h)
 	_pintar_stats(h)
-	_pintar_inventario(h)
+	_pintar_inventario()
 	_pintar_detalle()
 
-func _pintar_pestanas() -> void:
-	for c in pestanas.get_children():
+func _pintar_retratos() -> void:
+	for c in retratos.get_children():
 		c.queue_free()
 	for h in _heroes():
 		var nombre := str(h.name)
-		var b := _boton(str(h.get_meta("nombre_display", nombre)), func():
-			heroe = nombre
-			seleccion = {}
-			lbl_msg.text = ""
-			_refrescar(true))
-		b.toggle_mode = true
-		b.button_pressed = nombre == heroe
-		# Soltar un objeto en la pestaña de otro héroe = dárselo
-		b.set_drag_forwarding(Callable(), func(_p, d): return _puede_dar(d, nombre), func(_p, d): _dar(int(d["indice"]), nombre))
 		var junto: bool = nombre == heroe or bool(pm.call("PuedenIntercambiar", heroe, nombre))
-		b.tooltip_text = "" if junto else "Está lejos: solo podéis intercambiar pegados o en la fogata"
+		var r := PanelContainer.new()
+		r.custom_minimum_size = Vector2(64, 64)
+		r.add_theme_stylebox_override("panel", Estilo.caja("hueco_oro" if nombre == heroe else "hueco"))
+		r.tooltip_text = str(h.get_meta("nombre_display", nombre)) + ("" if junto else "\nEstá lejos: solo podéis intercambiar pegados o en la fogata")
+		r.mouse_filter = Control.MOUSE_FILTER_STOP
+		var t := TextureRect.new()
+		t.texture = _retrato(h)
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		r.add_child(t)
 		if not junto:
-			b.modulate = Color(0.75, 0.75, 0.8)
-		pestanas.add_child(b)
+			r.modulate = Color(0.55, 0.55, 0.6)
+		r.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				heroe = nombre
+				seleccion = {}
+				lbl_msg.text = ""
+				_refrescar(true))
+		# Soltar un objeto en el retrato de otro héroe = dárselo
+		r.set_drag_forwarding(Callable(), func(_p, d): return _puede_dar(d, nombre), func(_p, d): _dar(int(d["indice"]), nombre))
+		retratos.add_child(r)
 
 func _pintar_equipo(h: Node) -> void:
-	for c in rejilla_eq.get_children():
-		c.queue_free()
-	var eq: Dictionary = h.get_meta("equipo", {})
-	for r in RANURAS:
-		var ranura: String = r[0]
-		var o := _def(eq.get(ranura, ""))
-		var caja := VBoxContainer.new()
-		caja.add_theme_constant_override("separation", 1)
-		caja.add_child(_etiqueta(r[1], 10, AZUL))
-		var sel: bool = seleccion.get("origen", "") == "eq" and seleccion.get("ranura", "") == ranura
-		var casilla := _casilla(o.icono if o else null, 1, sel)
-		casilla.set_meta("clave", {"origen": "eq", "ranura": ranura})
-		casilla.tooltip_text = Textos.resumen(o) if o else "Vacía"
-		casilla.gui_input.connect(func(ev):
-			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT and o:
-				_seleccionar({"origen": "eq", "ranura": ranura}))
-		casilla.set_drag_forwarding(
-			func(_p):
-				if not o:
-					return null
-				casilla.set_drag_preview(_vista_arrastre(o.icono))
-				return {"origen": "eq", "ranura": ranura},
-			func(_p, d): return _puede_equipar(d),
-			func(_p, d): _equipar(int(d["indice"])))
-		caja.add_child(casilla)
-		rejilla_eq.add_child(caja)
+	retrato_grande.texture = _retrato(h)
+	for ranura in casillas_eq:
+		var o := _equipado(ranura)
+		_rellenar_casilla(casillas_eq[ranura], o.icono if o else null, 1)
+		_marcar(casillas_eq[ranura])
 
 func _pintar_stats(h: Node) -> void:
 	var base: Dictionary = h.get_meta("stats_base", {})
-	var t := "[b]%s[/b]  [color=#%s](%s)[/color]\n" % [h.get_meta("nombre_display", h.name), Textos.GRIS, h.get_meta("clase", "")]
-	t += "Vida %d/%d · PA %d/%d\nCordura %d/%d · Hambre %d/%d\n" % [h.get_meta("hp_actual", 0), h.get_meta("hp_max", 0),
-		h.get_meta("pa_actual", 0), h.get_meta("pa_max", 0), h.get_meta("sanidad_actual", 0), h.get_meta("sanidad_max", 0),
-		h.get_meta("hambre_actual", 0), h.get_meta("hambre_max", 0)]
+	var hex := func(nombre: String) -> String: return Estilo.color(nombre).to_html(false)
+	var t := "[b]%s[/b]  [color=#%s]%s[/color]\n" % [h.get_meta("nombre_display", h.name), hex.call("texto_suave"), h.get_meta("clase", "")]
+	t += "[color=#%s]Vida %d/%d[/color]   [color=#%s]PA %d/%d[/color]\n[color=#%s]Cordura %d[/color]   [color=#%s]Hambre %d[/color]\n" % [
+		hex.call("vida"), h.get_meta("hp_actual", 0), h.get_meta("hp_max", 0), hex.call("pa"), h.get_meta("pa_actual", 0), h.get_meta("pa_max", 0),
+		hex.call("cordura"), h.get_meta("sanidad_actual", 0), hex.call("hambre"), h.get_meta("hambre_actual", 0)]
+	var partes: PackedStringArray = []
 	for s in ["fuerza", "defensa", "magia", "suerte", "radio_luz"]:
 		var b := int(base.get(s, 0))
 		var f := int(h.get_meta(s, 0))
-		var bono := "" if f == b else " [color=#%s](%+d)[/color]" % [Textos.VERDE if f > b else Textos.ROJO, f - b]
-		t += "%s: %d%s\n" % [Textos.nombre_stat(s).capitalize(), f, bono]
-	var arma := _equipado("mano_principal")
-	if arma is ArmaData:
-		t += "[color=#%s]Ataque:[/color] %d de base (%s) · %d PA · alcance %s\n" % [Textos.GRIS, arma.dano + int(h.get_meta(arma.stat_ataque, 0)), arma.stat_ataque, arma.coste_pa, Textos._alcance(arma)]
-	else:
-		t += "[color=#%s]Ataque:[/color] puños, %d de base · 2 PA\n" % [Textos.GRIS, h.get_meta("fuerza", 0)]
-	t += "Oro %d · Comida %d" % [h.get_meta("oro", 0), h.get_meta("comida_bolsa", 0)]
+		var bono := "" if f == b else "[color=#%s](%+d)[/color]" % [hex.call("bien") if f > b else hex.call("mal"), f - b]
+		partes.append("%s %d%s" % [Textos.nombre_stat(s).capitalize(), f, bono])
+	t += "   ".join(partes)
 	lbl_stats.text = t
 
-func _pintar_inventario(_h: Node) -> void:
-	for c in rejilla_inv.get_children():
-		c.queue_free()
+func _pintar_inventario() -> void:
 	var inv := _inventario()
-	for e in inv:
-		var indice := int(e["indice"])
-		var o := _def(e["id"])
-		var sel: bool = seleccion.get("origen", "") == "inv" and int(seleccion.get("indice", -1)) == indice
-		var casilla := _casilla(e["icono"], int(e["cantidad"]), sel)
-		casilla.set_meta("clave", {"origen": "inv", "indice": indice})
-		var tip := Textos.resumen(o)
-		var comp := Textos.comparar_plano(o, _equipado_para(o))
-		casilla.tooltip_text = tip + ("\n" + comp if comp != "" else "")
-		casilla.gui_input.connect(func(ev):
-			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				if ev.double_click and e["equipable"]:
-					_equipar(indice)
-				elif ev.double_click and e["usable"]:
-					_usar(indice)
-				else:
-					_seleccionar({"origen": "inv", "indice": indice}))
-		casilla.set_drag_forwarding(
-			func(_p):
-				casilla.set_drag_preview(_vista_arrastre(e["icono"]))
-				return {"origen": "inv", "indice": indice, "id": e["id"]},
-			func(_p, _d): return false,
-			func(_p, _d): pass)
-		rejilla_inv.add_child(casilla)
-	# Casillas vacías para que se vea el hueco
-	for i in maxi(0, COLUMNAS * 3 - inv.size()):
-		var vacia := _casilla(null, 0, false)
-		vacia.mouse_filter = Control.MOUSE_FILTER_PASS
-		rejilla_inv.add_child(vacia)
+	var total := maxi(COLUMNAS * FILAS_MINIMAS, int(ceil(inv.size() / float(COLUMNAS))) * COLUMNAS)
+	while rejilla_inv.get_child_count() < total:
+		var c := _casilla()
+		_conectar_casilla(c)
+		rejilla_inv.add_child(c)
+	for i in rejilla_inv.get_child_count():
+		var c: PanelContainer = rejilla_inv.get_child(i)
+		if i < inv.size():
+			c.set_meta("clave", {"origen": "inv", "indice": i})
+			_rellenar_casilla(c, inv[i]["icono"], int(inv[i]["cantidad"]))
+		else:
+			c.set_meta("clave", {})
+			_rellenar_casilla(c, null, 0)
+		c.visible = i < total
+		_marcar(c)
+	# La carga se ve llenando el icono de la mochila
 	var peso: float = pm.call("PesoInventario", heroe)
 	var cap: float = pm.call("CapacidadInventario", heroe)
-	lbl_carga.text = "Carga: %.1f / %.1f kg   (lo equipado no pesa)" % [peso, cap]
-	barra_carga.max_value = maxf(cap, 0.1)
-	barra_carga.value = peso
+	var mochila := _equipado("mochila")
+	carga_icono.texture = mochila.icono if mochila else null
+	carga_barra.max_value = maxf(cap, 0.1)
+	carga_barra.value = peso
+	carga_barra.add_theme_stylebox_override("fill", Estilo.caja("barra_vida" if peso >= cap * 0.9 else "barra_pa"))
+	lbl_carga.text = "Carga %.1f / %.1f kg  ·  lo equipado no pesa" % [peso, cap]
 
 func _pintar_detalle() -> void:
-	for c in caja_acciones.get_children():
-		c.queue_free()
-	var o: ObjetoData = null
-	if seleccion.get("origen", "") == "eq":
-		o = _equipado(seleccion["ranura"])
-	elif seleccion.get("origen", "") == "inv":
-		var inv := _inventario()
-		var i := int(seleccion["indice"])
-		if i < inv.size():
-			o = _def(inv[i]["id"])
+	var o := _objeto_de(seleccion)
 	if o == null:
 		det_icono.texture = null
-		det_texto.text = "[color=#%s]Elige un objeto. Doble clic: equipar o usar. Arrastra a la pestaña de otro héroe para dárselo.[/color]" % Textos.GRIS
+		det_texto.text = "[color=#%s]Pasa el ratón por un objeto para verlo. Doble clic: equipar o usar. Clic derecho: más acciones. Arrastra a una ranura para equiparlo, o al retrato de otro héroe para dárselo.[/color]" % Estilo.color("texto_suave").to_html(false)
 		return
 	det_icono.texture = o.icono
+	det_texto.text = _texto_objeto(o, seleccion)
+
+func _texto_objeto(o: ObjetoData, clave: Dictionary) -> String:
 	var t := Textos.detalle(o)
-	if seleccion["origen"] == "inv":
+	if clave.get("origen", "") == "inv":
 		var comp := Textos.comparar(o, _equipado_para(o))
 		if comp != "":
 			t += "\n" + comp
-	det_texto.text = t
+	return t
 
-	if seleccion["origen"] == "eq":
-		var ranura: String = seleccion["ranura"]
-		caja_acciones.add_child(_boton("Quitar", func(): _quitar(ranura)))
+func _mostrar_flotante(o: ObjetoData) -> void:
+	if o == null:
+		flotante.visible = false
 		return
-	var indice := int(seleccion["indice"])
-	if not o.efectos_al_usar.is_empty():
-		caja_acciones.add_child(_boton("Usar", func(): _usar(indice)))
-	if o is EquipoData:
-		caja_acciones.add_child(_boton("Equipar", func(): _equipar(indice)))
-	var destinos := OptionButton.new()
-	destinos.focus_mode = Control.FOCUS_NONE
-	destinos.add_theme_font_size_override("font_size", 12)
-	for h in _heroes():
-		var n := str(h.name)
-		if n != heroe and bool(pm.call("PuedenIntercambiar", heroe, n)):
-			destinos.add_item(str(h.get_meta("nombre_display", n)))
-			destinos.set_item_metadata(destinos.item_count - 1, n)
-	if destinos.item_count > 0:
-		caja_acciones.add_child(destinos)
-		caja_acciones.add_child(_boton("Dar", func(): _dar(indice, destinos.get_item_metadata(destinos.selected))))
+	flotante_texto.text = _texto_objeto(o, bajo_raton)
+	flotante.reset_size()
+	flotante.visible = true
+	_colocar_flotante()
+
+func _colocar_flotante() -> void:
+	var raton := flotante.get_viewport().get_mouse_position()
+	var pantalla := flotante.get_viewport().get_visible_rect().size
+	var pos := raton + Vector2(18, 18)
+	if pos.x + flotante.size.x > pantalla.x - 8:
+		pos.x = raton.x - flotante.size.x - 12
+	if pos.y + flotante.size.y > pantalla.y - 8:
+		pos.y = raton.y - flotante.size.y - 12
+	flotante.position = pos
+
+func _seleccionar(clave: Dictionary) -> void:
+	seleccion = clave
+	_remarcar_todo()
+	_pintar_detalle()
+
+func _abrir_menu(clave: Dictionary, o: ObjetoData) -> void:
+	menu.clear()
+	menu_acciones.clear()
+	var add := func(texto: String, accion: Callable):
+		var id := menu.item_count
+		menu.add_item(texto, id)
+		menu_acciones[id] = accion
+	if clave["origen"] == "eq":
+		add.call("Quitar", func(): _quitar(clave["ranura"]))
 	else:
-		caja_acciones.add_child(_etiqueta("  (nadie a tu lado para darle cosas)", 11, AZUL))
-	caja_acciones.add_child(_boton("Tirar", func():
-		pm.call("QuitarObjeto", heroe, indice, 1)
-		seleccion = {}
-		_resultado("Tirar " + o.nombre, "")))
+		var indice := int(clave["indice"])
+		if not o.efectos_al_usar.is_empty():
+			add.call("Usar", func(): _usar(indice))
+		if o is EquipoData:
+			add.call("Equipar", func(): _equipar(indice))
+		for h in _heroes():
+			var n := str(h.name)
+			if n != heroe and bool(pm.call("PuedenIntercambiar", heroe, n)):
+				add.call("Dar a %s" % h.get_meta("nombre_display", n), func(): _dar(indice, n))
+		menu.add_separator()
+		add.call("Tirar", func():
+			pm.call("QuitarObjeto", heroe, indice, 1)
+			seleccion = {}
+			_resultado("Tirar " + o.nombre, ""))
+	menu.position = Vector2i(menu.get_viewport().get_mouse_position())
+	menu.reset_size()
+	menu.popup()
 
 # ==========================================
 # ACCIONES
