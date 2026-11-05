@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="EquipoData" format=3 uid="uid://dr7ql3xviuhtn"]
+[gd_resource type="Resource" script_class="EquipoData" format=3]
 
-[ext_resource type="Script" uid="uid://bnfaefupynqmv" path="res://Scripts/GDD/Datos/efecto.gd" id="1_wgvnq"]
-[ext_resource type="Script" uid="uid://p87mdf4h2v2w" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_xla6s"]
-[ext_resource type="Texture2D" uid="uid://vk3y3jqgxej" path="res://Assets/Iconos/Objetos/capucha.png" id="3_dah6c"]
-[ext_resource type="Script" uid="uid://c7sngciu4inmt" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_gxnvo"]
-[ext_resource type="Script" uid="uid://bdsxjy6gvr7ku" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_64snt"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_wgvnq"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_xla6s"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/capucha.png" id="3_dah6c"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_gxnvo"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_64snt"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/capucha.png" id="6_xla6s"]
 
 [sub_resource type="Resource" id="Resource_urcmt"]
 script = ExtResource("4_gxnvo")
@@ -16,6 +17,7 @@ script = ExtResource("5_64snt")
 ranura = 2
 modificadores = Array[ExtResource("4_gxnvo")]([SubResource("Resource_urcmt")])
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_xla6s")
 nombre = "Capucha de cuero"
 descripcion = "Ver sin ser visto."
 icono = ExtResource("3_dah6c")

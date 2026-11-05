@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/arco_corto.png" id="3_67jch"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_6wct2"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_18pl3"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/arco_corto.png" id="6_mul0c"]
 
 [resource]
 script = ExtResource("5_18pl3")
@@ -14,6 +15,7 @@ dos_manos = true
 animacion = 3
 ranura = 0
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_mul0c")
 nombre = "Arco corto"
 descripcion = "Dispara de 2 a 4 casillas. No sirve pegado al enemigo."
 icono = ExtResource("3_67jch")

@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="EquipoData" format=3 uid="uid://bdpeyvef3wn6e"]
+[gd_resource type="Resource" script_class="EquipoData" format=3]
 
-[ext_resource type="Script" uid="uid://bnfaefupynqmv" path="res://Scripts/GDD/Datos/efecto.gd" id="1_qbhph"]
-[ext_resource type="Script" uid="uid://p87mdf4h2v2w" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_m33by"]
-[ext_resource type="Texture2D" uid="uid://cbyjgxyw6dieq" path="res://Assets/Iconos/Objetos/cota_malla.png" id="3_amrcf"]
-[ext_resource type="Script" uid="uid://c7sngciu4inmt" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_1fdpi"]
-[ext_resource type="Script" uid="uid://bdsxjy6gvr7ku" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_bwg4q"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_qbhph"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/encantamiento.gd" id="2_m33by"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/cota_malla.png" id="3_amrcf"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_1fdpi"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_bwg4q"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/cota_malla.png" id="6_m33by"]
 
 [sub_resource type="Resource" id="Resource_p3eoi"]
 script = ExtResource("4_1fdpi")
@@ -15,6 +16,7 @@ plano = 3
 script = ExtResource("5_bwg4q")
 modificadores = Array[ExtResource("4_1fdpi")]([SubResource("Resource_p3eoi")])
 clases_permitidas = PackedStringArray("Caballero", "Tanque")
+sprite_puesto = ExtResource("6_m33by")
 nombre = "Cota de malla"
 descripcion = "Anillas de hierro. Pesa, pero protege."
 icono = ExtResource("3_amrcf")

@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/maza.png" id="3_xy31w"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_7kivf"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_m7j07"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/maza.png" id="6_j0h8m"]
 
 [resource]
 script = ExtResource("5_m7j07")
@@ -12,6 +13,7 @@ dano = 5
 animacion = 2
 ranura = 0
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_j0h8m")
 nombre = "Maza"
 descripcion = "Pesada; machaca armaduras."
 icono = ExtResource("3_xy31w")

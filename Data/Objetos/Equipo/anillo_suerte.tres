@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/anillo_suerte.png" id="3_jjayp"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_jslo5"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="5_lvf2k"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/anillo_suerte.png" id="6_qigjb"]
 
 [sub_resource type="Resource" id="Resource_jg42y"]
 script = ExtResource("4_jslo5")
@@ -16,6 +17,7 @@ script = ExtResource("5_lvf2k")
 ranura = 4
 modificadores = Array[ExtResource("4_jslo5")]([SubResource("Resource_jg42y")])
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_qigjb")
 nombre = "Anillo de la suerte"
 descripcion = "Brilla cuando la fortuna sonríe."
 icono = ExtResource("3_jjayp")

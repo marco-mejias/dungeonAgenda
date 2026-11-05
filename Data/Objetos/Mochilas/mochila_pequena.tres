@@ -5,12 +5,14 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/mochila_pequena.png" id="3_6a450"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_3svkp"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/mochila_data.gd" id="5_q220w"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/mochila_pequena.png" id="6_i3b8f"]
 
 [resource]
 script = ExtResource("5_q220w")
 capacidad = 8.0
 ranura = 6
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_i3b8f")
 nombre = "Mochila pequeña"
 descripcion = "Lo justo para el camino."
 icono = ExtResource("3_6a450")

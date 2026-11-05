@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/baston_arcano.png" id="3_dp3jd"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_kadx2"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_5rxei"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/baston_arcano.png" id="6_nh0hp"]
 
 [resource]
 script = ExtResource("5_5rxei")
@@ -14,6 +15,7 @@ dos_manos = true
 animacion = 4
 ranura = 0
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_nh0hp")
 nombre = "Bastón arcano"
 descripcion = "Lanza chispas a 3 casillas con línea de visión."
 icono = ExtResource("3_dp3jd")

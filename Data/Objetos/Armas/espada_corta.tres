@@ -5,12 +5,14 @@
 [ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/espada_corta.png" id="3_35ygh"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_sq4c4"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="5_l16mv"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/espada_corta.png" id="6_2nelf"]
 
 [resource]
 script = ExtResource("5_l16mv")
 dano = 4
 ranura = 0
 clases_permitidas = PackedStringArray()
+sprite_puesto = ExtResource("6_2nelf")
 nombre = "Espada corta"
 descripcion = "Hoja recta y fiable."
 icono = ExtResource("3_35ygh")

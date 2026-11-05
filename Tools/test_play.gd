@@ -334,12 +334,20 @@ func _definir_pasos():
 			var inv = memo.get("inventario")
 			if inv:
 				var n: String = inv.heroe
-				check(inv.casillas_eq.size() == 8, "la mochila muestra las 8 ranuras de equipo")
-				check(inv.rejilla_inv.get_child_count() >= 18, "y la rejilla del inventario (%d casillas)" % inv.rejilla_inv.get_child_count())
+				var inv_n: Array = pm.call("DescribirInventario", n)
+				check(inv.objetos.size() == inv_n.size(), "el saco tiene un objeto por cada entrada del inventario (%d)" % inv.objetos.size())
+				check(inv.capas["heroe"].texture != null and inv.capas["mano_principal"].texture != null, "el héroe se ve con su arma puesta")
 				var i_cota := _indice_de(n, "cota_malla")
-				inv.seleccion = {"origen": "inv", "indice": i_cota}
-				inv._refrescar(true)
-				check(inv.det_texto.text.contains("Cota de malla") and inv.det_texto.text.contains("Frente a") or inv.det_texto.text.contains("vacía"), "la ficha del objeto compara con lo equipado")
+				inv._mostrar_bocadillo({"origen": "inv", "indice": i_cota}, Vector2(700, 300))
+				check(inv.bocadillo.visible and inv.det_texto.text.contains("Cota de malla") and (inv.det_texto.text.contains("Frente a") or inv.det_texto.text.contains("vacía") or inv.det_texto.text.contains("Igual que")), "el bocadillo del objeto lo compara con lo puesto")
+
+			return 0.3,
+		func():
+			var inv = memo.get("inventario")
+			if inv:
+				var n: String = inv.heroe
+				captura("01c2_bocadillo")
+				inv._cerrar_bocadillo()
 				var radio0 := int(activo().get_meta("radio_luz"))
 				inv._equipar(_indice_de(n, "antorcha"))
 				check(int(activo().get_meta("radio_luz")) == radio0 + 1 and inv.lbl_msg.text.ends_with("hecho"), "equipar desde la mochila: %s" % inv.lbl_msg.text)
@@ -348,14 +356,14 @@ func _definir_pasos():
 				check(int(activo().get_meta("radio_luz")) == radio0, "y quitarla: %s" % inv.lbl_msg.text)
 				memo["radio_arrastre"] = radio0
 				inv._refrescar(true)
-			return 0.3,
+			return 1.5, # que los objetos caigan al fondo del saco
 		func():
 			# Arrastrar con el ratón la antorcha de la mochila a la ranura de luz
 			var inv = memo.get("inventario")
 			if inv:
 				var n: String = inv.heroe
-				var origen: Control = inv.rejilla_inv.get_child(_indice_de(n, "antorcha"))
-				var destino: Control = inv.casillas_eq["luz"]
+				var origen: Control = inv.nodo_de_objeto(_indice_de(n, "antorcha"))
+				var destino: Control = inv.muneco
 				memo["arrastre"] = [origen.get_global_rect().get_center(), destino.get_global_rect().get_center()]
 				_raton(memo["arrastre"][0], true, true)
 			return 0.1,
@@ -374,7 +382,7 @@ func _definir_pasos():
 			var inv = memo.get("inventario")
 			if inv:
 				var n: String = inv.heroe
-				check(int(activo().get_meta("radio_luz")) == int(memo["radio_arrastre"]) + 1, "arrastrar la antorcha a la ranura de luz la equipa (%s)" % inv.lbl_msg.text)
+				check(int(activo().get_meta("radio_luz")) == int(memo["radio_arrastre"]) + 1, "arrastrar la antorcha del saco al héroe la equipa (%s)" % inv.lbl_msg.text)
 				captura("01e_arrastrar")
 				inv._quitar("luz")
 				pm.call("QuitarObjeto", n, _indice_de(n, "antorcha"), 1)
@@ -574,6 +582,8 @@ func _definir_pasos():
 			check(int(dm.call("TipoCursor", e.x, e.y)) == 2, "el cursor sobre un enemigo es la espada")
 			var enemigo_n := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
 			var prevision: Dictionary = dm.get_node("CombatManager").call("PrevisionAtaque", e.x, e.y)
+			memo["contra_previsto"] = int(prevision.get("contra", 0))
+			memo["enemigo_nombre"] = str(prevision.get("defensor", "?"))
 			var arma = root.get_node("Catalogo").obtener(activo().get_meta("equipo").get("mano_principal", ""))
 			if arma and enemigo_n:
 				var esperado := maxi(1, arma.dano + int(activo().get_meta(arma.stat_ataque)) - int(enemigo_n.get_meta("defensa")))
@@ -601,7 +611,9 @@ func _definir_pasos():
 			var hp1: int = nodo.get_meta("hp_actual") if is_instance_valid(nodo) and not str(nodo.name).ends_with("_muerto") else -999
 			check(hp1 < int(memo["hp0"]), "el ataque quita vida (%d -> %d)" % [memo["hp0"], hp1])
 			var atacante: Node = memo["atacante"]
-			check(int(atacante.get_meta("hp_actual")) < int(memo["hp_atacante"]), "el enemigo contraataca cuerpo a cuerpo (%s: %d -> %d PV)" % [atacante.name, memo["hp_atacante"], atacante.get_meta("hp_actual")])
+			# Contraataca si su arma llega a 1 casilla (un arco no): lo mismo que anuncia la previsión
+			var herido: bool = int(atacante.get_meta("hp_actual")) < int(memo["hp_atacante"])
+			check(herido == (int(memo["contra_previsto"]) > 0), "el %s %s, como anunciaba la previsión (%s: %d -> %d PV)" % [memo["enemigo_nombre"], "contraataca" if herido else "no contraataca", atacante.name, memo["hp_atacante"], atacante.get_meta("hp_actual")])
 			if is_instance_valid(nodo):
 				nodo.set_meta("hp_actual", 5) # que el resto del guion no tenga que pelear con él
 			check(not dm.get_meta("is_moving", false), "al acabar la secuencia el tablero se desbloquea")
