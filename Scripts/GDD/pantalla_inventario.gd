@@ -15,9 +15,9 @@ const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 const HOJA := preload("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png")
 const SHADER_CONTORNO := preload("res://Shaders/contorno_ui.gdshader")
 
-const ESCALA_HEROE := 16          # el sprite de 16x16 se ve a 256x256
-const TAM_OBJETO := 60            # objetos del saco
-const RADIO := 27.0               # su "radio" para chocar entre ellos
+const ESCALA_HEROE := 16          # el sprite de 16x16 se ve a 256x256 (dibujado a 64x64 con PixelHD)
+const TAM_OBJETO := 88            # objetos del saco
+const RADIO := 40.0               # su "radio" para chocar entre ellos
 const GRAVEDAD := 1500.0
 const T_IDLE := 0.5               # cada cuánto alterna el sprite (como en el mapa)
 const UMBRAL_ARRASTRE := 6.0
@@ -363,35 +363,53 @@ func _frame(h: Node) -> int:
 static func pareja(f: int) -> int:
 	return {0: 1, 1: 0, 2: 3, 3: 2, 4: 5, 5: 4, 6: 5, 9: 10, 10: 9, 11: 12, 12: 11, 13: 12}.get(f, f)
 
-# Sprite del héroe; sin el arma que trae dibujada si lleva otra en la mano
-func _textura_heroe(f: int, sin_arma: bool) -> Texture2D:
-	var clave := "%d_%s" % [f, sin_arma]
+# Sprite del héroe a mayor resolución (PixelHD, 64x64); sin el arma que trae dibujada si lleva
+# otra en la mano. 'desplaz' es cuánto se ha movido el cuerpo en este fotograma.
+func _textura_heroe(f: int, sin_arma: bool, desplaz: Vector2i = Vector2i.ZERO) -> Texture2D:
+	var clave := "%d_%s_%s" % [f, sin_arma, desplaz] # el 5 es pareja del caballero y del tanque, con distinto desplazamiento
 	if imagenes_cache.has(clave):
 		return imagenes_cache[clave]
 	var im := _hoja().get_region(Rect2i((f % 7) * 16, (f / 7) * 16, 16, 16))
 	if sin_arma:
-		for x in range(13, 16):
+		for x in range(13 + desplaz.x, 16):
 			for y in range(0, 11):
-				im.set_pixel(x, y, Color(0, 0, 0, 0))
-	var tex := ImageTexture.create_from_image(im)
+				if x >= 0:
+					im.set_pixel(x, y, Color(0, 0, 0, 0))
+	var tex := ImageTexture.create_from_image(PixelHD.imagen_x4(im))
 	imagenes_cache[clave] = tex
 	return tex
 
-# Cuántos píxeles baja el héroe en su segundo fotograma (para que lo puesto se mueva con él)
-func _bajada(f: int) -> int:
-	var clave := "bajada_%d" % f
+# En el reposo el sprite alterna dos fotogramas que son el mismo cuerpo DESPLAZADO (el ladrón 1 px
+# a la derecha, el mago 1 a la izquierda, el tanque 2...). Buscamos ese desplazamiento comparando
+# los dos fotogramas (sin la columna del arma) para mover con él todo lo que lleva puesto.
+func _desplazamiento(f: int) -> Vector2i:
+	var clave := "desplaz_%d" % f
 	if imagenes_cache.has(clave):
 		return imagenes_cache[clave]
 	var hoja := _hoja()
-	var arriba := func(fr: int) -> int:
-		for y in 16:
-			for x in 16:
-				if hoja.get_pixel((fr % 7) * 16 + x, (fr / 7) * 16 + y).a > 0.1:
-					return y
-		return 0
-	var d: int = arriba.call(pareja(f)) - arriba.call(f)
-	imagenes_cache[clave] = d
-	return d
+	var g := pareja(f)
+	var mejor := Vector2i.ZERO
+	var menos := 1 << 30
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var dif := 0
+			for y in 16:
+				for x in 12: # sin las columnas del arma
+					var xx := x + dx
+					var yy := y + dy
+					var ca := hoja.get_pixel((f % 7) * 16 + x, (f / 7) * 16 + y)
+					var cb := hoja.get_pixel((g % 7) * 16 + xx, (g / 7) * 16 + yy) if xx >= 0 and xx < 16 and yy >= 0 and yy < 16 else Color(0, 0, 0, 0)
+					if not ca.is_equal_approx(cb):
+						dif += 1
+			if dif < menos or (dif == menos and absi(dx) + absi(dy) < absi(mejor.x) + absi(mejor.y)):
+				menos = dif
+				mejor = Vector2i(dx, dy)
+	imagenes_cache[clave] = mejor
+	return mejor
+
+func _desplazamiento_actual() -> Vector2i:
+	var h := _nodo(heroe)
+	return _desplazamiento(_frame(h)) if h and fase_idle == 1 else Vector2i.ZERO
 
 func _imagen(tex: Texture2D) -> Image:
 	if not imagenes_cache.has(tex):
@@ -562,7 +580,7 @@ func _animar_retratos() -> void:
 			continue
 		var t: TextureRect = r.get_child(0)
 		var f: int = t.get_meta("frame", 4)
-		t.texture = _textura_heroe(f if fase_idle == 0 else pareja(f), false)
+		t.texture = _textura_heroe(f if fase_idle == 0 else pareja(f), false, Vector2i.ZERO if fase_idle == 0 else _desplazamiento(f))
 
 func _cambiar_heroe(nombre: String) -> void:
 	if nombre == heroe:
@@ -584,13 +602,13 @@ func _pintar_heroe() -> void:
 	var f := _frame(h)
 	var fr := f if fase_idle == 0 else pareja(f)
 	var con_arma := _equipado("mano_principal") != null
-	capas["heroe"].texture = _textura_heroe(fr, con_arma)
-	var bajada := (_bajada(f) if fase_idle == 1 else 0) * ESCALA_HEROE
+	var desplaz := _desplazamiento_actual()
+	capas["heroe"].texture = _textura_heroe(fr, con_arma, desplaz)
 	for ranura in CAPAS_DETRAS + CAPAS_DELANTE:
 		var o := _equipado(ranura)
 		var t: TextureRect = capas[ranura]
-		t.texture = o.sprite_puesto if o is EquipoData and o.sprite_puesto else null
-		t.position.y = bajada
+		t.texture = PixelHD.textura_x4(o.sprite_puesto) if o is EquipoData and o.sprite_puesto else null
+		t.position = Vector2(desplaz) * ESCALA_HEROE # lo puesto se mueve con el cuerpo
 		t.material = material_resalte if ranura == bajo_raton else null
 
 func _pintar_stats(h: Node) -> void:
@@ -669,7 +687,7 @@ func _pintar_saco() -> void:
 			o = {"nodo": nodo, "pos": inicial, "vel": Vector2(randf_range(-60, 60), 0), "ang": randf_range(-0.4, 0.4), "giro": 0.0, "clave": clave}
 		o["indice"] = i
 		var tex: TextureRect = o["nodo"].get_node("Icono")
-		tex.texture = inv[i]["icono"]
+		tex.texture = PixelHD.textura_x4(inv[i]["icono"])
 		(o["nodo"].get_node("Cantidad") as Label).text = str(inv[i]["cantidad"]) if int(inv[i]["cantidad"]) > 1 else ""
 		o["nodo"].set_meta("indice", i)
 		nuevos.append(o)
@@ -702,7 +720,7 @@ func _nodo_objeto() -> Control:
 	c.add_child(t)
 	var l := Estilo.etiqueta("", "pequeno", "hueso")
 	l.name = "Cantidad"
-	l.position = Vector2(TAM_OBJETO - 16, TAM_OBJETO - 18)
+	l.position = Vector2(TAM_OBJETO - 22, TAM_OBJETO - 22)
 	l.add_theme_constant_override("outline_size", 4)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.add_child(l)
@@ -785,7 +803,7 @@ func _soltar_del_saco(pos: Vector2) -> void:
 
 # Qué pieza puesta hay bajo el ratón (la de más arriba que tenga un píxel opaco ahí)
 func _puesto_en(local: Vector2) -> String:
-	var px := Vector2i(int(local.x / ESCALA_HEROE), int(local.y / ESCALA_HEROE) - (_bajada(_frame(_nodo(heroe))) if fase_idle == 1 else 0))
+	var px := Vector2i(int(local.x / ESCALA_HEROE), int(local.y / ESCALA_HEROE)) - _desplazamiento_actual()
 	if px.x < 0 or px.y < 0 or px.x >= 16 or px.y >= 16:
 		return ""
 	var orden: Array = CAPAS_DELANTE.duplicate()

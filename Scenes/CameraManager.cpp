@@ -38,6 +38,11 @@ namespace {
 	Vector2 raton_prev;
 	const float VEL_SEGUIR = 14.0f;  // casi pegada al héroe mientras camina
 	const float VEL_VOLVER = 5.0f;   // regreso suave al soltar
+	// Arrastre con clic derecho "pesado": el ratón mueve un punto objetivo (con menos recorrido por
+	// píxel que antes) y la cámara lo persigue con retraso, como si tuviera inercia
+	const float ESCALA_ARRASTRE = 0.0016f; // antes 0.0025: la mazmorra se movía demasiado por cada píxel
+	const float VEL_ARRASTRE = 6.0f;       // cuánto tarda la cámara en alcanzar al ratón
+	Vector3 objetivo_arrastre;
 
 	Vector3 Direccion() {
 		float p = PITCH_DEG * (float)Math_PI / 180.0f;
@@ -112,14 +117,18 @@ void OnProcess(Caller* instance, double delta) {
 	// === CLIC DERECHO MANTENIDO: mirar libremente (arrastre sobre el plano del suelo) ===
 	Vector2 raton = RatonEnContenedor(cam);
 	bool derecho = input->is_mouse_button_pressed(MOUSE_BUTTON_RIGHT);
+	if (derecho && !arrastrando) objetivo_arrastre = pivote; // empieza el arrastre
 	if (derecho && arrastrando) {
 		Vector2 d = raton - raton_prev;
 		Basis b = cam->get_global_transform().basis;
 		Vector3 right = b.get_column(0); right.y = 0; right = right.normalized();
 		Vector3 fwd = -b.get_column(2); fwd.y = 0; fwd = fwd.normalized();
-		float escala = dist * 0.0025f;
-		pivote -= right * d.x * escala;
-		pivote += fwd * d.y * escala;
+		float escala = dist * ESCALA_ARRASTRE;
+		objetivo_arrastre -= right * d.x * escala;
+		objetivo_arrastre += fwd * d.y * escala;
+		objetivo_arrastre.x = UtilityFunctions::clampf(objetivo_arrastre.x, 0.0f, GRID);
+		objetivo_arrastre.z = UtilityFunctions::clampf(objetivo_arrastre.z, 0.0f, GRID);
+		pivote = pivote.lerp(objetivo_arrastre, (float)UtilityFunctions::minf(1.0, VEL_ARRASTRE * delta));
 	}
 	if (!derecho && arrastrando) volviendo = true; // acabamos de soltar
 	arrastrando = derecho;
