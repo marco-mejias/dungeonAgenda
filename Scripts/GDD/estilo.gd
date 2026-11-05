@@ -10,6 +10,8 @@ extends Node
 # El C++ y los scripts piden aquí sus cajas y colores: Estilo.caja("panel"), Estilo.color("oro").
 
 const DIR := "res://Assets/UI/Piedra/"
+# Títulos en letra gótica; el resto del texto sigue con la letra del proyecto (Symtext)
+const FUENTE_TITULO := preload("res://Assets/Fonts/gothicbyte/GothicByte.ttf")
 const ESCALA := 2 # píxeles reales por píxel de arte
 
 const COLORES := {
@@ -75,7 +77,17 @@ func etiqueta(texto: String, tamano: String = "normal", color_nombre: String = "
 	l.text = texto
 	l.add_theme_font_size_override("font_size", {"titulo": 22, "normal": 14, "pequeno": 11}.get(tamano, 14))
 	l.add_theme_color_override("font_color", color(color_nombre))
+	if tamano == "titulo":
+		como_titulo(l)
 	return l
+
+# Pone un título en gótica (GothicByte). Va con mayúscula solo al principio ("Equipo", "Piso 2"):
+# en mayúsculas la letra gótica casi no se lee. Se ve nítida a 24, 32 o 48.
+func como_titulo(c: Control, tamano: int = 32) -> void:
+	if c == null:
+		return
+	c.add_theme_font_override("font", FUENTE_TITULO)
+	c.add_theme_font_size_override("font_size", tamano)
 
 func crear_tema() -> Theme:
 	var t := Theme.new()

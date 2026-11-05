@@ -33,7 +33,7 @@ func _ready() -> void:
 	texto.set_anchors_preset(Control.PRESET_FULL_RECT)
 	texto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	texto.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	texto.add_theme_font_size_override("font_size", 26)
+	Estilo.como_titulo(texto, 32)
 	texto.add_theme_color_override("font_color", ORO)
 	texto.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texto)
@@ -59,7 +59,7 @@ func _process(_delta: float) -> void:
 	if enemigos != turno_enemigo:
 		turno_enemigo = enemigos
 		if enemigos:
-			mostrar("TURNO ENEMIGO")
+			mostrar("Turno enemigo")
 			return
 	var dia: int = pm.get_meta("turno_actual", 1)
 	var act = pm.call("GetActiveCharacter")
@@ -73,11 +73,11 @@ func _process(_delta: float) -> void:
 	if dia != ultimo_dia:
 		ultimo_dia = dia
 		ultimo_heroe = nombre
-		mostrar("DÍA %d" % dia)
-		pendiente = "TURNO DE %s" % nombre.to_upper() if nombre != "" else ""
+		mostrar("Día %d" % dia)
+		pendiente = "Turno de %s" % nombre if nombre != "" else ""
 	elif nombre != "" and nombre != ultimo_heroe:
 		ultimo_heroe = nombre
-		mostrar("TURNO DE %s" % nombre.to_upper())
+		mostrar("Turno de %s" % nombre)
 
 func mostrar(mensaje: String) -> void:
 	# No tapamos eventos ni la fogata

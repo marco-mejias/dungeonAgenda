@@ -20,8 +20,8 @@ func _ready() -> void:
 	move_child(fondo, 0)
 	fondo.color = Color(0.025, 0.018, 0.04, 0.97)
 
-	titulo.text = "LA HOGUERA"
-	titulo.add_theme_font_size_override("font_size", 30)
+	titulo.text = "La hoguera"
+	Estilo.como_titulo(titulo, 48)
 	titulo.add_theme_color_override("font_color", Estilo.color("oro"))
 	titulo.offset_left = -300
 	titulo.offset_right = 300

@@ -139,7 +139,7 @@ void ActualizarMarcadorTurno(Caller* instance) {
 	
 	Label* turn_marker = Object::cast_to<Label>(self->get_node_or_null("MarcadorTurnos"));
 	if (turn_marker) {
-		turn_marker->set_text("PISO " + String::num_int64(floor) + String::utf8("   -   D\xC3\x8D" "A ") + String::num_int64(turn));
+		turn_marker->set_text("Piso " + String::num_int64(floor) + String::utf8("   \xC2\xB7   D\xC3\xAD" "a ") + String::num_int64(turn));
 	}
 }
 
@@ -205,7 +205,7 @@ void DescansarYContinuar(Caller* instance) {
 	Node* pm = GetPartyManager();
 	int siguiente = (pm ? (int)pm->get_meta("piso_actual", 1) : 1) + 1;
 	if (transicion) {
-		transicion->call("fundido", "PISO " + String::num_int64(siguiente), Callable(self, StringName("EjecutarCambioDePiso")));
+		transicion->call("fundido", "Piso " + String::num_int64(siguiente), Callable(self, StringName("EjecutarCambioDePiso")));
 	} else {
 		EjecutarCambioDePiso(instance);
 	}

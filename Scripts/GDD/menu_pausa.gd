@@ -31,8 +31,8 @@ func _ready() -> void:
 
 func _traducir() -> void:
 	var titulo: Label = caja.get_node("Label")
-	titulo.text = "OPCIONES"
-	titulo.add_theme_font_size_override("font_size", 22)
+	titulo.text = "Opciones"
+	Estilo.como_titulo(titulo, 32)
 	_estilo_etiqueta(caja.get_node("Label2"), "VOLUMEN DE MÚSICA")
 	_estilo_etiqueta(caja.get_node("Label3"), "VOLUMEN DE EFECTOS")
 	btn_volver.text = "VOLVER"
@@ -81,8 +81,8 @@ func _crear_opciones_visuales() -> void:
 	var pos := btn_volver.get_index()
 
 	var titulo := Label.new()
-	titulo.text = "GRÁFICOS"
-	titulo.add_theme_font_size_override("font_size", 16)
+	titulo.text = "Gráficos"
+	Estilo.como_titulo(titulo, 24)
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var elementos: Array[Control] = [titulo]
 

@@ -1,7 +1,7 @@
 extends CanvasLayer
 
-# Fundido a negro con el rótulo del piso ("PISO 2"). Bloquea el ratón mientras se ve.
-#   fundido("PISO 2", callable_a_mitad)  -> negro, llama al callable, enseña el rótulo y vuelve
+# Fundido a negro con el rótulo del piso ("Piso 2", en gótica). Bloquea el ratón mientras se ve.
+#   fundido("Piso 2", callable_a_mitad)  -> negro, llama al callable, enseña el rótulo y vuelve
 
 const T_FUNDIDO := 0.55
 const T_ROTULO := 0.9
@@ -13,7 +13,8 @@ func _ready() -> void:
 	layer = 20
 	# Entrada al juego: empezamos en negro con "PISO 1"
 	negro.color.a = 1.0
-	rotulo.text = "PISO 1"
+	Estilo.como_titulo(rotulo, 48)
+	rotulo.text = "Piso 1"
 	rotulo.modulate.a = 1.0
 	negro.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tw := create_tween()

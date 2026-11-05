@@ -169,7 +169,7 @@ func _construir() -> void:
 	marco.add_child(v)
 
 	var cab := HBoxContainer.new()
-	cab.add_child(Estilo.etiqueta("EQUIPO", "titulo", "oro"))
+	cab.add_child(Estilo.etiqueta("Equipo", "titulo", "oro"))
 	lbl_msg = Estilo.etiqueta("", "pequeno", "oro")
 	lbl_msg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

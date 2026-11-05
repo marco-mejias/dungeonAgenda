@@ -13,6 +13,9 @@ var current_state: GameState = GameState.EXPLORING_MAP
 
 func _ready():
 	print("[Main GDScript] Iniciado. Jefe al mando.")
+	# Títulos del HUD y de la pantalla de evento en gótica
+	Estilo.como_titulo(get_node_or_null("CanvasLayer/MarcadorTurnos"), 24)
+	Estilo.como_titulo(get_node_or_null("CanvasLayer2/PantallaEvento/Titulo"), 32)
 	# Pantalla de inventario (I) y panel de depuración de inventario y equipo (F10)
 	add_child(preload("res://Scripts/GDD/pantalla_inventario.gd").new())
 	add_child(preload("res://Scripts/GDD/debug_inventario.gd").new())

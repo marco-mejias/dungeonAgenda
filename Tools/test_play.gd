@@ -337,9 +337,14 @@ func _definir_pasos():
 				var inv_n: Array = pm.call("DescribirInventario", n)
 				check(inv.objetos.size() == inv_n.size(), "el saco tiene un objeto por cada entrada del inventario (%d)" % inv.objetos.size())
 				check(inv.capas["heroe"].texture != null and inv.capas["mano_principal"].texture != null, "el héroe se ve con su arma puesta")
+				# La cota puede no caber si el botín aleatorio ya llenó la mochila: entonces, la antorcha
 				var i_cota := _indice_de(n, "cota_malla")
+				var nombre_obj := "Cota de malla"
+				if i_cota < 0:
+					i_cota = _indice_de(n, "antorcha")
+					nombre_obj = "Antorcha"
 				inv._mostrar_bocadillo({"origen": "inv", "indice": i_cota}, Vector2(700, 300))
-				check(inv.bocadillo.visible and inv.det_texto.text.contains("Cota de malla") and (inv.det_texto.text.contains("Frente a") or inv.det_texto.text.contains("vacía") or inv.det_texto.text.contains("Igual que")), "el bocadillo del objeto lo compara con lo puesto")
+				check(inv.bocadillo.visible and inv.det_texto.text.contains(nombre_obj) and (inv.det_texto.text.contains("Frente a") or inv.det_texto.text.contains("vacía") or inv.det_texto.text.contains("Igual que")), "el bocadillo del objeto lo compara con lo puesto")
 
 			return 0.3,
 		func():
@@ -729,7 +734,7 @@ func _definir_pasos():
 		func():
 			var negro: ColorRect = root.get_node("Main/CapaTransicion/Negro")
 			var rotulo: Label = root.get_node("Main/CapaTransicion/Rotulo")
-			check(negro.color.a > 0.9 and rotulo.text == "PISO 2", "la transición funde a negro con el rótulo '%s'" % rotulo.text)
+			check(negro.color.a > 0.9 and rotulo.text == "Piso 2", "la transición funde a negro con el rótulo '%s'" % rotulo.text)
 			captura("12b_transicion")
 			return 2.4,
 		func():

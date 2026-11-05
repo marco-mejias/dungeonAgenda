@@ -12,6 +12,11 @@ func _ready():
 	# Asegurarnos de que el panel de opciones empieza oculto
 	panel_opciones.visible = false
 	contenedor_principal.visible = true
+	# Título del juego en gótica
+	var titulo: Label = contenedor_principal.get_node_or_null("Label")
+	if titulo:
+		titulo.text = "Dungeon Agenda"
+		Estilo.como_titulo(titulo, 48)
 	
 	# --- SINCRONIZACIÓN CON BUSES DE AUDIO ---
 	# Buscamos la posición de nuestros canales en la mesa de mezclas
