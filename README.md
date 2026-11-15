@@ -5,9 +5,7 @@ A tactical dungeon crawler where you lead a party of four heroes down a procedur
 Every floor is built like a cave from a souls-like: a safe campfire at the entrance, enemy camps guarding their chests, and a locked boss room at the back with the stairs behind it. Explore freely, sneak past the guards reading their vision cones, or start a fight on your terms and roll the d20.
 The core of the game (dungeon generation, vision, pathfinding, combat, inventory and rendering) is written in C++ through the **Jenova Framework**, which runs native C++ scripts inside Godot 4.7, while the higher level systems (stealth, tactics, progression, UI) are written in GDScript. This project was a deep dive into procedural generation, tactical systems, UI/UX and performance.
 
-### The GIFs look a bit laggy due to compression techniques, sorry for the inconvenience
-
-https://github.com/user-attachments/assets/a42db60c-42de-4637-9d8c-c5b1b3250283
+<img width="1280" height="720" alt="Video Project 9 (1)" src="https://github.com/user-attachments/assets/b7191ea7-02e9-4c80-982e-3fbc7a3b3fff" />
 
 <!-- Add a gameplay GIF here: drag the file into a GitHub issue or the README editor and paste the link -->
 
@@ -33,6 +31,8 @@ Every floor is generated from scratch: big rooms in L and T shapes, corridors 1 
 On top of the layout, a zoning pass gives each room a role: the **entrance** with a campfire to rest, **camps** with an enemy squad around a chest, and the **boss room**, sealed with a locked door. The key is always in the deepest camp's chest, and the generator checks that every room stays reachable (and that the boss room is only reachable with the key) before accepting the floor.
 Days count: the longer you take, the more the dungeon stirs and sends reinforcements to the camps still standing. Rush for the boss or clear every zone?
 
+<img width="1280" height="720" alt="Video Project 9 (4)" src="https://github.com/user-attachments/assets/2c7f0ba1-e691-4464-9981-efb27f2034d3" />
+
 ### 2. Stealth & Vision Cones
 Every enemy looks in one direction and has a role: **sentinels** never turn, **lookouts** turn every round (you can see their next cone as a ghost), and **sleepers** only wake up if you end next to them.
 Their sight is drawn on the floor as a soft pulsing light cone, cut by walls. The cone is not just a visual: detection uses **the same rays** that draw it, so if your tile is inside the light, they see you. Heroes always see further than enemies, so you spot them first.
@@ -45,7 +45,9 @@ Combat is turn-based with action points and a d20 roll for every attack, shown o
 Positioning matters: **flanking** and **height** give advantage, **cover** gives disadvantage to ranged attacks, moving away from an enemy gives it an **attack of opportunity**, and pushes against walls or off high rooms stun and knock down.
 Enemies act by AI profile (tank, melee, caster, coward) using BFS distance fields, and they come in **squads**: wake one up and the whole camp joins the fight.
 
-<img width="426" height="240" alt="Video Project 8" src="https://github.com/user-attachments/assets/bd0c00cc-ef64-4b25-92bb-8ed1a0900e9c" />
+
+<img width="1280" height="720" alt="Video Project 8 (1)" src="https://github.com/user-attachments/assets/64e00753-285f-49bf-b79f-b93b4255414e" />
+
 
 ### 4. Heroes, Progression & Items
 Four classes with their own starting ability. Killing grants XP; on level up you **draft 1 of 3 abilities**, and repeated passives stack into combos.
