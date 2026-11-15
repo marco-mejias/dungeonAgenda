@@ -50,8 +50,8 @@ Each hero has an inventory with weight and equipment slots that change their sta
 Survival is still there: hunger, sanity, status effects (burning, bleeding, stunned...) and narrative events resolved with a d20 roll on one of your stats.
 
 ### 5. UI & Game Feel
-The HUD is a dark grimoire made of loose leather pieces: the hero plate, the hand of ability cards, the belt of consumables and a wax seal to end the turn. Everything reacts to the mouse, damage shows as "ghost health", and the bottom slides away when an event opens.
-On top sits a layer of juice: hit stop, screen shake, zoom punches, floating indicators and loot flying to the hero card. The world uses a PS1-style shader with vertex snapping, affine textures, per-pixel line of sight with cone-shaped shadows, and a dithered fog of war.
+The HUD is a dark grimoire made of loose leather pieces: the hero plate, the hand of ability cards, the belt of consumables... Everything reacts to the mouse, damage shows as "ghost health", and the bottom slides away when an event opens.
+Hit stop, screen shake, zoom punches, floating indicators and loot flying to the hero card. The world uses a PS1-style shader with vertex snapping, affine textures, per-pixel line of sight with cone-shaped shadows, and a dithered fog of war.
 
 ---
 
