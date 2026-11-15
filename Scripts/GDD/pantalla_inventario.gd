@@ -1,26 +1,26 @@
 extends CanvasLayer
 
-# Mochila: inventario y equipo (tecla I, botón MOCHILA del HUD o "Repartir objetos" en la fogata).
-#   Izquierda: los héroes (su sprite, animado). Clic = ver su mochila; soltar un objeto encima = dárselo.
-#   Centro: el héroe en grande con su animación de reposo y lo que lleva PUESTO dibujado encima
-#     (EquipoData.sprite_puesto). Ratón encima = la pieza se resalta; clic = bocadillo con lo que hace.
-#   Derecha: el saco. Los objetos están tirados dentro con algo de física: caen, se apilan y se
-#     pueden coger y lanzar. Cada héroe recuerda dónde dejó cada cosa. La carga, en el borde.
-#   Abajo: estado (vida, PA, cordura, hambre) y atributos (fuerza, defensa, magia, suerte, luz).
-# Arrastrar del saco al héroe = equipar (o usar, si es un consumible); del héroe al saco = quitar;
-# a otro héroe = dárselo; fuera de la ventana = tirarlo. Doble clic = equipar/usar/quitar.
-# Clic derecho = menú. Nada de esto cuesta PA. Todo pasa por el PartyManager (Inventario.hpp).
+# Backpack: inventory and equipment (I key, HUD BACKPACK button or "Repartir objetos" at the campfire).
+#   Left: the heroes (their animated sprite). Click = see their backpack; drop an item on them = give it.
+#   Centre: the big hero with their idle animation and what they're WEARING drawn on top
+#     (EquipoData.sprite_puesto). Hover = the piece highlights; click = bubble with what it does.
+#   Right: the sack. Items are thrown inside with some physics: they fall, stack and can be
+#     grabbed and thrown. Every hero remembers where they left each thing. The load, on the edge.
+#   Bottom: status (health, PA, sanity, hunger) and attributes (strength, defense, magic, luck, light).
+# Drag from the sack to the hero = equip (or use, if it's a consumable); from the hero to the sack =
+# unequip; to another hero = give; out of the window = drop. Double click = equip/use/unequip.
+# Right click = menu. None of this costs PA. Everything goes through the PartyManager (Inventario.hpp).
 
 const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 const SHADER_CONTORNO := preload("res://Shaders/contorno_ui.gdshader")
 
-const ESCALA_HEROE := 18          # cada píxel del sprite de 16x16 se ve de 18x18 (píxel nítido, sin suavizar)
-const TAM_OBJETO := 150           # tamaño del objeto más grande del saco; los demás, según lo que sean (_escala_objeto)
+const ESCALA_HEROE := 18          # Every pixel of the 16x16 sprite shows as 18x18 (sharp pixel, no smoothing)
+const TAM_OBJETO := 150           # Size of the biggest item in the sack; the rest, depending on what they are (_escala_objeto)
 const GRAVEDAD := 1500.0
 const UMBRAL_ARRASTRE := 6.0
-# Orden de dibujo de lo puesto: la mochila detrás del héroe, el resto encima
-const CAPAS_DETRAS := ["mochila", "luz"] # detrás del héroe (la antorcha va a la espalda)
-# Mismo orden que en el mapa (Apariencia.ORDEN): las manos van encima de lo que empuñan
+# Drawing order of what's worn: the backpack behind the hero, the rest on top
+const CAPAS_DETRAS := ["mochila", "luz"] # Behind the hero (the torch goes on the back)
+# Same order as on the map (Apariencia.ORDEN): the hands go on top of what they hold
 const CAPAS_DELANTE := ["cuerpo", "cabeza", "mano_secundaria", "mano_principal", "manos", "accesorio_1", "accesorio_2"]
 const ARMAS_EN_MANO := ["mano_principal"]
 const STATS_ESTADO := [["vida", "hp_actual", "hp_max", "Vida"], ["pa", "pa_actual", "pa_max", "PA (acciones de este turno)"],
@@ -31,41 +31,41 @@ const STATS_ATRIBUTOS := [["fuerza", "Fuerza: daño de las armas de fuerza"], ["
 var pm: Node
 var cat: Node
 var heroe := ""
-var seleccion := {} # {"origen": "inv", "indice": i} o {"origen": "eq", "ranura": r}
+var seleccion := {} # {"origen": "inv", "indice": i} or {"origen": "eq", "ranura": r}
 var firma := ""
-var fotograma_pintado := -1 # fotograma de reposo dibujado (el reloj es el de Apariencia, igual que en el mapa)
+var fotograma_pintado := -1 # Idle frame drawn (the clock is Apariencia's, same as on the map)
 
-# Nodos
+# Nodes
 var fondo: ColorRect
 var marco: PanelContainer
 var retratos: VBoxContainer
 var muneco: PanelContainer
 var figura: Control
-var capas := {}          # ranura (o "heroe") -> TextureRect
+var capas := {}          # slot (or "heroe") -> TextureRect
 var saco: PanelContainer
-var interior: Control    # donde caen los objetos
+var interior: Control    # Where the items fall
 var barra_carga: ProgressBar
 var lbl_carga: Label
 var fila_estado: HBoxContainer
 var fila_atributos: HBoxContainer
 var lbl_msg: Label
 var bocadillo: PanelContainer
-var det_texto: RichTextLabel # texto del bocadillo
+var det_texto: RichTextLabel # Bubble text
 var cola: Polygon2D
 var menu: PopupMenu
 var menu_acciones := {}
 var boton_hud: Button
 var boton_fogata: Button
-var fantasma: TextureRect    # lo que se arrastra desde el héroe
+var fantasma: TextureRect    # What's being dragged from the hero
 
-# Física del saco: una entrada por objeto del inventario
+# Sack physics: one entry per inventory item
 var objetos: Array = []      # [{nodo, pos, vel, ang, giro, clave, indice}]
-var cogido := -1             # índice en 'objetos' del que se arrastra
+var cogido := -1             # Index in 'objetos' of the one being dragged
 var desfase := Vector2.ZERO
 var pos_anterior := Vector2.ZERO
 var pulsado_en := Vector2.ZERO
-var arrastrando_puesto := ""  # ranura que se arrastra desde el héroe
-var bajo_raton := ""          # ranura resaltada en el héroe
+var arrastrando_puesto := ""  # Slot being dragged from the hero
+var bajo_raton := ""          # Highlighted slot on the hero
 var resaltado_saco := -1
 
 var material_resalte: ShaderMaterial
@@ -73,7 +73,7 @@ var imagenes_cache := {}
 
 func _ready() -> void:
 	layer = 12
-	add_to_group("pantalla_inventario") # Indicadores: los cambios de equipo no son buffs
+	add_to_group("pantalla_inventario") # Indicadores: equipment changes aren't buffs
 	pm = get_node_or_null("/root/Main/PartyManager")
 	cat = get_node_or_null("/root/Catalogo")
 	material_resalte = ShaderMaterial.new()
@@ -85,6 +85,7 @@ func _ready() -> void:
 func esta_abierta() -> bool:
 	return marco.visible
 
+# The backpack can't open during the enemy turn or an event
 func puede_abrir() -> bool:
 	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	if dm and (dm.get_meta("turno_enemigo", false) or dm.get_meta("bloqueo_evento", false)):
@@ -97,6 +98,7 @@ func alternar() -> void:
 	else:
 		abrir()
 
+# Opens the backpack on hero 'nombre' (or the active one)
 func abrir(nombre: String = "") -> void:
 	if not puede_abrir():
 		return
@@ -113,6 +115,7 @@ func abrir(nombre: String = "") -> void:
 	_refrescar(true)
 	_sonido("open")
 
+# Closes it, saving where every item was left in the sack
 func cerrar() -> void:
 	_guardar_posiciones()
 	fondo.visible = false
@@ -121,7 +124,7 @@ func cerrar() -> void:
 		_cerrar_bocadillo()
 
 # ==========================================
-# CONSTRUCCIÓN
+# CONSTRUCTION
 # ==========================================
 
 func _boton(texto: String, accion: Callable) -> Button:
@@ -132,6 +135,7 @@ func _boton(texto: String, accion: Callable) -> Button:
 	b.pressed.connect(accion)
 	return b
 
+# Builds the whole screen by code: heroes, doll, sack, stats bar, bubble and menu
 func _construir() -> void:
 	fondo = ColorRect.new()
 	fondo.color = Estilo.color("velo")
@@ -172,12 +176,12 @@ func _construir() -> void:
 	cuerpo.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(cuerpo)
 
-	# 1. Héroes
+	# 1. Heroes
 	retratos = VBoxContainer.new()
 	retratos.add_theme_constant_override("separation", 10)
 	cuerpo.add_child(retratos)
 
-	# 2. El héroe con lo puesto
+	# 2. The hero with what they wear
 	muneco = PanelContainer.new()
 	muneco.custom_minimum_size = Vector2(300, 0)
 	muneco.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
@@ -199,7 +203,7 @@ func _construir() -> void:
 		capas[ranura] = t
 	cuerpo.add_child(muneco)
 
-	# 3. El saco
+	# 3. The sack
 	saco = PanelContainer.new()
 	saco.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	saco.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
@@ -225,7 +229,7 @@ func _construir() -> void:
 	dentro.add_child(col_carga)
 	cuerpo.add_child(saco)
 
-	# 4. Barra de stats
+	# 4. Stats bar
 	var abajo := PanelContainer.new()
 	abajo.add_theme_stylebox_override("panel", Estilo.caja("hueco"))
 	var fila := HBoxContainer.new()
@@ -241,7 +245,7 @@ func _construir() -> void:
 	abajo.add_child(fila)
 	v.add_child(abajo)
 
-	# Bocadillo de cómic (papel hueso, como los del mapa) con la info del objeto
+	# Comic bubble (bone paper, like the map ones) with the item info
 	bocadillo = PanelContainer.new()
 	var estilo := StyleBoxFlat.new()
 	estilo.bg_color = Color(0.85, 0.84, 0.8)
@@ -285,6 +289,7 @@ func _construir() -> void:
 			menu_acciones[id].call())
 	add_child(menu)
 
+# "BACKPACK (I)" button on the HUD and "Repartir objetos" at the campfire
 func _crear_botones_de_acceso() -> void:
 	boton_hud = _boton("MOCHILA (I)", alternar)
 	boton_hud.add_theme_font_size_override("font_size", 12)
@@ -307,9 +312,10 @@ func _crear_botones_de_acceso() -> void:
 		fogata.add_child(boton_fogata)
 
 # ==========================================
-# DATOS
+# DATA
 # ==========================================
 
+# Living heroes
 func _heroes() -> Array:
 	var out: Array = []
 	if pm:
@@ -331,11 +337,13 @@ func _equipado(ranura: String) -> ObjetoData:
 	var h := _nodo(heroe)
 	return _def(h.get_meta("equipo", {}).get(ranura, "")) if h else null
 
+# What the hero wears in the slot this item would go to (for the comparison)
 func _equipado_para(o: ObjetoData) -> ObjetoData:
 	if not (o is EquipoData):
 		return null
 	return _equipado(Textos.RANURA_DE[o.ranura])
 
+# The item a key points to (from the inventory or from a slot)
 func _objeto_de(clave: Dictionary) -> ObjetoData:
 	match clave.get("origen", ""):
 		"eq":
@@ -346,6 +354,7 @@ func _objeto_de(clave: Dictionary) -> ObjetoData:
 			return _def(inv[i]["id"]) if i < inv.size() else null
 	return null
 
+# Decompressed Image of a texture (cached), for pixel-perfect hover tests
 func _imagen(tex: Texture2D) -> Image:
 	if not imagenes_cache.has(tex):
 		var im: Image = tex.get_image() if tex else null
@@ -359,6 +368,7 @@ func _sonido(nombre: String) -> void:
 	if audio:
 		audio.call("play_ui", nombre)
 
+# Shows the result of an action in the message line and refreshes
 func _resultado(accion: String, error: String) -> void:
 	lbl_msg.text = accion + (": hecho" if error == "" else ": " + error)
 	lbl_msg.add_theme_color_override("font_color", Estilo.color("oro") if error == "" else Estilo.color("mal"))
@@ -366,7 +376,7 @@ func _resultado(accion: String, error: String) -> void:
 	_refrescar(true)
 
 # ==========================================
-# BUCLE: animación, física y arrastres
+# LOOP: animation, physics and dragging
 # ==========================================
 
 func _process(delta: float) -> void:
@@ -391,20 +401,21 @@ func _input(event: InputEvent) -> void:
 		return
 	if not marco.visible:
 		return
-	# Soltar lo que se arrastra (del saco o desde el héroe), esté donde esté el ratón
+	# Drop whatever is being dragged (from the sack or from the hero), wherever the mouse is
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if cogido >= 0:
 			_soltar_del_saco(event.position)
 		elif arrastrando_puesto != "":
 			_soltar_puesto(event.position)
 	elif event is InputEventMouseMotion and arrastrando_puesto == "" and bajo_raton != "" and event.button_mask & MOUSE_BUTTON_MASK_LEFT:
-		# Empezar a arrastrar una pieza puesta en cuanto el ratón se mueve un poco
+		# Start dragging a worn piece as soon as the mouse moves a little
 		if event.position.distance_to(pulsado_en) > UMBRAL_ARRASTRE and _equipado(bajo_raton):
 			arrastrando_puesto = bajo_raton
 			fantasma.texture = _equipado(bajo_raton).icono
 			fantasma.visible = true
 			_cerrar_bocadillo()
 
+# Sack physics: gravity, bounces against the walls, collisions and the dragged item following the mouse
 func _fisica(dt: float) -> void:
 	var area := interior.size
 	var raton := interior.get_local_mouse_position()
@@ -420,7 +431,7 @@ func _fisica(dt: float) -> void:
 			o["pos"] += o["vel"] * dt
 			o["ang"] += o["giro"] * dt
 			o["giro"] *= 0.9
-			# Paredes y suelo del saco
+			# Sack walls and floor
 			var radio: float = o["r"]
 			if o["pos"].y > area.y - radio:
 				o["pos"].y = area.y - radio
@@ -437,7 +448,7 @@ func _fisica(dt: float) -> void:
 			if o["pos"].y < radio:
 				o["pos"].y = radio
 				o["vel"].y *= -0.3
-	# Choques entre objetos (se empujan para no solaparse)
+	# Collisions between items (they push each other so they don't overlap)
 	for _iter in 2:
 		for a in objetos.size():
 			for b in range(a + 1, objetos.size()):
@@ -467,9 +478,10 @@ func _fisica(dt: float) -> void:
 		nodo.rotation = o["ang"]
 
 # ==========================================
-# PINTAR
+# PAINT
 # ==========================================
 
+# Repaints only when the hero's inventory, equipment or stats changed (or if forced)
 func _refrescar(forzar: bool) -> void:
 	var h := _nodo(heroe)
 	if not h:
@@ -483,6 +495,7 @@ func _refrescar(forzar: bool) -> void:
 	_pintar_saco()
 	_pintar_stats(h)
 
+# One animated portrait per hero on the left
 func _pintar_retratos() -> void:
 	for c in retratos.get_children():
 		c.queue_free()
@@ -511,6 +524,7 @@ func _pintar_retratos() -> void:
 				_cambiar_heroe(nombre))
 		retratos.add_child(r)
 
+# Portraits play the same idle frame as the map
 func _animar_retratos() -> void:
 	for r in retratos.get_children():
 		if r.get_child_count() == 0:
@@ -520,6 +534,7 @@ func _animar_retratos() -> void:
 		if h:
 			t.texture = Apariencia.textura(h)
 
+# Look at another hero's backpack
 func _cambiar_heroe(nombre: String) -> void:
 	if nombre == heroe:
 		return
@@ -533,11 +548,12 @@ func _cambiar_heroe(nombre: String) -> void:
 	objetos.clear()
 	_refrescar(true)
 
+# Draws the big hero with every worn layer
 func _pintar_heroe() -> void:
 	var h := _nodo(heroe)
 	if not h:
 		return
-	# Las mismas capas y el mismo fotograma que el sprite del mapa (Apariencia)
+	# The same layers and the same frame as the map sprite (Apariencia)
 	var f: int = Apariencia.fotograma(h)
 	fotograma_pintado = f
 	capas["heroe"].texture = Apariencia.textura_capa(h, "persona", f)
@@ -546,6 +562,7 @@ func _pintar_heroe() -> void:
 		t.texture = Apariencia.textura_capa(h, ranura, f)
 		t.material = material_resalte if ranura == bajo_raton else null
 
+# Status and attributes rows at the bottom (with the bonus from equipment)
 func _pintar_stats(h: Node) -> void:
 	for c in fila_estado.get_children() + fila_atributos.get_children():
 		c.queue_free()
@@ -556,6 +573,7 @@ func _pintar_stats(h: Node) -> void:
 		var f := int(h.get_meta(s[0], 0))
 		fila_atributos.add_child(_stat(s[0], str(f), "hueso", s[1], f - int(base.get(s[0], f))))
 
+# One stat: icon, value and the equipment bonus in green/red
 func _stat(icono: String, valor: String, color: String, ayuda: String, bono: int) -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 5)
@@ -577,10 +595,10 @@ func _stat(icono: String, valor: String, color: String, ayuda: String, bono: int
 	return h
 
 # ==========================================
-# EL SACO
+# THE SACK
 # ==========================================
 
-# Una clave estable por unidad de inventario: "pocion_vida#0", "pocion_vida#1"...
+# A stable key per inventory unit: "pocion_vida#0", "pocion_vida#1"...
 func _claves(inv: Array) -> Array:
 	var vistos := {}
 	var out: Array = []
@@ -590,6 +608,7 @@ func _claves(inv: Array) -> Array:
 		out.append("%s#%d" % [e["id"], n])
 	return out
 
+# Each hero remembers where every item sits in their sack
 func _guardar_posiciones() -> void:
 	var h := _nodo(heroe)
 	if not h or objetos.is_empty():
@@ -599,12 +618,13 @@ func _guardar_posiciones() -> void:
 		pos[o["clave"]] = o["pos"]
 	h.set_meta("pos_mochila", pos)
 
+# Rebuilds the sack items, keeping the ones that were already there
 func _pintar_saco() -> void:
 	var h := _nodo(heroe)
 	var inv := _inventario()
 	var claves := _claves(inv)
 	var guardadas: Dictionary = h.get_meta("pos_mochila", {}) if h else {}
-	# Lo que ya está en el saco conserva su sitio (y su velocidad)
+	# Whatever is already in the sack keeps its spot (and its speed)
 	var previas := {}
 	for o in objetos:
 		previas[o["clave"]] = o
@@ -622,14 +642,14 @@ func _pintar_saco() -> void:
 			var inicial: Vector2 = guardadas.get(clave, Vector2(randf_range(r0, maxf(r0 + 1.0, interior.size.x - r0)), r0))
 			o = {"nodo": nodo, "pos": inicial, "vel": Vector2(randf_range(-60, 60), 0), "ang": randf_range(-0.4, 0.4), "giro": 0.0, "clave": clave}
 		o["indice"] = i
-		# Cada cosa a su tamaño: un casco es bastante más grande que una poción
+		# Everything at its own size: a helmet is quite a bit bigger than a potion
 		var tam := _tam_objeto(_def(inv[i]["id"]))
 		o["r"] = tam * 0.42
 		o["nodo"].size = Vector2(tam, tam)
 		o["nodo"].pivot_offset = o["nodo"].size * 0.5
 		(o["nodo"].get_node("Cantidad") as Label).position = Vector2(tam - 22, tam - 22)
 		var tex: TextureRect = o["nodo"].get_node("Icono")
-		tex.texture = inv[i]["icono"] # píxel nítido: lo escala el TextureRect (filtro nearest)
+		tex.texture = inv[i]["icono"] # Sharp pixel: the TextureRect scales it (nearest filter)
 		(o["nodo"].get_node("Cantidad") as Label).text = str(inv[i]["cantidad"]) if int(inv[i]["cantidad"]) > 1 else ""
 		o["nodo"].set_meta("indice", i)
 		nuevos.append(o)
@@ -638,7 +658,7 @@ func _pintar_saco() -> void:
 	objetos = nuevos
 	cogido = -1
 	resaltado_saco = -1
-	# Carga en el borde del saco
+	# Load on the sack edge
 	var peso: float = pm.call("PesoInventario", heroe)
 	var cap: float = pm.call("CapacidadInventario", heroe)
 	barra_carga.max_value = maxf(cap, 0.1)
@@ -647,10 +667,11 @@ func _pintar_saco() -> void:
 	barra_carga.tooltip_text = "Carga: %.1f / %.1f kg (lo equipado no pesa)" % [peso, cap]
 	lbl_carga.text = "%.0f/%.0f\nkg" % [peso, cap]
 
-# Tamaño en el saco según lo que es (el icono siempre es de 16x16, nítido)
+# Size in the sack depending on what it is (the icon is always 16x16, sharp)
 func _tam_objeto(o: ObjetoData) -> float:
 	return TAM_OBJETO * _escala_objeto(o)
 
+# How big an item looks in the sack, relative to the biggest one
 static func _escala_objeto(o: ObjetoData) -> float:
 	if o == null:
 		return 0.6
@@ -669,6 +690,7 @@ static func _escala_objeto(o: ObjetoData) -> float:
 		ObjetoData.Tipo.MATERIAL: return 0.5
 	return 0.6
 
+# Node for one item in the sack (icon + amount)
 func _nodo_objeto() -> Control:
 	var c := Control.new()
 	c.size = Vector2(TAM_OBJETO, TAM_OBJETO)
@@ -693,15 +715,18 @@ func _nodo_objeto() -> Control:
 	c.gui_input.connect(func(ev): _al_tocar_objeto(c, ev))
 	return c
 
+# Outline on the item under the mouse
 func _resaltar_saco(c: Control, si: bool) -> void:
 	(c.get_node("Icono") as TextureRect).material = material_resalte if si else null
 
+# Index in 'objetos' of a sack node (-1 if it isn't there)
 func _entrada_de(c: Control) -> int:
 	for i in objetos.size():
 		if objetos[i]["nodo"] == c:
 			return i
 	return -1
 
+# Click on a sack item: grab it, double click = equip/use, right click = menu
 func _al_tocar_objeto(c: Control, ev: InputEvent) -> void:
 	if not (ev is InputEventMouseButton and ev.pressed):
 		return
@@ -728,7 +753,7 @@ func _al_tocar_objeto(c: Control, ev: InputEvent) -> void:
 		seleccion = clave
 		_abrir_menu(clave, o)
 
-# Al soltar un objeto del saco: ¿dónde ha caído?
+# When dropping an item from the sack: where did it land?
 func _soltar_del_saco(pos: Vector2) -> void:
 	var i := cogido
 	cogido = -1
@@ -736,7 +761,7 @@ func _soltar_del_saco(pos: Vector2) -> void:
 		return
 	var indice: int = objetos[i]["indice"]
 	var o := _objeto_de({"origen": "inv", "indice": indice})
-	# Un clic sin mover = ver qué es
+	# A click without moving = see what it is
 	if pos.distance_to(pulsado_en) <= UMBRAL_ARRASTRE:
 		objetos[i]["vel"] = Vector2.ZERO
 		_mostrar_bocadillo({"origen": "inv", "indice": indice}, objetos[i]["nodo"].get_global_rect().get_center())
@@ -758,14 +783,14 @@ func _soltar_del_saco(pos: Vector2) -> void:
 		pm.call("QuitarObjeto", heroe, indice, 1)
 		_resultado("Tirar " + (o.nombre if o else "?"), "")
 		return
-	# Dentro del saco: se queda donde cae, con la inercia del lanzamiento
+	# Inside the sack: it stays where it falls, with the throw's inertia
 	objetos[i]["vel"] = objetos[i]["vel"].limit_length(900.0)
 
 # ==========================================
-# EL HÉROE (lo puesto)
+# THE HERO (what they wear)
 # ==========================================
 
-# Qué pieza puesta hay bajo el ratón (la de más arriba que tenga un píxel opaco ahí)
+# Which worn piece is under the mouse (the topmost one with an opaque pixel there)
 func _puesto_en(local: Vector2) -> String:
 	var px := Vector2i(int(local.x / ESCALA_HEROE), int(local.y / ESCALA_HEROE))
 	if px.x < 0 or px.y < 0 or px.x >= 16 or px.y >= 16:
@@ -781,6 +806,7 @@ func _puesto_en(local: Vector2) -> String:
 			return ranura
 	return ""
 
+# Highlights the worn piece under the mouse
 func _resaltar_puesto(ranura: String) -> void:
 	if ranura == bajo_raton:
 		return
@@ -788,6 +814,7 @@ func _resaltar_puesto(ranura: String) -> void:
 	figura.tooltip_text = (_equipado(ranura).nombre_completo() if ranura != "" else "")
 	_pintar_heroe()
 
+# Mouse over the big hero: highlight, click for info, drag to unequip
 func _al_tocar_figura(ev: InputEvent) -> void:
 	if ev is InputEventMouseMotion:
 		if arrastrando_puesto == "":
@@ -809,6 +836,7 @@ func _al_tocar_figura(ev: InputEvent) -> void:
 	elif ev.button_index == MOUSE_BUTTON_RIGHT:
 		_abrir_menu(clave, _equipado(ranura))
 
+# Dropping a worn piece: into the sack = unequip, onto another hero = give
 func _soltar_puesto(pos: Vector2) -> void:
 	var ranura := arrastrando_puesto
 	arrastrando_puesto = ""
@@ -817,9 +845,10 @@ func _soltar_puesto(pos: Vector2) -> void:
 		_quitar(ranura)
 
 # ==========================================
-# BOCADILLO Y MENÚ
+# BUBBLE AND MENU
 # ==========================================
 
+# Comic bubble with the item info, pointing at it
 func _mostrar_bocadillo(clave: Dictionary, apunta: Vector2) -> void:
 	var o := _objeto_de(clave)
 	if o == null:
@@ -832,13 +861,13 @@ func _mostrar_bocadillo(clave: Dictionary, apunta: Vector2) -> void:
 		if comp != "":
 			t += "\n" + comp
 	t += "\n[color=#5a5c6b][i]%s[/i][/color]" % ("Doble clic o arrástralo al saco para quitártelo" if clave["origen"] == "eq" else "Arrástralo al héroe para ponértelo o usarlo")
-	# Sobre el papel claro del bocadillo, los colores claros de la interfaz no se leen: tinta oscura
+	# On the light paper of the bubble the interface's light colours don't read: dark ink
 	for par in [[Textos.GRIS, "4a4c5a"], [Textos.VERDE, "3a7322"], [Textos.ROJO, "a3322a"]]:
 		t = t.replace(par[0], par[1])
 	det_texto.text = t
 	bocadillo.reset_size()
 	bocadillo.visible = true
-	# Encima del objeto y un poco a la derecha, sin salirse de la pantalla
+	# Above the item and a bit to the right, without going off screen
 	var pantalla := bocadillo.get_viewport().get_visible_rect().size
 	var pos := apunta + Vector2(30, -bocadillo.size.y - 34)
 	pos.x = clampf(pos.x, 8, pantalla.x - bocadillo.size.x - 8)
@@ -855,6 +884,7 @@ func _cerrar_bocadillo() -> void:
 	cola.visible = false
 	seleccion = {}
 
+# Right-click menu with what can be done with that item
 func _abrir_menu(clave: Dictionary, o: ObjetoData) -> void:
 	if o == null:
 		return
@@ -885,34 +915,38 @@ func _abrir_menu(clave: Dictionary, o: ObjetoData) -> void:
 	menu.popup()
 
 # ==========================================
-# ACCIONES
+# ACTIONS
 # ==========================================
 
+# Equip from the inventory
 func _equipar(indice: int) -> void:
 	var inv := _inventario()
 	var nombre: String = inv[indice]["nombre"] if indice < inv.size() else "?"
 	_cerrar_bocadillo()
 	_resultado("Equipar " + nombre, pm.call("Equipar", heroe, indice))
 
+# Unequip a slot
 func _quitar(ranura: String) -> void:
 	var o := _equipado(ranura)
 	_cerrar_bocadillo()
 	bajo_raton = ""
 	_resultado("Quitar " + (o.nombre if o else ""), pm.call("Desequipar", heroe, ranura))
 
+# Use a consumable from the inventory
 func _usar(indice: int) -> void:
 	var inv := _inventario()
 	var nombre: String = inv[indice]["nombre"] if indice < inv.size() else "?"
 	_cerrar_bocadillo()
 	_resultado("Usar " + nombre, pm.call("UsarObjeto", heroe, indice))
 
+# Give one unit to another hero
 func _dar(indice: int, destino: String) -> void:
 	var inv := _inventario()
 	var nombre: String = inv[indice]["nombre"] if indice < inv.size() else "?"
 	_cerrar_bocadillo()
 	_resultado("Dar %s a %s" % [nombre, destino], pm.call("DarObjeto", heroe, indice, destino, 1))
 
-# Para los tests: el nodo del saco que representa la entrada 'indice' del inventario
+# For the tests: the sack node that represents inventory entry 'indice'
 func nodo_de_objeto(indice: int) -> Control:
 	for o in objetos:
 		if o["indice"] == indice:

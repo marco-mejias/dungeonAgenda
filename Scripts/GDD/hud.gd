@@ -1,82 +1,82 @@
 extends Control
 
-# HUD táctico con aspecto de GRIMORIO: pergamino liso con el borde tostado y una línea de tinta,
-# sin nada animado de fondo (tiene que leerse sin esfuerzo). Las habilidades y objetos son cartas
-# apenas torcidas que se enderezan al pasar el ratón; FIN DEL TURNO es un sello de lacre. Todo responde al ratón (crece, se aplasta, rebota) y
-# lo que cambia se nota (la vida baja con "daño fantasma", el retrato tiembla, lo nuevo entra con
-# un rebote). Texturas: Tools/generar_ui_grimorio.gd -> Assets/UI/Grimorio.
-#   arriba izq.     "Piso 1 · Día 2" y una pastilla con el modo (Explorando / ¡Combate!). Debajo,
-#                   la COLUMNA DEL GRUPO: retrato, vida y PA de cada héroe (clic = seleccionar).
-#   arriba centro   ORDEN DE TURNO en combate o "A la vista" explorando. Se oculta si no hay nada.
-#   arriba der.     minimapa (su propio nodo)
-#   abajo izq.      REGISTRO de lo que va pasando
-#   abajo centro    BARRA: retrato con medidores · acciones (1 2 R) | habilidades (Z X C V) ·
-#                   objetos (5-9) · en combate, PA y FIN DEL TURNO · mochila, día, lejanos
-# Colores con significado fijo: oro = acciones básicas, violeta = habilidades, verde = consumibles,
-# rojo = enemigos. F9 enseña el botón de debug.
+# Tactical HUD with a dark GRIMOIRE look: dark leather pieces with a golden trim and parchment
+# cards, nothing animated in the background (it has to read effortlessly). The bottom isn't a
+# straight bar: loose pieces, each with its own meaning. Everything reacts to the mouse (grows,
+# squashes, bounces) and changes are noticeable (health drops with "ghost damage", the portrait
+# shakes, new things pop in with a bounce). Textures: Tools/generar_ui_grimorio.gd -> Assets/UI/Grimorio.
+#   top left       "Piso 1 · Día 2" and a pill with the mode (Explorando / ¡Combate!). Under it,
+#                  the PARTY COLUMN: portrait, health and PA of each hero (click = select).
+#   top centre     TURN ORDER in combat or "A la vista" while exploring. Hidden if there's nothing.
+#   top right      minimap (its own node)
+#   bottom left    LOG of what's happening
+#   bottom         hero plate with gauges · basic actions · the HAND of abilities (Z X C V) ·
+#                  the BELT of items (5-9) · with turns, PA and the END OF TURN seal ·
+#                  backpack, day, far ones
+# Colours with a fixed meaning: gold = basic actions, violet = abilities, green = consumables,
+# red = enemies. F9 shows the debug button.
 #
-# Rendimiento: lo caro (inventario, alcances, grupos) se recalcula solo cuando cambia algo que se
-# ve (FIRMA) o cada REFRESCO segundos; cada frame solo se colocan cosas y se leen las teclas.
+# Performance: the expensive stuff (inventory, reach, groups) is only recomputed when something
+# visible changes (FIRMA) or every REFRESCO seconds; every frame we only place things and read keys.
 
 const Iconos := preload("res://Scripts/GDD/iconos_pixel.gd")
 const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 const Jugo := preload("res://Scripts/GDD/ui_jugo.gd")
-# Letra: Alegreya (libro antiguo pero limpia, se lee bien en pequeño) para todo; IM Fell (imprenta
-# antigua, de bordes "sucios") solo en los títulos grandes
+# Font: Alegreya (old book but clean, reads well small) for everything; IM Fell (old printing press,
+# "dirty" edges) only for the big titles
 const FUENTE := preload("res://Assets/Fonts/alegreya/alegreya_texto.tres")
 const FUENTE_FUERTE := preload("res://Assets/Fonts/alegreya/alegreya_fuerte.tres")
 const FUENTE_CURSIVA := preload("res://Assets/Fonts/alegreya/alegreya_cursiva.tres")
 const FUENTE_TITULO := preload("res://Assets/Fonts/imfell/grimorio_titulo.tres")
-const SHADER := preload("res://Shaders/grimorio.gdshader")
 const GRIM_DIR := "res://Assets/UI/Grimorio/"
 const HUD_DIR := "res://Assets/UI/HUD/"
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const MARGEN := 12.0
 const TAM_RETRATO := 58.0
 const TAM_MEDIDOR := 20.0
-const TAM_GRUPO := 30.0   # retratos de la columna del grupo
-const TAM_TURNO := 28.0   # retratos del orden de turno
-const TAM_CARTA := Vector2(42, 54)  # cartas de habilidad (la mano)
-const TAM_ACCION := Vector2(34, 44) # cartas de acción básica
+const TAM_GRUPO := 30.0   # Portraits in the party column
+const TAM_TURNO := 28.0   # Portraits in the turn order
+const TAM_CARTA := Vector2(42, 54)  # Ability cards (the hand)
+const TAM_ACCION := Vector2(34, 44) # Basic action cards
 const TAM_OBJ := 34.0
-const SOMBRA := 4         # px de sombra que llevan las texturas sueltas (Tools/generar_ui_grimorio.gd)
+const SOMBRA := 4         # px of shadow the loose textures carry (Tools/generar_ui_grimorio.gd)
 const CON_SOMBRA := ["cuero", "cuero_tira", "carta", "carta_hover", "carta_off", "carta_roja", "sello", "sello_hover", "sello_off"]
 const MAX_ENEMIGOS := 6
-const MAX_USABLES := 5    # teclas 5-9
-const MAX_HAB := 4        # el Mago tiene 4 ranuras; el resto, 3
+const MAX_USABLES := 5    # Keys 5-9
+const MAX_HAB := 4        # The Mage has 4 slots; the rest, 3
 const TECLAS_HAB := [KEY_Z, KEY_X, KEY_C, KEY_V]
 const LETRAS_HAB := ["Z", "X", "C", "V"]
 const LINEAS_REGISTRO := 5
-const VIDA_REGISTRO := 7.0 # segundos que dura una línea
-const REFRESCO := 0.15     # como mucho, cada cuánto se recalcula lo caro sin que cambie nada
+const VIDA_REGISTRO := 7.0 # Seconds a line lasts
+const REFRESCO := 0.15     # At most, how often the expensive stuff is recomputed when nothing changes
 const RETRASO_FICHA := 0.12
 
-# Tamaños de letra (píxeles del lienzo base 1152x648; en 1080p se ven x1.67)
+# Font sizes (pixels of the 1152x648 base canvas; at 1080p they show x1.67)
 const TXT_MINI := 9
 const TXT_PEQ := 10
 const TXT := 11
 const TXT_GRANDE := 15
-const GIROS := [-1.0, 0.7, -0.5, 0.9, -0.8, 0.4, 1.1, -0.9, 0.6, -0.3] # cartas apenas torcidas (grados)
+const GIROS := [-1.0, 0.7, -0.5, 0.9, -0.8, 0.4, 1.1, -0.9, 0.6, -0.3] # Barely tilted cards (degrees)
 
-# Paleta de grimorio: tapas de CUERO con filete dorado (texto hueso), CARTAS de pergamino en tono
-# vela (texto de tinta), lacre y tinta mágica violeta
-const C_TINTA := Color(0.17, 0.09, 0.05)         # texto y trazos sobre las cartas
-const C_TINTA_SUAVE := Color(0.36, 0.24, 0.14)   # tinta aguada (secundario)
-const C_PERGAMINO := Color(0.90, 0.83, 0.66)     # texto hueso sobre el cuero
+# Grimoire palette: LEATHER covers with a golden trim (bone text), parchment CARDS in a candle tone
+# (ink text), sealing wax and violet magic ink
+const C_TINTA := Color(0.17, 0.09, 0.05)         # Text and strokes on the cards
+const C_TINTA_SUAVE := Color(0.36, 0.24, 0.14)   # Watered ink (secondary)
+const C_PERGAMINO := Color(0.90, 0.83, 0.66)     # Bone text on the leather
 const C_CUERO := Color(0.17, 0.11, 0.08)
-const C_DORADO := Color(0.82, 0.64, 0.32)        # filetes, día, PA de la columna
+const C_DORADO := Color(0.82, 0.64, 0.32)        # Trims, day, PA in the column
 const C_DORADO_OSCURO := Color(0.48, 0.36, 0.18)
-const C_HUECO := Color(0.08, 0.05, 0.035)        # fondo de los retratos
-const C_HIERRO := Color(0.55, 0.42, 0.22, 0.5)   # rayas y separadores
+const C_HUECO := Color(0.08, 0.05, 0.035)        # Portrait background
+const C_HIERRO := Color(0.55, 0.42, 0.22, 0.5)   # Lines and separators
 const C_HIERRO_CLARO := Color(0.48, 0.36, 0.18)
-const C_VERDE_CLARO := Color(0.58, 0.76, 0.42)   # "Explorando" sobre el cuero
-const C_ROJO_CLARO := Color(0.93, 0.42, 0.33)    # "¡Combate!" sobre el cuero
+const C_VERDE_CLARO := Color(0.58, 0.76, 0.42)   # "Explorando" on the leather
+const C_ROJO_CLARO := Color(0.93, 0.42, 0.33)    # "¡Combate!" on the leather
 const C_HUESO := C_PERGAMINO
 const C_SUAVE := Color(0.68, 0.60, 0.46)
-const C_ORO := Color(0.60, 0.38, 0.05)           # ocre: acciones básicas
-const C_VIOLETA := Color(0.42, 0.22, 0.72)       # tinta mágica: habilidades
-const C_VERDE := Color(0.24, 0.42, 0.14)         # consumibles
-const C_ROJO := Color(0.62, 0.10, 0.08)          # tinta roja / lacre
+const C_ORO := Color(0.60, 0.38, 0.05)           # Ochre: basic actions
+const C_VIOLETA := Color(0.42, 0.22, 0.72)       # Magic ink: abilities
+const C_VERDE := Color(0.24, 0.42, 0.14)         # Consumables
+const C_ROJO := Color(0.62, 0.10, 0.08)          # Red ink / sealing wax
 const C_VIDA := Color(0.58, 0.07, 0.06)
 const C_MAGIA := Color(0.62, 0.38, 1.0)
 
@@ -84,13 +84,13 @@ var pm: Node
 var dm: Node
 var ui: Node
 
-# Arriba
+# Top
 var lbl_piso: Label
 var lbl_dia: Label
 var lbl_modo: Label
 var pastilla_modo: PanelContainer
 var columna: VBoxContainer
-var slots := {}            # nombre -> Button (columna del grupo)
+var slots := {}            # name -> Button (party column)
 var rayas_grupo: Array = []
 var barra_turno: PanelContainer
 var lbl_turno: Label
@@ -98,9 +98,9 @@ var fila_turno_heroes: HBoxContainer
 var separador: Control
 var fila_enemigos: HBoxContainer
 var slots_enemigo: Array = []
-var minis_turno := {}      # nombre -> TextureRect (héroes con PA en el orden de turno)
+var minis_turno := {}      # name -> TextureRect (heroes with PA in the turn order)
 
-# Barra (ya no es una barra: piezas sueltas dentro de un Control a pantalla completa)
+# Bar (not a bar any more: loose pieces inside a full screen Control)
 var barra: Control
 var placa_heroe: PanelContainer
 var acciones: Control
@@ -116,16 +116,16 @@ var lbl_pa: Label
 var lbl_nivel: Label
 var barra_xp: ColorRect
 var fondo_xp: ColorRect
-var huecos_acc := {}       # id -> Button (atacar, ayudar, retirada)
+var huecos_acc := {}       # id -> Button (atacar, ayudar, retirada, ocultarse, antorcha)
 var huecos_hab: Array = []
 var huecos_usables: Array = []
-var huecos_equipo := {}    # (ya no hay equipo en la barra: se mira en la mochila)
+var huecos_equipo := {}    # (no equipment on the bar any more: you check it in the backpack)
 var botones := {}          # id -> Button: atacar, ayudar, retirada, pasar, dia, mochila, lejanos
 var btn_lejanos: Button
 var heroe_pintado := ""
 var fotograma_pintado := -1
 
-# Fichas al pasar el ratón y registro
+# Hover cards and log
 var ficha_objeto: PanelContainer
 var texto_objeto: RichTextLabel
 var objeto_hover: Button = null
@@ -133,7 +133,7 @@ var t_hover := 0.0
 var registro: VBoxContainer
 var teclas_previas := {}
 
-# Refresco
+# Refresh
 var firma_vista := ""
 var t_refresco := 0.0
 var modo_visto := ""
@@ -141,7 +141,7 @@ var pa_visto := -1
 var giro_i := 0
 
 const ACCIONES := [
-	# id, icono, título, tecla, texto
+	# id, icon, title, key, text
 	["atacar", "espada", "Atacar", "1", "Al enemigo más cercano a tu alcance."],
 	["ayudar", "mano", "Ayudar", "2", "A un aliado pegado: [color=#f0c860]+3[/color] a su próximo ataque."],
 	["retirada", "res://Assets/Habilidades/retirada.png", "Retirada", "R", "Hasta mañana, alejarte no provoca [color=#f0c860]ataques de oportunidad[/color]."],
@@ -150,10 +150,11 @@ const ACCIONES := [
 ]
 
 # ==========================================
-# ESTILO (cacheado: crear StyleBox nuevos cada frame es carísimo)
+# STYLE (cached: creating new StyleBoxes every frame is very expensive)
 # ==========================================
 var _estilos := {}
 
+# Flat box with border and shadow (cached by its parameters)
 func _caja(fondo: Color, borde: Color, grosor: int = 2, radio: int = 5, relleno: int = 4, sombra: int = 0) -> StyleBoxFlat:
 	var clave := "%s|%s|%d|%d|%d|%d" % [fondo.to_html(), borde.to_html(), grosor, radio, relleno, sombra]
 	if _estilos.has(clave):
@@ -172,12 +173,9 @@ func _caja(fondo: Color, borde: Color, grosor: int = 2, radio: int = 5, relleno:
 	_estilos[clave] = s
 	return s
 
-# Hoja de pergamino quemado (9 trozos: los bordes no se estiran)
-func _tarjeta(relleno: int = 6) -> StyleBox:
-	return _tex("pergamino", 16, relleno + 8)
-
 var _texturas := {}
 
+# Box with a grimoire texture (Assets/UI/Grimorio): 9-slice, the borders don't stretch
 func _tex(nombre: String, margen: int, relleno: int = 4) -> StyleBoxTexture:
 	var clave := "%s|%d|%d" % [nombre, margen, relleno]
 	if _texturas.has(clave):
@@ -195,31 +193,12 @@ func _tex(nombre: String, margen: int, relleno: int = 4) -> StyleBoxTexture:
 	_texturas[clave] = s
 	return s
 
-# El shader de grimorio (temblor de tinta y runas en lo quemado) en este nodo. Solo pinta lo que
-# dibuja el propio nodo (su caja), no a sus hijos
-func _magia(c: CanvasItem, nivel: float = 0.45) -> void:
-	var m := ShaderMaterial.new()
-	m.shader = SHADER
-	m.set_shader_parameter("magia", nivel)
-	m.set_shader_parameter("semilla", randf() * 100.0)
-	c.material = m
-	c.set_meta("magia", nivel)
-
-func _fijar_magia(c: CanvasItem, nivel: float) -> void:
-	if c.material is ShaderMaterial and not is_equal_approx(float(c.get_meta("magia", -1.0)), nivel):
-		c.set_meta("magia", nivel)
-		var m: ShaderMaterial = c.material
-		var t := c.create_tween() if c.is_inside_tree() else null
-		if t:
-			t.tween_method(func(v): m.set_shader_parameter("magia", v), float(m.get_shader_parameter("magia")), nivel, 0.25)
-		else:
-			m.set_shader_parameter("magia", nivel)
-
-# Carta torcida (cada una un poco distinta)
+# Tilted card (each one slightly different)
 func _torcer(c: Control) -> void:
 	Jugo.torcer(c, GIROS[giro_i % GIROS.size()])
 	giro_i += 1
 
+# Pixel-sharp icon of a fixed size
 func _icono_rect(tex: Texture2D, tam: float) -> TextureRect:
 	var r := TextureRect.new()
 	r.texture = tex
@@ -230,12 +209,13 @@ func _icono_rect(tex: Texture2D, tam: float) -> TextureRect:
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return r
 
+# Label with the HUD font, size and colour
 func _label(tam: int, color: Color = C_TINTA, fuerte: bool = false) -> Label:
 	var l := Label.new()
 	l.add_theme_font_override("font", FUENTE_FUERTE if fuerte else FUENTE)
 	l.add_theme_font_size_override("font_size", tam)
 	l.add_theme_color_override("font_color", color)
-	# La tinta sobre el pergamino va sin contorno; lo claro (sobre lo oscuro), con contorno de tinta
+	# Ink on parchment goes without an outline; light text (on dark), with an ink outline
 	if color.get_luminance() > 0.45:
 		l.add_theme_color_override("font_outline_color", C_TINTA)
 		l.add_theme_constant_override("outline_size", 4)
@@ -244,17 +224,19 @@ func _label(tam: int, color: Color = C_TINTA, fuerte: bool = false) -> Label:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
+# Only touches the Label when the text really changes (avoids relayouts every frame)
 func _set_texto(l: Label, t: String) -> void:
 	if l.text != t:
 		l.text = t
 
+# Same idea for styleboxes: only override when it changes
 func _set_estilo(c: Control, nombre: String, s: StyleBox) -> void:
 	var clave := "_estilo_" + nombre
 	if not c.has_meta(clave) or c.get_meta(clave) != s:
 		c.set_meta(clave, s)
 		c.add_theme_stylebox_override(nombre, s)
 
-# Barra fina con fondo, "fantasma" y relleno (ver Jugo.barra)
+# Thin bar with background, "ghost" and fill (see Jugo.barra)
 func _barra(ancho: float, alto: float, color: Color) -> ColorRect:
 	var fondo := ColorRect.new()
 	fondo.name = "VidaFondo"
@@ -274,12 +256,12 @@ func _barra(ancho: float, alto: float, color: Color) -> ColorRect:
 	return fondo
 
 # ==========================================
-# MEDIDOR DE LÍQUIDO
+# LIQUID GAUGE
 # ==========================================
 class Medidor extends Control:
 	var lleno: Texture2D
 	var vacio: Texture2D
-	var nivel := 1.0      # lo que se dibuja (se acerca al objetivo poco a poco)
+	var nivel := 1.0      # What gets drawn (moves towards the target little by little)
 	var objetivo := 1.0
 	var texto: Label
 	var t := 0.0
@@ -314,7 +296,7 @@ class Medidor extends Control:
 			texto.text = t_nuevo
 
 	func _process(delta: float) -> void:
-		# Solo se redibuja mientras se mueve el líquido (o si está a medias, por la ola)
+		# Only redrawn while the liquid moves (or if it's half full, because of the wave)
 		var antes := nivel
 		nivel = move_toward(nivel, objetivo, delta * 0.8)
 		if nivel < 0.999:
@@ -338,7 +320,7 @@ class Medidor extends Control:
 			draw_texture_rect_region(lleno, Rect2(0, y, size.x, 2), Rect2(0, tam.y * (1.0 - f), tam.x, 1), Color(1.6, 1.6, 1.6, 0.9))
 
 # ==========================================
-# MONTAJE
+# ASSEMBLY
 # ==========================================
 func _ready() -> void:
 	add_to_group("hud")
@@ -354,8 +336,8 @@ func _ready() -> void:
 	_montar_registro()
 	_montar_ficha()
 
-# Las fichas viejas, su botón y el marcador se quedan en la escena (el C++ los sigue rellenando)
-# pero no se ven. El botón de debug, oculto hasta pulsar F9.
+# The old cards, their button and the marker stay in the scene (C++ still fills them) but they're
+# hidden. The debug button, hidden until F9 is pressed.
 func _ocultar_hud_viejo() -> void:
 	for n in ["PanelFichas", "BtnFichas", "MarcadorTurnos", "BtnSalidaDebug"]:
 		var c := ui.get_node_or_null(n) as CanvasItem
@@ -368,13 +350,14 @@ func _ocultar_hud_viejo() -> void:
 		debug.add_theme_font_size_override("font_size", TXT)
 	call_deferred("_quitar_boton_mochila")
 
+# The backpack screen creates its own HUD button; ours replaces it, so we remove that one
 func _quitar_boton_mochila() -> void:
 	for inv in get_tree().get_nodes_in_group("pantalla_inventario"):
 		if inv.boton_hud:
 			inv.boton_hud.queue_free()
 			inv.boton_hud = null
 
-# --- arriba izquierda: piso, día, modo y la columna del grupo ---
+# --- top left: floor, day, mode and the party column ---
 func _montar_cabecera() -> void:
 	var tira := PanelContainer.new()
 	tira.position = Vector2(MARGEN - 6, MARGEN - 8)
@@ -411,7 +394,8 @@ func _montar_cabecera() -> void:
 	columna.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(columna)
 
-# Un héroe de la columna: tira de cuero con su retrato en un medallón dorado, nombre, vida y PA
+# A hero in the column: a leather strip with their portrait in a golden medallion, name, health and
+# PA
 func _ficha_grupo(nombre: String) -> Button:
 	var s := float(SOMBRA)
 	var b := Button.new()
@@ -432,7 +416,7 @@ func _ficha_grupo(nombre: String) -> Button:
 	r.name = "Retrato"
 	r.position = Vector2(3, 3)
 	r.size = Vector2(TAM_GRUPO - 6, TAM_GRUPO - 6)
-	marco.add_child(r) # dentro del marco: así tiembla y crece con él
+	marco.add_child(r) # Inside the frame: so it shakes and grows with it
 	var x0 := TAM_GRUPO + 17 + s
 	var nom := _label(TXT, C_HUESO, true)
 	nom.name = "Nombre"
@@ -469,11 +453,12 @@ func _ficha_grupo(nombre: String) -> Button:
 	_torcer(b)
 	return b
 
+# Selects a hero through the uiManager (same path as clicking them on the map)
 func _seleccionar(nombre: String) -> void:
 	if ui:
 		ui.call("SeleccionarPersonajeDesdeUI", nombre)
 
-# --- arriba centro: orden de turno / a la vista ---
+# --- top centre: turn order / in view ---
 func _montar_turno() -> void:
 	barra_turno = PanelContainer.new()
 	barra_turno.add_theme_stylebox_override("panel", _tex("cuero_tira", 10, 8))
@@ -507,6 +492,7 @@ func _montar_turno() -> void:
 		fila_enemigos.add_child(s)
 		slots_enemigo.append(s)
 
+# Small portrait for an enemy in the turn order
 func _mini_enemigo() -> Button:
 	var s := float(SOMBRA)
 	var b := Button.new()
@@ -531,17 +517,17 @@ func _mini_enemigo() -> Button:
 	_torcer(b)
 	return b
 
-# --- abajo: piezas sueltas, cada una con su sentido ---
-#   placa del HÉROE (quién) · ACCIONES básicas (cartas pequeñas) · la MANO de habilidades (en
-#   abanico, suben al pasar el ratón) · el CINTURÓN con los objetos (bolsillos) · el SELLO de fin
-#   del turno con los PA encima, y al lado la mochila, el día y "lejanos"
+# --- bottom: loose pieces, each one with its meaning ---
+#   HERO plate (who) · basic ACTIONS (small cards) · the ability HAND (fanned, they rise on
+#   hover) · the BELT with the items (pockets) · the end of turn SEAL with the PA on top, and
+#   next to it the backpack, the day and "lejanos"
 func _montar_barra() -> void:
 	barra = Control.new()
 	barra.set_anchors_preset(Control.PRESET_FULL_RECT)
 	barra.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(barra)
 
-	# 1) El héroe: placa de cuero con retrato, medidores y nivel
+	# 1) The hero: leather plate with portrait, gauges and level
 	placa_heroe = PanelContainer.new()
 	placa_heroe.add_theme_stylebox_override("panel", _tex("cuero", 12, 8))
 	placa_heroe.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -590,7 +576,7 @@ func _montar_barra() -> void:
 	Jugo.centrar_pivote(placa_heroe)
 	Jugo.torcer(placa_heroe, -1.2)
 
-	# 2) Acciones básicas: tres cartas pequeñas
+	# 2) Basic actions: small cards
 	acciones = Control.new()
 	acciones.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	barra.add_child(acciones)
@@ -616,7 +602,7 @@ func _montar_barra() -> void:
 		huecos_acc[id] = b
 		botones[id] = b
 
-	# 3) La mano: las habilidades, en abanico
+	# 3) The hand: the abilities, fanned
 	mano = Control.new()
 	mano.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	barra.add_child(mano)
@@ -647,7 +633,7 @@ func _montar_barra() -> void:
 		mano.add_child(b)
 		huecos_hab.append(b)
 
-	# 4) El cinturón: los objetos de un uso, en bolsillos
+	# 4) The belt: single-use items, in pockets
 	cinturon = PanelContainer.new()
 	cinturon.add_theme_stylebox_override("panel", _tex("cuero", 12, 6))
 	cinturon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -665,7 +651,8 @@ func _montar_barra() -> void:
 	Jugo.centrar_pivote(cinturon)
 	Jugo.torcer(cinturon, 1.0)
 
-	# 5) El sello: PA en rombos encima y FIN DEL TURNO (solo en combate); al lado mochila, día y lejanos
+	# 5) The seal: PA as diamonds on top and END OF TURN (only with turns); next to it backpack, day
+	# and far ones
 	grupo_sello = HBoxContainer.new()
 	grupo_sello.add_theme_constant_override("separation", 6)
 	grupo_sello.alignment = BoxContainer.ALIGNMENT_END
@@ -759,8 +746,8 @@ func _montar_barra() -> void:
 	peq.add_child(dia)
 	_abanico(acciones, huecos_acc.values(), 34.0, 4.0, 1.5)
 
-# Coloca unas cartas en abanico (como una mano): cada una un poco más girada y más baja hacia
-# los lados. Solo rehace la colocación si cambia cuántas se ven
+# Fans some cards out (like a hand): each one a bit more rotated and lower towards the sides. Only
+# redoes the layout if the number of visible cards changes
 func _abanico(cont: Control, cartas: Array, paso: float, giro: float, curva: float) -> void:
 	var vis := cartas.filter(func(c): return c.visible)
 	var n := vis.size()
@@ -781,8 +768,8 @@ func _abanico(cont: Control, cartas: Array, paso: float, giro: float, curva: flo
 	cont.custom_minimum_size = Vector2(ancho, alto)
 	cont.size = cont.custom_minimum_size
 
-# Texto de una ficha (sobre pergamino oscuro): título del color de su tipo, avivado para que se
-# lea; la tecla en tinta aguada y debajo la explicación
+# Card tooltip text (on dark parchment): title in the colour of its type, brightened so it reads;
+# the key in watered ink and the explanation below
 func _ficha_texto(titulo: String, tecla: String, texto: String, color: Color) -> String:
 	var c := color.lightened(0.5) if color.get_luminance() < 0.5 else color
 	var t := "[font_size=13][b][color=#%s]%s[/color][/b][/font_size]" % [c.to_html(false), titulo]
@@ -792,9 +779,9 @@ func _ficha_texto(titulo: String, tecla: String, texto: String, color: Color) ->
 		t += "\n" + texto
 	return t
 
-# Una carta (acción o habilidad) de tamaño 'tam' (más la sombra alrededor): icono en el centro, la
-# tecla abajo a la izquierda, el coste en PA (tinta roja) arriba a la derecha y usos/cantidad abajo
-# a la derecha. Al pasar el ratón se endereza, crece un poco, sube y su tinta se vuelve violeta.
+# A card (action or ability) of size 'tam' (plus the shadow around it): icon in the centre, the key
+# bottom left, the PA cost (red ink) top right and uses/amount bottom right. On hover it
+# straightens, grows a bit, rises and its ink turns violet.
 func _hueco(color: Color, tecla: String, tam: Vector2) -> Button:
 	var s := float(SOMBRA)
 	var b := Button.new()
@@ -845,7 +832,7 @@ func _hueco(color: Color, tecla: String, tam: Vector2) -> Button:
 	Jugo.elevar(b, 8.0)
 	return b
 
-# Un bolsillo del cinturón (objetos de un uso): redondo, de cuero, con ribete dorado
+# A belt pocket (single-use items): round, leather, with a golden trim
 func _bolsillo(tecla: String) -> Button:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
@@ -875,7 +862,7 @@ func _bolsillo(tecla: String) -> Button:
 	Jugo.boton(b)
 	return b
 
-# Botón redondo de cuero (mochila, día)
+# Round leather button (backpack, day)
 func _boton_peq(id: String, tex: Texture2D, texto: String) -> Button:
 	var b := Button.new()
 	b.name = "Btn_" + id
@@ -896,6 +883,7 @@ func _boton_peq(id: String, tex: Texture2D, texto: String) -> Button:
 	botones[id] = b
 	return b
 
+# Remembers which slot is under the mouse, for the delayed tooltip card
 func _hover_ficha(b: Control) -> void:
 	b.mouse_entered.connect(func():
 		objeto_hover = b
@@ -904,14 +892,14 @@ func _hover_ficha(b: Control) -> void:
 		if objeto_hover == b:
 			objeto_hover = null)
 
-# --- abajo izquierda: registro ---
+# --- bottom left: log ---
 func _montar_registro() -> void:
 	registro = VBoxContainer.new()
 	registro.add_theme_constant_override("separation", 0)
 	registro.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(registro)
 
-## Apunta una línea en el registro (la llaman Indicadores, DadoCombate, Estados...)
+## Writes a line in the log (called by Indicadores, DadoCombate, Estados...)
 func registrar(texto: String, color: Color = C_PERGAMINO) -> void:
 	if registro == null:
 		return
@@ -930,6 +918,7 @@ func registrar(texto: String, color: Color = C_PERGAMINO) -> void:
 		registro.remove_child(vieja)
 		vieja.queue_free()
 
+# The tooltip card (dark parchment) shared by every slot
 func _montar_ficha() -> void:
 	ficha_objeto = PanelContainer.new()
 	ficha_objeto.add_theme_stylebox_override("panel", _tex("pergamino_oscuro", 16, 16))
@@ -951,7 +940,7 @@ func _montar_ficha() -> void:
 	ficha_objeto.add_child(texto_objeto)
 
 # ==========================================
-# ACCIONES
+# ACTIONS
 # ==========================================
 func _usar_hueco(i: int) -> void:
 	var b: Button = huecos_usables[i]
@@ -970,12 +959,14 @@ func _usar_hueco(i: int) -> void:
 		ui.call("UpdateWarriorUI")
 	_pedir_refresco()
 
+# Opens the backpack if nothing is blocking it
 func _abrir_mochila() -> void:
 	for inv in get_tree().get_nodes_in_group("pantalla_inventario"):
 		if inv.puede_abrir():
 			inv.alternar()
 		return
 
+# A basic action from the bar (attack, help, retreat, hide, torch, end turn...)
 func _accion(id: String) -> void:
 	var combate := dm.get_node_or_null("CombatManager") if dm else null
 	if combate == null or not botones.has(id):
@@ -1002,16 +993,16 @@ func _accion(id: String) -> void:
 			Sigilo.antorcha(pm.call("GetActiveCharacter"))
 		"dia":
 			if not Modo.con_turnos():
-				Modo.descansar() # explorando: descansar, pasa el día sin andar
+				Modo.descansar() # Exploring: rest, the day goes by without walking
 			else:
-				# Todos se quedan sin PA: se acaba el día (juegan los enemigos)
+				# Everyone runs out of PA: the day ends (the enemies play)
 				for h in _heroes():
 					h.set_meta("pa_actual", 0)
 				pm.call("TerminarTurnoPersonaje")
 	_pedir_refresco()
 
 # ==========================================
-# CADA FRAME
+# EVERY FRAME
 # ==========================================
 func _heroes() -> Array:
 	var out := []
@@ -1021,12 +1012,14 @@ func _heroes() -> Array:
 				out.append(h)
 	return out
 
-const ALFA_EN_COMBATE := 0.15 # lo que se ve el HUD mientras dura un golpe o una habilidad
+const ALFA_EN_COMBATE := 0.15 # What is visible of the HUD while a hit or an ability lasts
 
+# Forces the expensive refresh on the next frame
 func _pedir_refresco() -> void:
 	firma_vista = ""
 
-# Lo barato que cambia lo que se ve. Si no cambia, lo caro se recalcula solo cada REFRESCO s
+# The cheap stuff that changes what's visible. If it doesn't change, the expensive stuff is only
+# recomputed every REFRESCO s
 func _firma(act) -> String:
 	if act == null:
 		return "-"
@@ -1055,6 +1048,7 @@ func _process(delta: float) -> void:
 	_colocar_ficha_objeto(act, delta)
 	_teclas()
 
+# Expensive refresh: floor, day, mode, party column, turn order, abilities and items
 func _refrescar(act) -> void:
 	_set_texto(lbl_piso, "Piso %d" % int(pm.get_meta("piso_actual", 1)))
 	_set_texto(lbl_dia, "Día %d" % int(pm.get_meta("turno_actual", 1)))
@@ -1076,11 +1070,11 @@ func _refrescar(act) -> void:
 	_actualizar_objetos(act)
 	_actualizar_botones(act)
 
-# Coloca las piezas de abajo alrededor de la mano (que va en el centro), cada una a su altura.
-# Con un evento abierto (su panel ocupa la derecha) todo lo de abajo y el orden de turno se deslizan
-# a la izquierda, al hueco que queda libre, y el minimapa se va por arriba. Al cerrarse, vuelven.
-var _dx := 0.0           # desplazamiento actual (suavizado) de las piezas de abajo
-var _mini_fuera := 0.0   # 0 = minimapa en su sitio, 1 = fuera por arriba
+# Places the bottom pieces around the hand (which goes in the centre), each one at its height. With
+# an event open (its panel takes the right side) everything at the bottom and the turn order slide
+# left, into the free space, and the minimap goes off the top. When it closes, they come back.
+var _dx := 0.0           # Current (smoothed) offset of the bottom pieces
+var _mini_fuera := 0.0   # 0 = minimap in place, 1 = off the top
 
 func _colocar() -> void:
 	var pantalla := get_viewport_rect().size
@@ -1096,40 +1090,40 @@ func _colocar() -> void:
 	cinturon.position = Vector2(mano.position.x + mano.size.x + 16.0, suelo - cinturon.size.y + 2.0)
 	grupo_sello.size = grupo_sello.get_combined_minimum_size()
 	grupo_sello.position = Vector2(cinturon.position.x + cinturon.size.x + 14.0, suelo - grupo_sello.size.y + 2.0)
-	# ¿Hay un evento abierto? Lo libre es lo que queda a la izquierda de su panel
+	# Is there an event open? The free space is whatever is left of its panel
 	var pe := get_node_or_null("/root/Main/CanvasLayer2/PantallaEvento") as Control
 	var evento := pe != null and pe.visible and pe.position.y < pantalla.y * 0.5
 	var objetivo := 0.0
 	if evento:
 		var libre := pe.global_position.x
-		objetivo = libre * 0.5 - cx                                                   # centrado en lo libre...
-		objetivo = minf(objetivo, libre - 10.0 - (cinturon.position.x + cinturon.size.x))   # ...sin meterse debajo
-		objetivo = maxf(objetivo, MARGEN - placa_heroe.position.x)                       # ...ni salirse por la izquierda
+		objetivo = libre * 0.5 - cx                                                   # Centred in the free space...
+		objetivo = minf(objetivo, libre - 10.0 - (cinturon.position.x + cinturon.size.x))   # ...without going under it
+		objetivo = maxf(objetivo, MARGEN - placa_heroe.position.x)                       # ...nor off the left edge
 	_dx = lerpf(_dx, objetivo, suave) if absf(_dx - objetivo) > 0.5 else objetivo
 	for pieza in [mano, acciones, placa_heroe, cinturon, grupo_sello]:
 		pieza.position.x += roundf(_dx)
-	# Durante un evento no se puede acabar el turno: el sello (y mochila/día) se desvanecen
+	# During an event you can't end the turn: the seal (and backpack/day) fade out
 	grupo_sello.modulate.a = 1.0 - _mini_fuera
 	grupo_sello.visible = grupo_sello.modulate.a > 0.02
 	barra_turno.size = barra_turno.get_combined_minimum_size()
 	var centro_turno: float = (pe.global_position.x * 0.5) if evento else cx
 	var x_turno := roundf(centro_turno - barra_turno.size.x * 0.5)
 	barra_turno.position = Vector2(x_turno if absf(barra_turno.position.x - x_turno) < 1.0 else lerpf(barra_turno.position.x, x_turno, suave), 6)
-	# Minimapa: sube y sale de la pantalla
+	# Minimap: goes up and off the screen
 	var mini: Control = (ui.get_node_or_null("Minimapa") as Control) if ui else null
 	if mini:
 		if not mini.has_meta("y_base"):
 			mini.set_meta("y_base", mini.position.y)
 		_mini_fuera = lerpf(_mini_fuera, 1.0 if evento else 0.0, suave)
 		mini.position.y = float(mini.get_meta("y_base")) - _mini_fuera * (mini.size.y + float(mini.get_meta("y_base")) + 20.0)
-	# El registro va abajo a la izquierda; si la placa del héroe llega hasta ahí, se sube encima de ella
+	# The log goes bottom left; if the hero plate reaches there, it moves up above it
 	var alto_reg := registro.get_combined_minimum_size().y
 	var y_reg := pantalla.y - 14.0 - alto_reg - 8
 	if placa_heroe.position.x < MARGEN + 215.0:
 		y_reg = minf(y_reg, placa_heroe.position.y - 10.0 - alto_reg)
 	registro.position = Vector2(MARGEN, y_reg)
 
-# Mientras la cámara encuadra un ataque o una habilidad, el HUD (y el minimapa) casi desaparecen
+# While the camera frames an attack or an ability, the HUD (and the minimap) almost disappear
 func _atenuar(delta: float) -> void:
 	var cam := dm.get_node_or_null("Camera3D")
 	var en_golpe: bool = cam != null and cam.has_meta("encuadre")
@@ -1141,10 +1135,11 @@ func _atenuar(delta: float) -> void:
 		if n is CanvasItem:
 			n.modulate.a = modulate.a
 
-# Leer metas del DungeonManager (script C++) cuesta ~0.13 ms cada una: una vez por frame
+# Reading metas from the DungeonManager (C++ script) costs ~0.13 ms each: once per frame
 var _bloq_frame := -1
 var _bloq := false
 
+# Can the player act right now? Cached once per frame (it reads C++ metas)
 func _bloqueado() -> bool:
 	var frame := Engine.get_process_frames()
 	if frame != _bloq_frame:
@@ -1152,11 +1147,12 @@ func _bloqueado() -> bool:
 		_bloq = dm.get_meta("is_moving", false) or dm.get_meta("turno_enemigo", false) or dm.get_meta("bloqueo_evento", false) or dm.get_meta("bloqueo_banner", false)
 	return _bloq
 
+# Health bar of a portrait, with ghost damage
 func _fijar_vida(s: Control, hp: int, hp_max: int) -> void:
 	var fondo: ColorRect = s.get_node("VidaFondo")
 	Jugo.barra(fondo, fondo.get_node("Vida"), float(hp) / float(maxi(1, hp_max)))
 
-# La columna del grupo: el líder y su fila primero; luego los apartados, separados por una raya
+# The party column: the leader and their line first; then the ones apart, separated by a line
 func _actualizar_columna(act) -> void:
 	var nombres := {}
 	var turnos: bool = Modo.con_turnos()
@@ -1187,12 +1183,11 @@ func _actualizar_columna(act) -> void:
 		var es_act: bool = h == act
 		if bool(s.get_meta("activo", false)) != es_act:
 			s.set_meta("activo", es_act)
-			# El activo: medallón violeta, la tira derecha y sus runas encendidas
+			# The active one: violet medallion, the right strip and its runes lit
 			_set_estilo(marco, "panel", _caja(C_HUECO, C_MAGIA if es_act else C_DORADO_OSCURO, 2, int(TAM_GRUPO / 2), 0))
 			Jugo.escalar(marco, 1.08 if es_act else 1.0, 0.2)
 			Jugo.girar(s, 0.0 if es_act else float(s.get_meta("_jugo_rot", 0.0)), 0.25)
-			_fijar_magia(s, 1.4 if es_act else 0.2)
-		# Le han dado: tiembla
+		# They got hit: shake
 		var hp_prev := int(s.get_meta("hp_prev", hp))
 		if hp < hp_prev:
 			Jugo.sacudir(marco, 0.08)
@@ -1206,7 +1201,7 @@ func _actualizar_columna(act) -> void:
 		if not nombres.has(n):
 			slots[n].queue_free()
 			slots.erase(n)
-	# Orden por grupos (el del activo primero) y rayas entre grupos
+	# Order by groups (the active one's first) and lines between groups
 	var grupos: Array = Modo.grupos_heroes()
 	var idx := 0
 	var raya_i := 0
@@ -1241,7 +1236,7 @@ func _actualizar_columna(act) -> void:
 	for j in range(raya_i, rayas_grupo.size()):
 		rayas_grupo[j].visible = false
 
-# Arriba: en combate, quién tiene turno (héroes con PA) y contra quién; explorando, lo que se ve
+# Top: in combat, who has a turn (heroes with PA) and against whom; exploring, what's in view
 func _actualizar_turno(act) -> void:
 	var combate: bool = Modo.con_turnos()
 	var cam: Camera3D = dm.get_node_or_null("Camera3D")
@@ -1276,7 +1271,7 @@ func _actualizar_turno(act) -> void:
 			at.region = Rect2((frame % 7) * 16, (frame / 7) * 16, 16, 16)
 			r.texture = at
 		_fijar_vida(s, int(e.get_meta("hp_actual", 0)), int(e.get_meta("hp_max", 1)))
-	# Héroes que aún tienen turno (el activo primero y más grande)
+	# Heroes who still have a turn (the active one first and bigger)
 	var con_turno := []
 	if combate:
 		if act and int(act.get_meta("pa_actual", 0)) > 0:
@@ -1320,6 +1315,7 @@ func _actualizar_turno(act) -> void:
 		Jugo.aparecer(barra_turno)
 	barra_turno.visible = ver_barra
 
+# Hero plate: portrait, gauges, level and XP of the active hero
 func _actualizar_activo(act) -> void:
 	barra.visible = act != null
 	if act == null:
@@ -1344,7 +1340,7 @@ func _actualizar_activo(act) -> void:
 		var p := ColorRect.new()
 		p.custom_minimum_size = Vector2(6, 6)
 		p.pivot_offset = Vector2(3, 3)
-		p.rotation = PI * 0.25 # rombos de lacre
+		p.rotation = PI * 0.25 # Sealing wax diamonds
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		fila_pa.add_child(p)
 	for i in fila_pa.get_child_count():
@@ -1352,13 +1348,13 @@ func _actualizar_activo(act) -> void:
 		p.visible = i < pa_max
 		var color := C_ROJO if i < pa else C_HIERRO
 		if p.color != color:
-			# Un PA que se gasta (o vuelve) da un saltito
+			# A PA being spent (or coming back) does a little hop
 			if p.is_visible_in_tree() and pa_visto >= 0:
 				Jugo.latido(p, 1.3)
 			p.color = color
 	pa_visto = pa
 
-# Sus habilidades: icono, coste, usos (activas) o pilas (pasivas), y el velo de recarga
+# Their abilities: icon, cost, uses (actives) or stacks (passives), and the cooldown veil
 func _actualizar_habilidades(act) -> void:
 	if act == null:
 		return
@@ -1391,7 +1387,7 @@ func _actualizar_habilidades(act) -> void:
 		var tex: Texture2D = d.icono if d else null
 		if ic.texture != tex:
 			ic.texture = tex
-			Jugo.aparecer(b) # habilidad nueva en la barra
+			Jugo.aparecer(b) # New ability on the bar
 		if d and d.es_activa():
 			_set_texto(n, str(e["usos"]))
 			_set_texto(coste, str(d.coste_pa) if d.coste_pa > 0 else "")
@@ -1405,7 +1401,7 @@ func _actualizar_habilidades(act) -> void:
 			velo.visible = false
 			ic.modulate = Color(0.85, 0.85, 1.0)
 
-# Los consumibles (de un uso, apilados)
+# The consumables (single-use, stacked)
 func _actualizar_objetos(act) -> void:
 	if act == null:
 		return
@@ -1429,19 +1425,20 @@ func _actualizar_objetos(act) -> void:
 			b.disabled = bloqueado
 		else:
 			ic.texture = null
-			b.modulate = Color(1, 1, 1, 0.45) # hueco vacío: casi no se ve
+			b.modulate = Color(1, 1, 1, 0.45) # Empty slot: barely visible
 			_set_texto(b.get_node("Cantidad"), "")
 			for k in ["indice", "objeto"]:
 				if b.has_meta(k):
 					b.remove_meta(k)
 			b.disabled = true
 
+# Enables/disables every action card depending on PA, reach and mode
 func _actualizar_botones(act) -> void:
 	var bloqueado: bool = _bloqueado() or act == null
 	var debug: bool = dm.get_meta("debug_mode", false)
 	var pa: int = int(act.get_meta("pa_actual", 0)) if act else 0
 	var combate: bool = Modo.con_turnos()
-	# Atacar: alguien al alcance y PA para el arma
+	# Attack: someone in reach and PA for the weapon
 	var puede_atacar := false
 	var coste_ataque := 2
 	var motivo_ataque := "Nadie al alcance"
@@ -1466,7 +1463,7 @@ func _actualizar_botones(act) -> void:
 		_set_texto(b.get_node("Coste"), "1" if combate else "")
 		b.get_node("Icono").modulate.a = 1.0 if not b.disabled else 0.35
 		b.set_meta("texto", _ficha_texto(ACCIONES[k][2], ACCIONES[k][3], ACCIONES[k][4] + _motivo_txt(motivo), C_ORO))
-	# Sigilo: ocultarse (1 PA; si ya lo está, levantarse) y la antorcha (gratis)
+	# Stealth: hide (1 PA; if already hidden, stand up) and the torch (free)
 	var oculto: bool = act != null and Estados.tiene(act, "oculto")
 	var b_oc: Button = botones["ocultarse"]
 	var motivo_oc := "" if oculto else ("Solo con turnos (sigilo o combate)" if not combate else ("Faltan PA" if pa < Sigilo.COSTE_OCULTARSE and not debug else ""))
@@ -1495,10 +1492,11 @@ func _actualizar_botones(act) -> void:
 	btn_lejanos.disabled = bloqueado
 	btn_lejanos.text = "Lejanos (%d)" % n_lejos
 
+# Red line explaining why an action can't be used ("" if it can)
 func _motivo_txt(motivo: String) -> String:
 	return "\n[color=#e0675a]%s[/color]" % motivo if motivo != "" else ""
 
-# La ficha del hueco señalado: aparece tras un instante, subiendo y con fundido
+# The card of the hovered slot: shows up after a moment, rising and fading in
 func _colocar_ficha_objeto(act, delta: float) -> void:
 	var b := objeto_hover
 	if b == null or not is_instance_valid(b) or not b.is_visible_in_tree():
@@ -1535,6 +1533,7 @@ func _colocar_ficha_objeto(act, delta: float) -> void:
 	ficha_objeto.modulate.a = subida
 	ficha_objeto.visible = true
 
+# Log lines fade out after a while and then go away
 func _envejecer_registro(delta: float) -> void:
 	for l in registro.get_children():
 		var t: float = float(l.get_meta("t", 0.0)) + delta
@@ -1544,8 +1543,8 @@ func _envejecer_registro(delta: float) -> void:
 		if t > VIDA_REGISTRO:
 			l.queue_free()
 
-# Atajos: 1 atacar · 2 ayudar · R retirada · 3 fin del turno · 4 fin del día/descansar · L lejanos ·
-# Z X C V habilidades · 5-9 objetos · F9 botón de debug
+# Shortcuts: 1 attack · 2 help · R retreat · H hide · T torch · 3 end of turn · 4 end of day/rest ·
+# L far ones · Z X C V abilities · 5-9 items · F9 debug button
 func _teclas() -> void:
 	var atajos := {KEY_1: "atacar", KEY_2: "ayudar", KEY_R: "retirada", KEY_H: "ocultarse", KEY_T: "antorcha", KEY_3: "pasar", KEY_4: "dia", KEY_L: "lejanos"}
 	for tecla in atajos:

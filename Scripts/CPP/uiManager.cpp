@@ -56,7 +56,8 @@ namespace {
 
 	Control* m_event_screen = nullptr;
 
-	// Fichas de personaje: AUTO = las de quien sale en pantalla (+ el activo); OCULTAS = solo las fijadas
+	// Character cards: AUTO = the ones of whoever is on screen (+ the active hero); OCULTAS = only
+	// the pinned ones
 	bool fichas_auto = true;
 	bool tab_prev = false;
 	float t_fichas = 0.0f;
@@ -82,6 +83,7 @@ Node* GetPartyManager() {
 	return main_node ? main_node->get_node_or_null("PartyManager") : nullptr;
 }
 
+// Heroes that get a card (alive and not escaped)
 TypedArray<Node> GetPersonajesValidos() {
 	TypedArray<Node> valid_characters; 
 	Node* pm = GetPartyManager();
@@ -109,6 +111,7 @@ Node* GetDungeon() {
 	return self ? self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager") : nullptr;
 }
 
+// Refreshes every card with the current stats
 void ActualizarStatsUI(Caller* instance) {
 	Control* panel = PanelFichas();
 	Node* pm = GetPartyManager();
@@ -122,11 +125,12 @@ void ActualizarStatsUI(Caller* instance) {
 	}
 }
 
-// Qué fichas se ven en este momento (la lógica está en UI/Fichas.hpp)
+// Which cards are visible right now (the logic lives in UI/Fichas.hpp)
 void ActualizarVisibilidadFichas() {
 	ActualizarVisibilidad(PanelFichas(), GetPartyManager(), GetDungeon(), GetPersonajesValidos(), fichas_auto, fichas_fijadas);
 }
 
+// Floor and day counter
 void ActualizarMarcadorTurno(Caller* instance) {
 	if (!self) return;
 	
@@ -142,7 +146,7 @@ void ActualizarMarcadorTurno(Caller* instance) {
 	}
 }
 
-// Lo hace la transición a mitad del fundido (con la pantalla en negro)
+// The transition does it halfway through the fade (with the screen black)
 void EjecutarCambioDePiso(Caller* instance) {
 	if (!self) return;
 
@@ -156,7 +160,7 @@ void EjecutarCambioDePiso(Caller* instance) {
 		int floor = pm->has_meta("piso_actual") ? (int)pm->get_meta("piso_actual") : 1;
 		pm->set_meta("piso_actual", floor + 1);
 		pm->set_meta("turno_actual", 1);
-		pm->call("FinDePiso"); // se acaban los efectos "hasta el final del piso"
+		pm->call("FinDePiso"); // The "until the end of the floor" effects end
 
 		TypedArray<Node> children = pm->get_children();
 		for (int i = 0; i < children.size(); i++) {
@@ -183,7 +187,7 @@ void EjecutarCambioDePiso(Caller* instance) {
 	}
 	
 
-	// LLAMADAS DIRECTAS EN C++
+	// DIRECT C++ CALLS
 	ActualizarMarcadorTurno(instance);
 	ActualizarStatsUI(instance);
 	UpdateWarriorUI(instance);
@@ -197,7 +201,7 @@ void EjecutarCambioDePiso(Caller* instance) {
 	if (audio) audio->call("play_music", "dungeon");
 }
 
-// Botón "Descansar": fundido a negro con el rótulo del piso y, a mitad, el cambio real
+// "Rest" button: fade to black with the floor title and, halfway, the real change
 void DescansarYContinuar(Caller* instance) {
 	if (!self) return;
 	Node* transicion = self->get_parent()->get_node_or_null("CapaTransicion");
@@ -210,6 +214,7 @@ void DescansarYContinuar(Caller* instance) {
 	}
 }
 
+// Debug: takes the whole party out of the floor at once
 void DebugForzarSalida(Caller* instance) {
 	if (!self) return;
 	
@@ -250,11 +255,13 @@ void DebugForzarSalida(Caller* instance) {
 	UpdateWarriorUI(instance);
 }
 
+// Main refresh: stats and which cards are visible
 void UpdateWarriorUI(Caller* instance) {
 	ActualizarStatsUI(instance);
 	ActualizarVisibilidadFichas();
 }
 
+// Creates one card per hero and the enemy cards when the game starts
 void InicializarTodaLaUI(Caller* instance) {
 	Control* panel = PanelFichas();
 	if (!panel) return;
@@ -288,7 +295,7 @@ void InicializarTodaLaUI(Caller* instance) {
 		conectar(ficha, name, true);
 	}
 
-	// Fichas de enemigo (se reutilizan según quién esté en pantalla)
+	// Enemy cards (reused depending on who is on screen)
 	for (int k = 0; k < MAX_FICHAS_ENEMIGO; k++) {
 		String name = "Enemigo" + String::num_int64(k);
 		if (panel->get_node_or_null(NodePath(name))) continue;
@@ -308,6 +315,7 @@ void InicializarTodaLaUI(Caller* instance) {
 	ActualizarVisibilidadFichas();
 }
 
+// AUTO <-> OCULTAS card mode (TAB)
 void AlternarModoFichas(Caller* instance) {
 	fichas_auto = !fichas_auto;
 	fichas_fijadas.clear();
@@ -318,12 +326,13 @@ void AlternarModoFichas(Caller* instance) {
 	ActualizarVisibilidadFichas();
 }
 
-// Al hacer clic en un héroe del mapa su ficha se queda visible (también en modo OCULTAS)
+// Clicking a hero on the map keeps their card visible (also in OCULTAS mode)
 void FijarFicha(Caller* instance, String nombre) {
 	if (!EstaFijada(fichas_fijadas, nombre)) fichas_fijadas.push_back(nombre);
 	ActualizarVisibilidadFichas();
 }
 
+// Clicking a card selects that hero (unless something is moving)
 void SeleccionarPersonajeDesdeUI(Caller* instance, String nombre) {
 	if (!self || nombre.begins_with("Enemigo")) return;
 
@@ -340,10 +349,11 @@ void SeleccionarPersonajeDesdeUI(Caller* instance, String nombre) {
 	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
 	if (audio) audio->call("play_ui", "clic");
 	
-	// 1. Cambiamos el personaje activo en la lógica del juego
+	// 1. We change the active character in the game logic
 	pm->call("CambiarPersonajeActivo", nombre);
 }
 
+// Shows the detailed stats of a card (hover)
 void MostrarStats(Caller* instance, String nombre) {
 	Control* panel = PanelFichas();
 	Control* detalle = panel ? Object::cast_to<Control>(panel->get_node_or_null(NodePath(nombre + "/V/Detalle"))) : nullptr;
@@ -353,6 +363,7 @@ void MostrarStats(Caller* instance, String nombre) {
 	if (audio) audio->call("play_ui", "open");
 }
 
+// Hides them again
 void OcultarStats(Caller* instance, String nombre) {
 	Control* panel = PanelFichas();
 	Control* detalle = panel ? Object::cast_to<Control>(panel->get_node_or_null(NodePath(nombre + "/V/Detalle"))) : nullptr;
@@ -363,8 +374,8 @@ void OcultarStats(Caller* instance, String nombre) {
 // EVENT SCREEN FUNCTIONS
 // ==========================================
 
-// La pantalla de evento la lleva Scripts/GDD/pantalla_evento.gd (tirada d20, imágenes de victoria
-// y derrota, efectos). Aquí solo quedan las entradas de siempre, que la delegan.
+// The event screen is handled by Scripts/GDD/pantalla_evento.gd (d20 roll, win and lose images,
+// effects). Only the usual entry points are left here, and they delegate to it.
 Control* PantallaEvento() {
 	if (!self) return nullptr;
 	Node* main_node = self->get_parent();
@@ -376,26 +387,28 @@ Control* PantallaEvento() {
 	return m_event_screen;
 }
 
+// Closes the event screen
 void CerrarEvento(Caller* instance) {
 	Control* p = PantallaEvento();
 	if (p) p->call("cerrar");
 }
 
-// Se mantiene por compatibilidad: ahora lo hace la pantalla al acabar la tirada
+// Kept for compatibility: the screen does it now when the roll ends
 void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {}
 
-// Cierra la pantalla de evento al instante (al cambiar de piso o desde debug)
+// Closes the event screen instantly (when changing floors or from debug)
 void CerrarEventoPorDebug(Caller* instance) {
 	Control* p = PantallaEvento();
 	if (p) p->call("cerrar_ya");
 }
 
+// The player picked an option on the event screen
 void ResolverOpcion(Caller* instance, int option_index) {
 	Control* p = PantallaEvento();
 	if (p) p->call("resolver", option_index);
 }
 
-// OJO: Jenova revienta si una función llamada con call()/Callable recibe un Variant por valor
+// CAREFUL: Jenova crashes if a function called with call()/Callable takes a Variant by value
 void MostrarEventoVisual(Caller* instance, Resource* event_data) {
 	Control* p = PantallaEvento();
 	if (!p) {
@@ -422,8 +435,8 @@ void OnAwake(Caller* instance) {
 }
 
 void OnReady(Caller* instance) {
-	InicializarTodaLaUI(instance); // LLAMADA C++ DIRECTA
-	ActualizarMarcadorTurno(instance); // LLAMADA C++ DIRECTA
+	InicializarTodaLaUI(instance); // DIRECT C++ CALL
+	ActualizarMarcadorTurno(instance); // DIRECT C++ CALL
 	
 	Button* btn_fichas = Object::cast_to<Button>(self->get_node_or_null("BtnFichas"));
 	if (btn_fichas) {
@@ -454,7 +467,7 @@ void OnReady(Caller* instance) {
 void OnProcess(Caller* instance, double delta) {
 	if (!self) return;
 
-	// TAB alterna el modo de las fichas
+	// TAB toggles the card mode
 	bool tab = Input::get_singleton()->is_physical_key_pressed(KEY_TAB);
 	if (tab && !tab_prev) AlternarModoFichas(instance);
 	tab_prev = tab;

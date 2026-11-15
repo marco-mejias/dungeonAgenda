@@ -1,14 +1,14 @@
 #pragma once
-// Inventario y equipo de los héroes, sus stats finales y los efectos de los objetos.
+// Heroes' inventory and equipment, their final stats and the item effects.
 //
-// Los objetos se definen en Data/Objetos (.tres, clases en Scripts/GDD/Datos) y se piden
-// por id al autoload Catalogo. Cada héroe guarda:
-//   meta "equipo"          Dictionary ranura -> id   (lo equipado NO pesa)
-//   meta "inventario"      Array de {id, cantidad, usos}
-//   meta "stats_base"      Dictionary stat -> valor  (de su PersonajeData)
-//   meta "mods_temporales" Array de {stat, valor, turnos}  (turnos < 0 = hasta el final del piso)
-// Las metas de siempre ("fuerza", "defensa", "hp_max"...) guardan el valor FINAL
-// (base + equipo + temporales), así que el resto del juego las sigue leyendo igual.
+// Items are defined in Data/Objetos (.tres, classes in Scripts/GDD/Datos) and requested by id
+// from the Catalogo autoload. Every hero stores:
+//   meta "equipo"          Dictionary slot -> id   (equipped items DON'T weigh)
+//   meta "inventario"      Array of {id, cantidad, usos}
+//   meta "stats_base"      Dictionary stat -> value  (from their PersonajeData)
+//   meta "mods_temporales" Array of {stat, valor, turnos}  (turnos < 0 = until the end of the floor)
+// The usual metas ("fuerza", "defensa", "hp_max"...) keep the FINAL value (base + equipment +
+// temporary), so the rest of the game keeps reading them the same way.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -22,22 +22,23 @@ namespace inventario {
 
 using namespace godot;
 
-const float CAPACIDAD_SIN_MOCHILA = 3.0f; // lo que cabe en los bolsillos
+const float CAPACIDAD_SIN_MOCHILA = 3.0f; // What fits in the pockets
 const int NUM_RANURAS = 8;
 const char* const RANURAS[NUM_RANURAS] = { "mano_principal", "mano_secundaria", "cabeza", "cuerpo", "accesorio_1", "accesorio_2", "luz", "mochila" };
 const int NUM_STATS = 9;
 const char* const STATS[NUM_STATS] = { "hp_max", "velocidad", "fuerza", "defensa", "magia", "suerte", "radio_luz", "sanidad_max", "hambre_max" };
 
-// Mismo orden que los enums de efecto.gd y entrada_botin.gd
+// Same order as the enums in efecto.gd and entrada_botin.gd
 enum TipoEfecto { E_CURAR, E_DANAR, E_CORDURA, E_HAMBRE, E_PA, E_ORO, E_COMIDA, E_MODIFICAR_STAT, E_DAR_OBJETO };
 enum RecursoBotin { B_OBJETO, B_ORO, B_COMIDA };
 
 // ==========================================
-// CATÁLOGO Y DEFINICIONES
+// CATALOGUE AND DEFINITIONS
 // ==========================================
 
 inline Node* Catalogo(Node* ctx) { return ctx ? ctx->get_node_or_null("/root/Catalogo") : nullptr; }
 
+// The ObjetoData with this id (asked to the Catalogo autoload)
 inline Ref<Resource> Definicion(Node* ctx, const String& id) {
 	Node* cat = Catalogo(ctx);
 	if (!cat || id.is_empty()) return Ref<Resource>();
@@ -54,7 +55,7 @@ inline bool EsMochila(const Ref<Resource>& def) { return def.is_valid() && def->
 inline Dictionary Equipo(Node* h) { return h ? Dictionary(h->get_meta("equipo", Dictionary())) : Dictionary(); }
 inline Array Inventario(Node* h) { return h ? Array(h->get_meta("inventario", Array())) : Array(); }
 
-// ¿Lleva puesto el objeto con este id (en cualquier ranura)?
+// Is the item with this id equipped (in any slot)?
 inline bool Lleva(Node* h, const char* id) {
 	if (!h) return false;
 	Array valores = Equipo(h).values();
@@ -63,29 +64,31 @@ inline bool Lleva(Node* h, const char* id) {
 	return false;
 }
 
-// Escudo de cartón mojado: +5 de defensa el primer turno de combate, -1 por cada turno de combate
-// que pasa, y al deshacerse deja -1 (el peso del cartón empapado)
+// Wet cardboard shield: +5 defense on the first combat turn, -1 for every combat turn that goes by,
+// and when it falls apart it leaves -1 (the weight of soaked cardboard)
 inline int BonoCarton(Node* h) {
 	if (!Lleva(h, "escudo_carton")) return 0;
 	int t = h->get_meta("carton_turnos", 0);
 	return t <= 5 ? 5 - t : -1;
 }
 
+// What the hero has in that slot (null if empty)
 inline Ref<Resource> Equipado(Node* h, const String& ranura) {
 	Dictionary eq = Equipo(h);
 	return eq.has(ranura) ? Definicion(h, eq[ranura]) : Ref<Resource>();
 }
 
-// El arma de la mano principal (los enemigos no tienen equipo: devuelve nulo)
+// The main hand weapon (enemies have no equipment: returns null)
 inline Ref<Resource> Arma(Node* h) {
 	Ref<Resource> a = Equipado(h, "mano_principal");
 	return EsArma(a) ? a : Ref<Resource>();
 }
 
 // ==========================================
-// PESO
+// WEIGHT
 // ==========================================
 
+// Weight of everything in the backpack (equipped items don't count)
 inline float PesoInventario(Node* h) {
 	Array inv = Inventario(h);
 	float total = 0.0f;
@@ -96,15 +99,17 @@ inline float PesoInventario(Node* h) {
 	return total;
 }
 
+// How much weight fits: the backpack's capacity, or the pockets without one
 inline float Capacidad(Node* h) {
 	Ref<Resource> m = Equipado(h, "mochila");
 	return EsMochila(m) ? (float)(double)m->get("capacidad") : CAPACIDAD_SIN_MOCHILA;
 }
 
 // ==========================================
-// STATS FINALES
+// FINAL STATS
 // ==========================================
 
+// Base + equipment + temporary mods -> the final stats in the usual metas
 inline void RecalcularStats(Node* h) {
 	if (!h) return;
 	Dictionary base = h->get_meta("stats_base", Dictionary());
@@ -151,16 +156,16 @@ inline void RecalcularStats(Node* h) {
 		h->set_meta(s, std::max(minimo_uno ? 1 : 0, v));
 	}
 
-	// Derivados: los PA por día salen de la velocidad; lo actual no puede pasar del máximo
+	// Derived: PA per day come from speed; the current value can't go over the max
 	h->set_meta("pa_max", h->get_meta("velocidad"));
 	h->set_meta("hp_actual", std::min((int)h->get_meta("hp_actual", 0), (int)h->get_meta("hp_max")));
 	h->set_meta("sanidad_actual", std::min((int)h->get_meta("sanidad_actual", 0), (int)h->get_meta("sanidad_max")));
 	h->set_meta("hambre_actual", std::min((int)h->get_meta("hambre_actual", 0), (int)h->get_meta("hambre_max")));
 }
 
-// Un día menos para los efectos temporales; devuelve true si alguno se ha acabado
+// One day less for the temporary effects; returns true if any of them ended
 inline bool AvanzarDia(Node* h) {
-	// El cartón se empapa un poco más con cada turno de combate; el pollo vuelve a ser persona
+	// The cardboard soaks a bit more every combat turn; the chicken turns back into a person
 	bool cambio_extra = false;
 	if (Lleva(h, "escudo_carton") && h->has_meta("in_combat") && (bool)h->get_meta("in_combat")) {
 		h->set_meta("carton_turnos", (int)h->get_meta("carton_turnos", 0) + 1);
@@ -182,7 +187,7 @@ inline bool AvanzarDia(Node* h) {
 	return cambio;
 }
 
-// Al cambiar de piso se acaban los efectos "hasta el final del piso"
+// When changing floors the "until the end of the floor" effects end
 inline void FinDePiso(Node* h) {
 	Array temporales = h->get_meta("mods_temporales", Array());
 	Array quedan;
@@ -195,11 +200,11 @@ inline void FinDePiso(Node* h) {
 }
 
 // ==========================================
-// INVENTARIO
+// INVENTORY
 // ==========================================
 
-// Mete hasta 'cantidad' unidades (apilando si se puede). Sin 'forzar' respeta el peso.
-// Devuelve cuántas han entrado.
+// Puts in up to 'cantidad' units (stacking if possible). Without 'forzar' it respects the weight.
+// Returns how many got in.
 inline int AnadirInterno(Node* h, const String& id, int cantidad, bool forzar) {
 	Ref<Resource> d = Definicion(h, id);
 	if (!h || d.is_null() || cantidad <= 0) return 0;
@@ -242,6 +247,7 @@ inline int AnadirInterno(Node* h, const String& id, int cantidad, bool forzar) {
 
 inline int Anadir(Node* h, const String& id, int cantidad) { return AnadirInterno(h, id, cantidad, false); }
 
+// Removes 'cantidad' units from inventory entry 'indice' (the entry goes away at 0)
 inline bool Quitar(Node* h, int indice, int cantidad) {
 	Array inv = Inventario(h);
 	if (indice < 0 || indice >= inv.size() || cantidad <= 0) return false;
@@ -255,14 +261,16 @@ inline bool Quitar(Node* h, int indice, int cantidad) {
 }
 
 // ==========================================
-// EQUIPO
+// EQUIPMENT
 // ==========================================
 
+// Can this class wear it? (empty list = everyone)
 inline bool PuedeLlevar(Node* h, const Ref<Resource>& def) {
 	PackedStringArray clases = def->get("clases_permitidas");
 	return clases.is_empty() || clases.has(String(h->get_meta("clase", "")));
 }
 
+// Slot name for an EquipoData (its enum -> the "equipo" dictionary key)
 inline String RanuraPara(Node* h, const Ref<Resource>& def) {
 	switch ((int)def->get("ranura")) {
 		case 0: return "mano_principal";
@@ -282,8 +290,8 @@ inline String RanuraPara(Node* h, const Ref<Resource>& def) {
 
 inline bool DosManos(const Ref<Resource>& def) { return EsArma(def) && (bool)def->get("dos_manos"); }
 
-// Equipa el objeto 'indice' del inventario. Lo que estuviera en la ranura vuelve al inventario
-// (y un arma a dos manos desplaza también la mano secundaria). Devuelve "" o el motivo del fallo.
+// Equips item 'indice' from the inventory. Whatever was in the slot goes back to the inventory (and
+// a two-handed weapon also pushes out the off hand). Returns "" or the reason it failed.
 inline String Equipar(Node* h, int indice) {
 	Array inv = Inventario(h);
 	if (indice < 0 || indice >= inv.size()) return "No existe ese objeto";
@@ -299,7 +307,7 @@ inline String Equipar(Node* h, int indice) {
 	if (ranura == "mano_principal" && DosManos(def) && eq.has("mano_secundaria")) salen.push_back("mano_secundaria");
 	if (ranura == "mano_secundaria" && DosManos(Equipado(h, "mano_principal"))) salen.push_back("mano_principal");
 
-	// Simulamos el peso: sale una unidad del objeto y entra lo que se quita
+	// We simulate the weight: one unit of the item goes out and whatever is removed comes in
 	float peso = PesoInventario(h) - PesoDe(def);
 	for (int i = 0; i < salen.size(); i++) peso += PesoDe(Definicion(h, eq[salen[i]]));
 	float capacidad = ranura == "mochila" ? (float)(double)def->get("capacidad") : Capacidad(h);
@@ -315,6 +323,7 @@ inline String Equipar(Node* h, int indice) {
 	return "";
 }
 
+// Puts the item in that slot back into the backpack (if it fits). Returns "" or the reason it failed.
 inline String Desequipar(Node* h, const String& ranura) {
 	Dictionary eq = Equipo(h);
 	if (!eq.has(ranura)) return "No hay nada en esa ranura";
@@ -331,9 +340,10 @@ inline String Desequipar(Node* h, const String& ranura) {
 }
 
 // ==========================================
-// INICIALIZACIÓN DE UN HÉROE (desde su PersonajeData)
+// HERO INITIALISATION (from their PersonajeData)
 // ==========================================
 
+// First setup of a hero: base stats from their PersonajeData, empty bag, starting kit
 inline void Inicializar(Node* h, const Ref<Resource>& p) {
 	Dictionary base;
 	base["hp_max"] = p->get("vida_max");
@@ -369,17 +379,19 @@ inline void Inicializar(Node* h, const Ref<Resource>& p) {
 }
 
 // ==========================================
-// EFECTOS (consumibles, armas al golpear, eventos)
+// EFFECTS (consumables, weapons on hit, events)
 // ==========================================
 
 inline bool EsHeroe(Node* n) { return n && n->get_parent() && n->get_parent()->get_name() == StringName("PartyManager"); }
 
+// Adds 'delta' to an int meta, kept between 'minimo' and 'maximo'
 inline void SumarMeta(Node* n, const char* meta, int delta, int minimo, int maximo) {
 	int v = (int)n->get_meta(meta, 0) + delta;
 	n->set_meta(meta, std::clamp(v, minimo, maximo));
 }
 
-// Aplica un Efecto al objetivo. Devuelve un texto corto para mostrar ("+25 PV"), o "" si no pasó nada.
+// Applies an Efecto to the target. Returns a short text to show ("+25 PV"), or "" if nothing
+// happened.
 inline String AplicarEfecto(const Ref<Resource>& ef, Node* objetivo) {
 	if (ef.is_null() || !objetivo) return "";
 	int prob = ef->get("probabilidad");
@@ -433,6 +445,7 @@ inline String AplicarEfecto(const Ref<Resource>& ef, Node* objetivo) {
 	return "";
 }
 
+// Applies a list of effects and joins their texts ("+20 PV, -10 oro")
 inline String AplicarEfectos(const Array& efectos, Node* objetivo) {
 	String texto;
 	for (int i = 0; i < efectos.size(); i++) {
@@ -443,8 +456,8 @@ inline String AplicarEfectos(const Array& efectos, Node* objetivo) {
 	return texto;
 }
 
-// Usa el objeto 'indice' del inventario: aplica sus efectos al héroe y gasta un uso
-// (al acabarse los usos se va una unidad). Devuelve "" o el motivo del fallo.
+// Uses item 'indice' from the inventory: applies its effects to the hero and spends one use (when
+// uses run out one unit goes away). Returns "" or the reason it failed.
 inline String Usar(Node* h, int indice, String& resultado) {
 	Array inv = Inventario(h);
 	if (indice < 0 || indice >= inv.size()) return "No existe ese objeto";
@@ -461,7 +474,7 @@ inline String Usar(Node* h, int indice, String& resultado) {
 		if (usos <= 0) {
 			Quitar(h, indice, 1);
 			inv = Inventario(h);
-			// Si quedan más unidades en la pila, la siguiente empieza con todos sus usos
+			// If there are more units in the stack, the next one starts with all its uses
 			if (indice < inv.size()) {
 				Dictionary siguiente = inv[indice];
 				if (String(siguiente["id"]) == IdDe(def)) siguiente["usos"] = usos_max;
@@ -476,11 +489,11 @@ inline String Usar(Node* h, int indice, String& resultado) {
 }
 
 // ==========================================
-// BOTÍN
+// LOOT
 // ==========================================
 
-// Entrega al héroe lo que salió de una tabla de botín (oro, comida, objetos), con el icono
-// volando a su ficha. Devuelve lo que no ha cabido (mismo formato que la entrada).
+// Gives the hero whatever came out of a loot table (gold, food, items), with the icon flying to
+// their card. Returns what didn't fit (same format as the input).
 inline Array EntregarBotin(Node* h, const Array& botin, Vector3 pos_mundo) {
 	Array restos;
 	if (!h) return botin;
@@ -515,7 +528,7 @@ inline Array EntregarBotin(Node* h, const Array& botin, Vector3 pos_mundo) {
 	return restos;
 }
 
-// Para la interfaz y los tests: el inventario con nombres, iconos y pesos
+// For the interface and the tests: the inventory with names, icons and weights
 inline Array DescribirInventario(Node* h) {
 	Array out;
 	Array inv = Inventario(h);

@@ -1,8 +1,8 @@
 class_name TextosObjetos
 extends RefCounted
 
-# Textos de los objetos para la interfaz (pantalla de inventario, panel F10): resumen en una
-# línea, ficha detallada y comparación con lo que el héroe lleva puesto en esa ranura.
+# Item texts for the interface (inventory screen, F10 panel): one-line summary, detailed card and
+# comparison with what the hero is wearing in that slot.
 
 const NOMBRE_STAT := {
 	"hp_max": "vida máx", "velocidad": "PA", "fuerza": "fuerza", "defensa": "defensa", "magia": "magia",
@@ -17,9 +17,11 @@ const VERDE := "7fe08a"
 const ROJO := "ff7a6e"
 const GRIS := "a6b0d8"
 
+# Readable stat name ("fuerza" -> "Fuerza")
 static func nombre_stat(s: String) -> String:
 	return NOMBRE_STAT.get(s, s)
 
+# "+2 Fuerza", "+10% Defensa"...
 static func describir_mod(m: ModificadorStat) -> String:
 	var partes: PackedStringArray = []
 	if m.plano != 0:
@@ -28,7 +30,7 @@ static func describir_mod(m: ModificadorStat) -> String:
 		partes.append("%+d%%" % m.porcentaje)
 	return "%s %s" % [" ".join(partes), nombre_stat(m.stat)]
 
-# Una línea: "Espada corta [daño 4, 2 PA, alcance 1]"
+# One line: "Espada corta [daño 4, 2 PA, alcance 1]"
 static func resumen(o: ObjetoData) -> String:
 	if o == null:
 		return "—"
@@ -46,10 +48,11 @@ static func resumen(o: ObjetoData) -> String:
 			extra.append(e.describir())
 	return o.nombre_completo() + ("  [" + ", ".join(extra) + "]" if not extra.is_empty() else "")
 
+# Weapon reach as text ("1" or "2-4")
 static func _alcance(a: ArmaData) -> String:
 	return str(a.alcance_min) if a.alcance_min == a.alcance_max else "%d-%d" % [a.alcance_min, a.alcance_max]
 
-# Ficha completa en BBCode (descripción, stats, efectos, peso)
+# Full card in BBCode (description, stats, effects, weight)
 static func detalle(o: ObjetoData) -> String:
 	if o == null:
 		return ""
@@ -81,7 +84,7 @@ static func detalle(o: ObjetoData) -> String:
 	t += "[color=#%s]%.1f kg · %d oro[/color]" % [GRIS, o.peso, o.valor]
 	return t
 
-# Bonos totales de una pieza de equipo: {stat: valor plano} (+ daño/alcance si es arma)
+# Total bonuses of an equipment piece: {stat: flat value} (+ damage/reach if it's a weapon)
 static func _bonos(o) -> Dictionary:
 	var b := {}
 	if o is EquipoData:
@@ -96,12 +99,12 @@ static func _bonos(o) -> Dictionary:
 	if o is ArmaData:
 		b["daño"] = o.dano
 		b["alcance"] = o.alcance_max
-		b["coste PA"] = -o.coste_pa # menos coste = mejor
+		b["coste PA"] = -o.coste_pa # Less cost = better
 	if o is MochilaData:
 		b["kg"] = int(o.capacidad)
 	return b
 
-# Comparación con lo equipado en la misma ranura, en BBCode ("" si no es equipo)
+# Comparison with what's equipped in the same slot, in BBCode ("" if it isn't equipment)
 static func comparar(o: ObjetoData, equipado: ObjetoData) -> String:
 	if not (o is EquipoData):
 		return ""
@@ -124,7 +127,7 @@ static func comparar(o: ObjetoData, equipado: ObjetoData) -> String:
 		return "[color=#%s]Igual que %s[/color]" % [GRIS, equipado.nombre_completo()]
 	return "Frente a %s: %s" % [equipado.nombre_completo(), ", ".join(partes)]
 
-# La misma comparación sin colores (para tooltips)
+# The same comparison without colours (for tooltips)
 static func comparar_plano(o: ObjetoData, equipado: ObjetoData) -> String:
 	var re := RegEx.create_from_string("\\[/?[a-z]+(=[^\\]]*)?\\]")
 	return re.sub(comparar(o, equipado), "", true)

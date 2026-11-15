@@ -1,21 +1,21 @@
 extends SceneTree
-# Genera las texturas del HUD "grimorio" en Assets/UI/Grimorio. Estilo LIMPIO y OSCURO:
-#   - CUERO de las tapas del grimorio (marcos y placas): marrón muy oscuro, tono suave, canto
-#     oscuro, un brillo fino arriba y un filete dorado por dentro.
-#   - CARTAS de pergamino en tono vela (ocre apagado, más oscuras hacia el borde).
-#   - Pergamino oscuro (fichas de ayuda) y el SELLO de lacre.
-# Las piezas que flotan sueltas llevan su sombra suave dentro de la textura (SOMBRA px alrededor).
+# Generates the "grimoire" HUD textures in Assets/UI/Grimorio. CLEAN and DARK style:
+#   - LEATHER of the grimoire covers (frames and plates): very dark brown, soft tone, dark
+#     edge, a thin highlight on top and a golden trim inside.
+#   - Parchment CARDS in a candle tone (muted ochre, darker towards the edge).
+#   - Dark parchment (help cards) and the wax SEAL.
+# The pieces that float loose carry their soft shadow inside the texture (SOMBRA px around).
 #   godot --headless --path . -s res://Tools/generar_ui_grimorio.gd
 
 const DIR := "res://Assets/UI/Grimorio/"
-const SOMBRA := 4 # px de sombra alrededor (el HUD lo tiene en cuenta: Hud.SOMBRA)
+const SOMBRA := 4 # px of shadow around (the HUD takes it into account: Hud.SOMBRA)
 
 func _initialize():
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(DIR))
-	# Cuero
+	# Leather
 	_guardar(con_sombra(cuero(120, 90, 7, 5.0, 3)), "cuero")
 	_guardar(con_sombra(cuero(170, 50, 6, 4.0, 5)), "cuero_tira")
-	# Cartas en tono vela: normal, encima (tinta violeta, más luz), apagada, roja (enemigos)
+	# Candle tone cards: normal, hovered (violet ink, more light), dimmed, red (enemies)
 	var carta := {
 		"base": Color(0.78, 0.67, 0.48), "tostado": Color(0.36, 0.24, 0.13), "canto": Color(0.16, 0.10, 0.06),
 		"tinta": Color(0.24, 0.14, 0.08, 0.75), "tinta_en": 3.5, "tostado_ancho": 9.0, "irregular": 0.8,
@@ -24,17 +24,17 @@ func _initialize():
 	_guardar(con_sombra(pergamino(42, 54, carta.merged({"base": Color(0.90, 0.81, 0.62), "tinta": Color(0.45, 0.25, 0.78, 0.95)}), 51)), "carta_hover")
 	_guardar(con_sombra(pergamino(42, 54, carta.merged({"base": Color(0.46, 0.40, 0.32), "tostado": Color(0.24, 0.19, 0.14), "tinta": Color(0.20, 0.16, 0.12, 0.4)}), 51)), "carta_off")
 	_guardar(con_sombra(pergamino(42, 54, carta.merged({"tinta": Color(0.55, 0.10, 0.08, 0.85)}), 51)), "carta_roja")
-	# Fichas de ayuda: pergamino oscuro
+	# Help cards: dark parchment
 	var oscuro := {
 		"base": Color(0.20, 0.14, 0.10), "tostado": Color(0.12, 0.08, 0.05), "canto": Color(0.06, 0.04, 0.03),
 		"tinta": Color(0.78, 0.62, 0.36, 0.45), "tinta_en": 7.0, "tostado_ancho": 10.0, "irregular": 1.6,
 	}
 	_guardar(pergamino(180, 120, oscuro, 37), "pergamino_oscuro")
-	# Sello de lacre
+	# Wax seal
 	_guardar(con_sombra(sello(64, Color(0.60, 0.11, 0.09))), "sello")
 	_guardar(con_sombra(sello(64, Color(0.72, 0.16, 0.12))), "sello_hover")
 	_guardar(con_sombra(sello(64, Color(0.36, 0.27, 0.23))), "sello_off")
-	# Las cajas comunes (Estilo.caja: ventanas, botones, huecos de las pantallas) en cuero
+	# The common boxes (Estilo.caja: windows, buttons, screen slots) in leather
 	var oro := Color(0.72, 0.55, 0.27)
 	_guardar(cuero_v(160, 120, 8, 6.0, {}), "estilo_panel")
 	_guardar(cuero_v(160, 120, 8, 6.0, {"filete": Color(0.95, 0.78, 0.40), "grosor": 1.3}), "estilo_panel_oro")
@@ -62,14 +62,14 @@ func _ruido(semilla: int, freq: float, octavas: int = 2) -> FastNoiseLite:
 	n.fractal_octaves = octavas
 	return n
 
-# Distancia (positiva dentro) al borde de un rectángulo de esquinas redondas
+# Distance (positive inside) to the edge of a rounded rectangle
 func _dentro_redondeado(p: Vector2, w: int, h: int, r: float) -> float:
 	var media := Vector2(w, h) * 0.5
 	var q := (p - media).abs() - (media - Vector2(r, r))
 	var fuera := Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0) - r
 	return -fuera
 
-# Cuero: tono suave, canto oscuro, brillo fino arriba y filete dorado a 'filete' px del borde
+# Leather: soft tone, dark edge, thin highlight on top and a golden trim 'filete' px from the edge
 func cuero(w: int, h: int, radio: float, filete: float, semilla: int) -> Image:
 	var tono := _ruido(semilla, 0.02)
 	var poro := _ruido(semilla + 1, 0.45, 1)
@@ -83,17 +83,17 @@ func cuero(w: int, h: int, radio: float, filete: float, semilla: int) -> Image:
 				img.set_pixel(x, y, Color(0, 0, 0, 0))
 				continue
 			var col := base.darkened(clampf(tono.get_noise_2d(x, y) * 0.12, -0.08, 0.12))
-			col = col.darkened(clampf(poro.get_noise_2d(x, y) * 0.05, 0.0, 0.05)) # poro muy leve
-			col = col.lerp(Color(0.06, 0.035, 0.025), clampf(1.0 - (d - 0.5) / 2.0, 0.0, 1.0))  # canto
+			col = col.darkened(clampf(poro.get_noise_2d(x, y) * 0.05, 0.0, 0.05)) # Very faint pores
+			col = col.lerp(Color(0.06, 0.035, 0.025), clampf(1.0 - (d - 0.5) / 2.0, 0.0, 1.0))  # Edge
 			if y < h * 0.5:
-				col = col.lerp(Color(0.32, 0.22, 0.15), clampf(1.0 - absf(d - 2.2) / 0.8, 0.0, 1.0) * 0.5) # brillo
-			col = col.lerp(Color(0.72, 0.55, 0.27), clampf(1.0 - absf(d - filete) / 0.75, 0.0, 1.0) * 0.8) # filete
+				col = col.lerp(Color(0.32, 0.22, 0.15), clampf(1.0 - absf(d - 2.2) / 0.8, 0.0, 1.0) * 0.5) # Highlight
+			col = col.lerp(Color(0.72, 0.55, 0.27), clampf(1.0 - absf(d - filete) / 0.75, 0.0, 1.0) * 0.8) # Trim
 			col.a = alfa
 			img.set_pixel(x, y, col)
 	return img
 
-# Cuero con opciones: base, filete (color), grosor del filete, brillo arriba, hundido (hueco: sombra
-# interior arriba en vez de brillo)
+# Leather with options: base, trim (colour), trim thickness, top highlight, sunken (slot: inner
+# shadow on top instead of highlight)
 func cuero_v(w: int, h: int, radio: float, filete: float, o: Dictionary) -> Image:
 	var tono := _ruido(9, 0.02)
 	var base: Color = o.get("base", Color(0.17, 0.11, 0.08))
@@ -111,7 +111,7 @@ func cuero_v(w: int, h: int, radio: float, filete: float, o: Dictionary) -> Imag
 				continue
 			var col := base.darkened(clampf(tono.get_noise_2d(x, y) * 0.1, -0.06, 0.1))
 			if hundido:
-				col = col.darkened(clampf(1.0 - (y - 1.0) / 6.0, 0.0, 1.0) * 0.5) # sombra interior arriba
+				col = col.darkened(clampf(1.0 - (y - 1.0) / 6.0, 0.0, 1.0) * 0.5) # Inner shadow on top
 			else:
 				col = col.lerp(Color(0.05, 0.03, 0.02), clampf(1.0 - (d - 0.5) / 2.0, 0.0, 1.0))
 				if brillo and y < h * 0.5:
@@ -175,7 +175,7 @@ func sello(w: int, rojo: Color) -> Image:
 			img.set_pixel(x, y, col)
 	return img
 
-# Añade SOMBRA px de sombra suave alrededor (un poco hacia abajo)
+# Adds SOMBRA px of soft shadow around (slightly downwards)
 func con_sombra(src: Image) -> Image:
 	var w := src.get_width() + SOMBRA * 2
 	var h := src.get_height() + SOMBRA * 2

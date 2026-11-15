@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-# Añade el panel "Base de datos" a la parte de abajo del editor.
+# Adds the "Base de datos" panel to the bottom of the editor.
 
 const PanelBaseDatos := preload("res://addons/base_datos/panel_base_datos.gd")
 

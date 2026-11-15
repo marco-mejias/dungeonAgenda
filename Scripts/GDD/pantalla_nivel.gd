@@ -1,9 +1,9 @@
 extends CanvasLayer
 
-# ¡Subida de nivel! Lo que ha ganado el héroe y el draft: 1 de 3 habilidades (Progreso.opciones_draft).
-# Si las ranuras están llenas se elige cuál olvidar (o no aprender nada). Una pasiva que ya tiene se apila.
-# Se abre sola cuando hay subidas pendientes (Progreso.pendientes) y el tablero está libre.
-# Teclas 1-3 eligen carta.
+# Level up! What the hero gained and the draft: 1 of 3 abilities (Progreso.opciones_draft). If the
+# slots are full you pick which one to forget (or learn nothing). A passive they already have
+# stacks. It opens on its own when there are pending level ups (Progreso.pendientes) and the board
+# is free. Keys 1-3 pick a card.
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const NOMBRE_STAT := {"hp_max": "Vida", "fuerza": "Fuerza", "defensa": "Defensa", "magia": "Magia", "suerte": "Suerte", "velocidad": "Velocidad"}
@@ -17,7 +17,7 @@ var cartas: HBoxContainer
 var pie: Label
 var heroe: Node = null
 var opciones: Array = []
-var eligiendo := "" # id elegido esperando a que se elija qué olvidar
+var eligiendo := "" # Chosen id waiting for the pick of what to forget
 
 func _ready() -> void:
 	name = "PantallaNivel"
@@ -67,11 +67,13 @@ func _process(_delta: float) -> void:
 		return
 	_abrir(Progreso.pendientes.pop_front())
 
+# Keeps the panel centred on screen
 func _centrar() -> void:
 	panel.size = panel.get_combined_minimum_size()
 	var pantalla := get_viewport().get_visible_rect().size
 	panel.position = (pantalla - panel.size) * 0.5
 
+# Opens the draft for a pending level up: what was gained and 3 ability cards
 func _abrir(p: Dictionary) -> void:
 	var pm := get_node_or_null("/root/Main/PartyManager")
 	heroe = pm.get_node_or_null(NodePath(p["heroe"])) if pm else null
@@ -88,9 +90,10 @@ func _abrir(p: Dictionary) -> void:
 	visible = true
 	var dm := _dm()
 	if dm:
-		dm.set_meta("bloqueo_evento", true) # nada se mueve mientras se elige
+		dm.set_meta("bloqueo_evento", true) # Nothing moves while choosing
 	_centrar()
 
+# One card per draft option
 func _pintar_cartas() -> void:
 	for c in cartas.get_children():
 		c.queue_free()
@@ -103,6 +106,7 @@ func _pintar_cartas() -> void:
 	for i in opciones.size():
 		cartas.add_child(_carta(opciones[i], i))
 
+# An ability card: icon, name, class tag, numbers and description
 func _carta(d: HabilidadData, i: int) -> Button:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_NONE
@@ -157,6 +161,7 @@ func _carta(d: HabilidadData, i: int) -> Button:
 			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return b
 
+# Plain text button (skip, forget...)
 func _boton_texto(t: String, f: Callable) -> Button:
 	var b := Button.new()
 	b.text = t
@@ -165,7 +170,7 @@ func _boton_texto(t: String, f: Callable) -> Button:
 	b.pressed.connect(f)
 	return b
 
-## Elige la carta i (también para los tests)
+## Picks card i (for the tests too)
 func elegir(i: int) -> void:
 	if not visible or eligiendo != "" or i < 0 or i >= opciones.size():
 		return
@@ -180,7 +185,7 @@ func elegir(i: int) -> void:
 	Progreso.aprender(heroe, id)
 	_cerrar()
 
-# Ranuras llenas: ¿cuál olvida?
+# Slots full: which one do they forget?
 func _pintar_olvidar() -> void:
 	for c in cartas.get_children():
 		c.queue_free()
@@ -195,12 +200,14 @@ func _pintar_olvidar() -> void:
 			v.add_child(_boton_texto("Olvidar %s" % d.nombre, olvidar.bind(str(e["id"]))))
 	v.add_child(_boton_texto("No aprender nada", func(): _cerrar()))
 
+# Slots were full: learn the chosen ability forgetting 'id_viejo'
 func olvidar(id_viejo: String) -> void:
 	if eligiendo == "":
 		return
 	Progreso.aprender(heroe, eligiendo, id_viejo)
 	_cerrar()
 
+# Closes and frees the board again
 func _cerrar() -> void:
 	visible = false
 	eligiendo = ""

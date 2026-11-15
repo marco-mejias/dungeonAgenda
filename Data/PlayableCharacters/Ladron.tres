@@ -12,7 +12,7 @@
 [resource]
 script = ExtResource("1_tqqmb")
 nombre_display = "Nathan Snake"
-retrato_path = "uid://dgcawfionqxmg"
+retrato_path = ""
 vida_max = 75
 velocidad = 8
 fuerza = 6

@@ -1,16 +1,16 @@
 extends CanvasLayer
 
-# DadoCombate (autoload): el d20 de cada ataque (héroes y enemigos). Un dado pequeño sobre la
-# cabeza de quien ataca que solo enseña el número y, si toca, CRÍTICO o FALLO. Sin cuentas.
-#   tirar(d20, acierta, sello, _detalle, ficha)  -> el que ataca espera `espera` segundos y lanza el golpe
-# 'ficha' es el Node3D de quien tira; sin ella se pone sobre el héroe activo.
+# DadoCombate (autoload): the d20 of every attack (heroes and enemies). A small die over the
+# attacker's head that only shows the number and, when it applies, CRITICAL or MISS. No maths.
+#   tirar(d20, acierta, sello, _detalle, ficha)  -> the attacker waits `espera` seconds and hits
+# 'ficha' is the Node3D of whoever rolls; without it, it goes over the active hero.
 
 const DADO := preload("res://Scripts/GDD/dado3d.gd")
-const GIRO := 0.6            # lo que gira el dado antes de pararse
-const LECTURA := 0.35        # tiempo para leer el resultado antes del golpe
-const TAM := 92.0            # px del dado
-const ALTURA := 1.15         # sobre los pies de la ficha (unidades de mundo)
-var espera := GIRO + LECTURA # lo lee el CombatManager
+const GIRO := 0.6            # How long the die spins before stopping
+const LECTURA := 0.35        # Time to read the result before the hit
+const TAM := 92.0            # Die size in px
+const ALTURA := 1.15         # Above the token's feet (world units)
+var espera := GIRO + LECTURA # The CombatManager reads it
 
 var caja: Control
 var dado: Control
@@ -29,13 +29,13 @@ func _ready() -> void:
 	dado.size = Vector2(TAM, TAM)
 	dado.solo_sellos_especiales = true
 	caja.add_child(dado)
-	# Más pequeño que el de los eventos: número y sello a escala, el sello debajo del dado
+	# Smaller than the event one: number and stamp scaled down, the stamp under the die
 	dado.numero.add_theme_font_size_override("font_size", 30)
 	dado.numero.add_theme_constant_override("outline_size", 7)
 	dado.sello.add_theme_font_size_override("font_size", 16)
 	dado.sello.offset_top = 0
 	dado.sello.offset_bottom = 22
-	# ▲ VENTAJA / ▼ DESVENTAJA encima del dado (se tiraron dos y cuenta el mejor/peor)
+	# ▲ ADVANTAGE / ▼ DISADVANTAGE above the die (two were rolled and the best/worst counts)
 	etiqueta_ventaja = Label.new()
 	etiqueta_ventaja.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	etiqueta_ventaja.position = Vector2(-30, -16)
@@ -47,6 +47,7 @@ func _ready() -> void:
 	caja.add_child(etiqueta_ventaja)
 	caja.visible = false
 
+# Shows the roll over 'quien' and writes it in the log. Returns how long to wait before the hit
 func tirar(d20: int, acierta: int, sello: String, _detalle: String = "", quien: Node3D = null, ventaja: int = 0) -> float:
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud:
@@ -67,13 +68,14 @@ func tirar(d20: int, acierta: int, sello: String, _detalle: String = "", quien: 
 func esta_visible() -> bool:
 	return caja.visible
 
+# Token of the active hero (where the die goes when nobody is given)
 func _ficha_activa() -> Node3D:
 	var pm := get_node_or_null("/root/Main/PartyManager")
 	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	var h = pm.call("GetActiveCharacter") if pm else null
 	return dm.get_node_or_null(NodePath(str(h.name))) as Node3D if dm and h else null
 
-# Sobre la cabeza de quien tira (la sigue si se mueve o si la cámara se recoloca)
+# Over the roller's head (it follows them if they move or the camera repositions)
 func _colocar() -> void:
 	var f = ficha.get_ref() if ficha else null
 	var cont: SubViewportContainer = get_node_or_null("/root/Main/ContenedorMapa")
@@ -85,7 +87,7 @@ func _colocar() -> void:
 	if cam.is_position_behind(punto):
 		return
 	var p: Vector2 = cont.global_position + cam.unproject_position(punto) * cont.stretch_shrink
-	# Siempre dentro de la pantalla
+	# Always inside the screen
 	var pantalla := get_viewport().get_visible_rect().size
 	caja.position = (p - Vector2(TAM * 0.5, TAM)).clamp(Vector2(4, 4), pantalla - caja.size - Vector2(4, 4))
 

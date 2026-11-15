@@ -1,22 +1,22 @@
 extends Node
 
-# Tactica (autoload): posicionamiento. Piezas reutilizables que usan las habilidades, las pasivas,
-# los eventos, el C++ y lo que venga:
+# Tactica (autoload): positioning. Reusable pieces used by abilities, passives, events, C++ and
+# whatever comes next:
 #
-#   GEOMETRÍA    unidades(), unidad_en(c), pos(n), dist(a,b), dir_hacia(a,b), nivel(c), solido(c),
+#   GEOMETRY     unidades(), unidad_en(c), pos(n), dist(a,b), dir_hacia(a,b), nivel(c), solido(c),
 #                es_heroe(n), hostiles_adyacentes(n), mundo(c), ficha(n)
-#   TIRADAS      modificadores(atacante, defensor) -> {ventaja, bono, razones}  (lo usa el d20 del C++)
-#                  ventaja: flanqueo, altura, derribado/aturdido · desventaja: desde abajo, cobertura
-#                  bono: ayuda de un aliado, estandarte cercano
-#                tras_atacar(atacante): gasta lo que dura "una tirada" (la ayuda)
-#   MOVER        colocar(n, c) · empujar(n, dir, casillas, fuente) · atraer(n, hacia, casillas, fuente)
+#   ROLLS        modificadores(atacante, defensor) -> {ventaja, bono, razones}  (used by the C++ d20)
+#                  advantage: flanking, height, knocked down/stunned · disadvantage: from below, cover
+#                  bonus: an ally's help, a nearby banner
+#                tras_atacar(atacante): spends whatever lasts "one roll" (the help)
+#   MOVE         colocar(n, c) · empujar(n, dir, casillas, fuente) · atraer(n, hacia, casillas, fuente)
 #                intercambiar(a, b) · danar(n, cantidad, fuente)
-#                Los choques se resuelven igual para todo: pared/columna (daño + aturdido),
-#                otra unidad (daño a las dos), caída de una sala alta (daño + derribado), peligros.
-#   PELIGROS     crear_peligro(c, tipo, dias, fuente) (fuego en el suelo...), al_entrar(n, c)
-#   CADA PASO    al_mover(n, desde, hasta): ataques de oportunidad, sangrado, peligros. Lo llaman el
-#                DungeonManager (héroes) y el EnemyManager (enemigos). true = que se pare.
-#   GUARDAESPALDAS protector_de(heroe): un aliado pegado con la etiqueta "guardaespaldas"
+#                Collisions are solved the same way for everything: wall/column (damage + stunned),
+#                another unit (damage to both), falling from a high room (damage + knocked down).
+#   HAZARDS      crear_peligro(c, tipo, dias, fuente) (fire on the floor...), al_entrar(n, c)
+#   EVERY STEP   al_mover(n, desde, hasta): attacks of opportunity, bleeding, hazards. Called by
+#                the DungeonManager (heroes) and the EnemyManager (enemies). true = it should stop.
+#   BODYGUARD    protector_de(heroe): an adjacent ally with the "guardaespaldas" tag
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
@@ -25,9 +25,9 @@ const ALTO := 2
 const DANO_PARED := 3
 const DANO_CHOQUE := 2
 const DANO_CAIDA := 3
-const T_EMPUJE := 0.16 # segundos por casilla empujada
+const T_EMPUJE := 0.16 # Seconds per pushed tile
 
-# Peligros del suelo: Vector2i -> {tipo, dias, fuente, nodo}
+# Floor hazards: Vector2i -> {tipo, dias, fuente, nodo}
 const PELIGROS := {
 	"fuego": {"estado": "ardiendo", "dias_estado": 2, "color": Color(1.0, 0.45, 0.12)},
 }
@@ -42,11 +42,12 @@ func _pm() -> Node:
 	return get_node_or_null(RUTA_PM)
 
 # ==========================================
-# GEOMETRÍA Y QUIÉN ESTÁ DÓNDE
+# GEOMETRY AND WHO IS WHERE
 # ==========================================
 func es_heroe(n: Node) -> bool:
 	return n != null and is_instance_valid(n) and not str(n.name).begins_with("Enemy_")
 
+# Alive and on the map (heroes) or alive (enemies)
 func vivo(n: Node) -> bool:
 	if n == null or not is_instance_valid(n):
 		return false
@@ -54,8 +55,8 @@ func vivo(n: Node) -> bool:
 		return not n.get_meta("esta_muerto", false) and not n.get_meta("ha_escapado", false) and n.has_meta("grid_pos")
 	return not str(n.name).ends_with("_muerto") and int(n.get_meta("hp_actual", 1)) > 0
 
-## Héroes en el mapa y enemigos vivos. Se calcula una vez por frame (lo piden muchos scripts):
-## los enemigos salen de la lista del DungeonManager, no recorriendo todos los nodos del mapa.
+## Heroes on the map and living enemies. Computed once per frame (lots of scripts ask for it):
+## enemies come from the DungeonManager list, not by walking every node on the map.
 var _cache_frame := -1
 var _cache: Array = []
 
@@ -75,22 +76,25 @@ func unidades() -> Array:
 				var e := dm.get_node_or_null("Enemy_%d_%d" % [p.x, p.y])
 				if e:
 					_cache.append(e)
-	# Alguien puede haber muerto o escapado en este mismo frame
+	# Someone may have died or escaped this very frame
 	var out := []
 	for u in _cache:
 		if vivo(u):
 			out.append(u)
 	return out
 
+# Grid tile of a unit
 func pos(n: Node) -> Vector2i:
 	return n.get_meta("grid_pos", Vector2i(-99, -99)) if n else Vector2i(-99, -99)
 
+# The unit standing on that tile (ignoring 'excepto'), or null
 func unidad_en(c: Vector2i, excepto: Node = null) -> Node:
 	for u in unidades():
 		if u != excepto and pos(u) == c:
 			return u
 	return null
 
+# The 3D token of a unit (enemies are their own token, heroes have one on the map)
 func ficha(n: Node) -> Node3D:
 	if n == null or not is_instance_valid(n):
 		return null
@@ -99,10 +103,11 @@ func ficha(n: Node) -> Node3D:
 	var dm := _dm()
 	return dm.get_node_or_null(NodePath(str(n.name))) as Node3D if dm else null
 
+# Manhattan distance in tiles
 func dist(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 
-## Dirección cardinal de a hacia b (por el eje más largo)
+## Cardinal direction from a to b (along the longest axis)
 func dir_hacia(a: Vector2i, b: Vector2i) -> Vector2i:
 	var d := b - a
 	if d == Vector2i.ZERO:
@@ -111,9 +116,11 @@ func dir_hacia(a: Vector2i, b: Vector2i) -> Vector2i:
 		return Vector2i(signi(d.x), 0)
 	return Vector2i(0, signi(d.y))
 
+# Grid size of the current floor
 func lado() -> int:
 	return int(Engine.get_meta("alturas_lado", 40))
 
+# Height level of a tile (0 low floor, 1 step, 2 high room)
 func nivel(c: Vector2i) -> int:
 	if not Engine.has_meta("alturas"):
 		return 0
@@ -124,22 +131,23 @@ func nivel(c: Vector2i) -> int:
 	var i := c.x * l + c.y
 	return int(a[i]) if i < a.size() else 0
 
+# World position of a tile's centre, at its floor height
 func mundo(c: Vector2i) -> Vector3:
 	return Vector3(c.x + 0.5, nivel(c) * 0.2, c.y + 0.5)
 
 # ==========================================
-# MAPA FIJO (sin llamar al C++ cada vez: cada llamada de GDScript al C++ cuesta ~0.8 ms)
+# FIXED MAP (without calling C++ every time: every GDScript -> C++ call costs ~0.8 ms)
 # ==========================================
-# Lo que no se mueve (muros, puertas, cofres, braseros, escalera) se pide una vez al C++
-# (ObtenerMapaFijo) y se vuelve a pedir solo cuando sube la meta "version_mapa" (piso nuevo,
-# puerta abierta). Bit 1 = no se pasa; bit 2 = tapa la vista.
+# Whatever doesn't move (walls, doors, chests, braziers, stairs) is asked from C++ once
+# (ObtenerMapaFijo) and asked again only when the meta "version_mapa" goes up (new floor, door
+# opened). Bit 1 = can't be crossed; bit 2 = blocks sight.
 var _fijo := PackedByteArray()
 var _version_fijo := -1
 var _dm_fijo: Node = null
 var _frame_fijo := -1
 
-# OJO: leer una meta del DungeonManager (nodo con script C++) también cuesta ~0.13 ms, así que la
-# versión se mira una sola vez por frame
+# CAREFUL: reading a meta from the DungeonManager (node with a C++ script) also costs ~0.13 ms, so
+# the version is checked only once per frame
 func mapa_fijo() -> PackedByteArray:
 	var frame := Engine.get_process_frames()
 	if frame == _frame_fijo and not _fijo.is_empty():
@@ -155,7 +163,7 @@ func mapa_fijo() -> PackedByteArray:
 		_dm_fijo = dm
 	return _fijo
 
-## Pared, columna, puerta cerrada, cofre, brasero, escalera o fuera del mapa (no cuenta a las unidades)
+## Wall, column, closed door, chest, brazier, stairs or off the map (units don't count)
 func solido(c: Vector2i) -> bool:
 	var l := lado()
 	if c.x < 0 or c.y < 0 or c.x >= l or c.y >= l:
@@ -165,12 +173,13 @@ func solido(c: Vector2i) -> bool:
 		return true
 	return (m[c.x * l + c.y] & 1) != 0
 
+# Bit 2 of the fixed map: blocks sight
 func _tapa_vista(x: int, y: int, m: PackedByteArray, l: int) -> bool:
 	return (m[x * l + y] & 2) != 0
 
-## Línea de visión entre dos casillas: la MISMA regla que el C++ (Mazmorra::CheckLineOfSight, Bresenham
-## con esquinas estrictas), pero sin llamarlo. La casilla de origen no tapa; la de destino se ve
-## aunque sea un muro
+## Line of sight between two tiles: the SAME rule as C++ (Mazmorra::CheckLineOfSight, Bresenham with
+## strict corners), but without calling it. The origin tile doesn't block; the destination is seen
+## even if it's a wall
 func linea_de_vision(a: Vector2i, b: Vector2i) -> bool:
 	var l := lado()
 	var m := mapa_fijo()
@@ -208,9 +217,11 @@ func linea_de_vision(a: Vector2i, b: Vector2i) -> bool:
 				return false
 	return true
 
+# 0 = heroes, 1 = enemies
 func bando(n: Node) -> int:
 	return 0 if es_heroe(n) else 1
 
+# Units of the other side right next to 'n'
 func hostiles_adyacentes(n: Node) -> Array:
 	var out := []
 	for u in unidades():
@@ -219,9 +230,9 @@ func hostiles_adyacentes(n: Node) -> Array:
 	return out
 
 # ==========================================
-# TIRADAS: ventaja, desventaja y bonos
+# ROLLS: advantage, disadvantage and bonuses
 # ==========================================
-## Lo usa el d20 (C++ Reglas::TiradaAtaque, la previsión y las habilidades). ventaja: -1, 0 o 1
+## Used by the d20 (C++ Reglas::TiradaAtaque, the preview and the abilities). ventaja: -1, 0 or 1
 func modificadores(a: Node, d: Node) -> Dictionary:
 	var razones := PackedStringArray()
 	var hay_v := false
@@ -232,7 +243,7 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 	var pa := pos(a)
 	var pd := pos(d)
 	var cuerpo := dist(pa, pd) <= 1
-	# Flanqueo: el defensor tiene pegados a dos o más del bando del atacante
+	# Flanking: the defender has two or more of the attacker's side right next to them
 	if cuerpo:
 		var cerca := 0
 		for u in unidades():
@@ -241,14 +252,14 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 		if cerca >= 2:
 			hay_v = true
 			razones.append("Flanqueo")
-	# Altura
+	# Height
 	if nivel(pa) >= ALTO and nivel(pd) < ALTO:
 		hay_v = true
 		razones.append("Altura")
 	elif nivel(pa) < ALTO and nivel(pd) >= ALTO:
 		hay_d = true
 		razones.append("Desde abajo")
-	# Cobertura: a distancia, una pared o columna pegada al defensor por el lado del atacante
+	# Cover: at range, a wall or column next to the defender on the attacker's side
 	if not cuerpo:
 		for dd in DIRS4:
 			var c: Vector2i = pd + dd
@@ -257,7 +268,7 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 				hay_d = true
 				razones.append("Cobertura")
 				break
-	# Estados
+	# States
 	if Estados.tiene(d, "derribado"):
 		if cuerpo:
 			hay_v = true
@@ -271,7 +282,8 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 	if Estados.tiene(d, "sorprendido"):
 		hay_v = true
 		razones.append("Sorprendido")
-	# Por la espalda (Sigilo.gd: hacia dónde mira): si no os había visto, PUÑALADA (crítico seguro)
+	# From behind (Sigilo.gd: where it's looking): if it hadn't seen you, BACKSTAB (guaranteed
+	# critical)
 	var critico := false
 	if Sigilo.por_la_espalda(a, d):
 		if Sigilo.desprevenido(d):
@@ -283,7 +295,7 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 	if Estados.tiene(a, "derribado"):
 		hay_d = true
 		razones.append("Desde el suelo")
-	# Bonos: ayuda de un aliado y estandartes cercanos
+	# Bonuses: an ally's help and nearby banners
 	if Estados.tiene(a, "ayudado"):
 		var p := Estados.potencia(a, "ayudado")
 		bono += p
@@ -297,14 +309,14 @@ func modificadores(a: Node, d: Node) -> Dictionary:
 	var v := (1 if hay_v else 0) - (1 if hay_d else 0)
 	return {"ventaja": v, "bono": bono, "razones": razones, "critico": critico}
 
-## Tras tirar un ataque: lo que dura una sola tirada se gasta
+## After rolling an attack: whatever lasts a single roll is spent
 func tras_atacar(a: Node) -> void:
 	Estados.quitar(a, "ayudado")
 
 # ==========================================
-# DAÑO UNIFICADO
+# UNIFIED DAMAGE
 # ==========================================
-## Daño a cualquiera: un héroe (PartyManager) o un enemigo (si muere, XP y botín para 'fuente')
+## Damage to anyone: a hero (PartyManager) or an enemy (if it dies, XP and loot for 'fuente')
 func danar(n: Node, cantidad: int, fuente: Node = null) -> void:
 	if not vivo(n) or cantidad <= 0:
 		return
@@ -316,10 +328,10 @@ func danar(n: Node, cantidad: int, fuente: Node = null) -> void:
 		Progreso.golpear_enemigo(fuente if fuente and es_heroe(fuente) else null, n, cantidad)
 
 # ==========================================
-# MOVER: colocar, empujar, atraer, intercambiar
+# MOVE: place, push, pull, swap
 # ==========================================
-## Pone a 'n' en la casilla c (sin comprobar si está libre: eso lo decide quien llama).
-## animar: segundos del desplazamiento (0 = de golpe)
+## Puts 'n' on tile c (without checking whether it's free: the caller decides that). animar: seconds
+## of the movement (0 = instantly)
 func colocar(n: Node, c: Vector2i, animar: float = 0.18) -> void:
 	if not vivo(n):
 		return
@@ -340,8 +352,8 @@ func colocar(n: Node, c: Vector2i, animar: float = 0.18) -> void:
 			f.position = mundo(c)
 	al_entrar(n, c)
 
-## Empuja 'n' en 'dir' hasta 'casillas'. Choques: pared (daño + aturdido), unidad (daño a las dos),
-## caída de una sala alta (daño + derribado). Devuelve cuántas casillas se ha movido.
+## Pushes 'n' along 'dir' up to 'casillas'. Collisions: wall (damage + stunned), unit (damage to
+## both), falling from a high room (damage + knocked down). Returns how many tiles it moved.
 func empujar(n: Node, dir: Vector2i, casillas: int, fuente: Node = null) -> int:
 	if not vivo(n) or dir == Vector2i.ZERO or casillas <= 0:
 		return 0
@@ -369,7 +381,7 @@ func empujar(n: Node, dir: Vector2i, casillas: int, fuente: Node = null) -> int:
 			break
 	if movidas > 0:
 		colocar(n, actual, T_EMPUJE * movidas)
-	# Efectos del final del empujón
+	# Effects at the end of the push
 	match choque:
 		"pared":
 			_texto(n, "¡Pum!", Color(1, 0.8, 0.5))
@@ -388,20 +400,20 @@ func empujar(n: Node, dir: Vector2i, casillas: int, fuente: Node = null) -> int:
 		feel.sacudir(0.25)
 	return movidas
 
-## Trae 'n' hacia 'hacia' (se para pegado a él)
+## Pulls 'n' towards 'hacia' (stops right next to it)
 func atraer(n: Node, hacia: Node, casillas: int, fuente: Node = null) -> int:
 	if not vivo(n) or not vivo(hacia):
 		return 0
 	var d := dist(pos(n), pos(hacia))
 	return empujar(n, dir_hacia(pos(n), pos(hacia)), mini(casillas, d - 1), fuente)
 
-## Cambia de sitio a dos unidades (héroe-héroe, héroe-enemigo...)
+## Swaps two units (hero-hero, hero-enemy...)
 func intercambiar(a: Node, b: Node) -> void:
 	if not vivo(a) or not vivo(b):
 		return
 	var pa := pos(a)
 	var pb := pos(b)
-	# Los enemigos mueven su marca en el mapa: primero el que no pisa a nadie
+	# Enemies move their mark on the map: first the one that doesn't step on anyone
 	if not es_heroe(b):
 		colocar(b, pa)
 		colocar(a, pb)
@@ -410,7 +422,7 @@ func intercambiar(a: Node, b: Node) -> void:
 		colocar(b, pa)
 
 # ==========================================
-# PELIGROS DEL SUELO
+# FLOOR HAZARDS
 # ==========================================
 func crear_peligro(c: Vector2i, tipo: String, dias: int, fuente: Node = null) -> void:
 	if not PELIGROS.has(tipo) or solido(c):
@@ -437,9 +449,11 @@ func crear_peligro(c: Vector2i, tipo: String, dias: int, fuente: Node = null) ->
 	if u:
 		al_entrar(u, c)
 
+# Hazard type on that tile ("" if none)
 func peligro_en(c: Vector2i) -> String:
 	return str(peligros[c]["tipo"]) if peligros.has(c) else ""
 
+# Someone steps into a hazard: it hurts (and may apply a state)
 func al_entrar(n: Node, c: Vector2i) -> void:
 	if not peligros.has(c) or not vivo(n):
 		return
@@ -449,6 +463,7 @@ func al_entrar(n: Node, c: Vector2i) -> void:
 	var fuente: Node = pm.get_node_or_null(NodePath(str(p["fuente"]))) if pm and str(p["fuente"]) != "" else null
 	Estados.aplicar(n, def["estado"], def["dias_estado"], 1, fuente)
 
+# New floor: the old hazards go away
 func _limpiar_peligros() -> void:
 	for c in peligros:
 		if is_instance_valid(peligros[c]["nodo"]):
@@ -471,7 +486,7 @@ func _process(_delta: float) -> void:
 		dia_visto = dia
 	elif dia != dia_visto:
 		dia_visto = dia
-		# Quien amanece encima se quema otra vez; el fuego se va apagando
+		# Whoever wakes up on top burns again; the fire slowly dies out
 		for c in peligros.keys():
 			var u := unidad_en(c)
 			if u:
@@ -481,7 +496,7 @@ func _process(_delta: float) -> void:
 				if is_instance_valid(peligros[c]["nodo"]):
 					peligros[c]["nodo"].queue_free()
 				peligros.erase(c)
-	# El fuego parpadea
+	# The fire flickers
 	var t := Time.get_ticks_msec() / 1000.0
 	for c in peligros:
 		var m: MeshInstance3D = peligros[c]["nodo"]
@@ -489,21 +504,21 @@ func _process(_delta: float) -> void:
 			(m.material_override as StandardMaterial3D).albedo_color.a = 0.42 + 0.16 * sin(t * 7.0 + c.x * 1.3 + c.y)
 
 # ==========================================
-# CADA PASO: ataques de oportunidad, sangrado y peligros
+# EVERY STEP: attacks of opportunity, bleeding and hazards
 # ==========================================
-## n se mueve de 'desde' a 'hasta' (una casilla). true = debe pararse (ha caído o está aturdido)
+## n moves from 'desde' to 'hasta' (one tile). true = it must stop (it fell or it's stunned)
 func al_mover(n: Node, desde: Vector2i, hasta: Vector2i) -> bool:
 	if not vivo(n):
 		return true
 	if es_heroe(n):
-		Modo.contar_paso(n) # explorando, el tiempo pasa andando
-		Modo.paso_lider(n, desde, hasta) # explorando, la fila india avanza un paso tras él
-		if Sigilo.paso_oculto(n): # oculto, cada casilla cuesta un PA más
+		Modo.contar_paso(n) # Exploring: time passes by walking
+		Modo.paso_lider(n, desde, hasta) # Exploring: the single file moves one step behind them
+		if Sigilo.paso_oculto(n): # Hidden: every tile costs one more PA
 			return true
 	var dm := _dm()
 	var combate := dm.get_node_or_null("CombatManager") if dm else null
-	# Ataques de oportunidad: cada enemigo (despierto) que deja de tenerlo pegado, un golpe gratis
-	# (uno por día y atacante). La Retirada o la etiqueta "escurridizo" los evitan.
+	# Attacks of opportunity: every (awake) enemy that stops having them next to it gets a free hit
+	# (one per day and attacker). Retreat or the "escurridizo" tag avoid them.
 	if combate and not Estados.tiene(n, "desenganchado") and not Progreso.tiene_etiqueta(n, "escurridizo"):
 		var dia := int(_pm().get_meta("turno_actual", 1)) if _pm() else 0
 		for u in unidades():
@@ -518,7 +533,7 @@ func al_mover(n: Node, desde: Vector2i, hasta: Vector2i) -> bool:
 			combate.call("AtaqueLibre", u, n, 1)
 			if not vivo(n):
 				return true
-	# Sangrado: cada casilla duele
+	# Bleeding: every tile hurts
 	var sangre := Estados.dano_por_paso(n)
 	if sangre > 0:
 		danar(n, sangre)
@@ -526,9 +541,9 @@ func al_mover(n: Node, desde: Vector2i, hasta: Vector2i) -> bool:
 	return not vivo(n) or Estados.tiene(n, "aturdido")
 
 # ==========================================
-# GUARDAESPALDAS
+# BODYGUARD
 # ==========================================
-## Un aliado pegado al héroe con la etiqueta "guardaespaldas" recibe el golpe por él
+## An ally next to the hero with the "guardaespaldas" tag takes the hit for them
 func protector_de(h: Node) -> Node:
 	if not es_heroe(h):
 		return null
@@ -538,6 +553,7 @@ func protector_de(h: Node) -> Node:
 			return u
 	return null
 
+# Floating text over a unit
 func _texto(n: Node, t: String, color: Color) -> void:
 	var f := ficha(n)
 	var esp := get_node_or_null("/root/Especiales")

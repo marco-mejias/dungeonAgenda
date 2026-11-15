@@ -1,20 +1,21 @@
 extends Node
 
-# Estados (autoload): estados alterados de héroes y enemigos. Una sola API para todo el juego:
-#   Estados.aplicar(nodo, "ardiendo", dias, potencia, fuente)   Estados.quitar(nodo, "ardiendo")
-#   Estados.tiene(nodo, "aturdido")   Estados.potencia(nodo, "sangrando")   Estados.de(nodo)
-# Los guardan las metas del propio nodo: "estados" = {nombre: {dias, potencia, fuente}}
-# (héroes: su nodo del PartyManager; enemigos: su ficha). El C++ también lee esa meta.
+# Estados (autoload): status effects of heroes and enemies. One API for the whole game:
+#   Estados.aplicar(nodo, "ardiendo", dias, potencia, fuente)
+#   Estados.quitar(nodo, "ardiendo")   Estados.tiene(nodo, "aturdido")
+#   Estados.potencia(nodo, "sangrando")   Estados.de(nodo)
+# They live in the node's own metas: "estados" = {nombre: {dias, potencia, fuente}} (heroes: their
+# PartyManager node; enemies: their token). The C++ reads that meta too.
 #
-# Cada día (al empezar) hacen su efecto y se gastan: "dias" = cuántos inicios de día aguantan.
-# Los iconos se dibujan sobre la cabeza de cada personaje (placeholders en Assets/UI/Estados).
+# Every day (at the start) they apply their effect and wear off: "dias" = how many day starts they
+# last. The icons are drawn over each character's head (placeholders in Assets/UI/Estados).
 
 const CARPETA_ICONOS := "res://Assets/UI/Estados/"
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
 
-# nombre -> definición. dano_dia: daño al empezar el día; dano_paso: daño por casilla que anda;
-# pierde_dia: no actúa (héroe: se queda sin PA ese día; enemigo: se salta su turno)
+# name -> definition. dano_dia: damage at the start of the day; dano_paso: damage per tile walked;
+# pierde_dia: doesn't act (hero: no PA that day; enemy: skips its turn)
 const DEF := {
 	"ardiendo": {"nombre": "Ardiendo", "color": Color(1.0, 0.55, 0.2), "dano_dia": 3, "texto": "3 de daño cada día"},
 	"envenenado": {"nombre": "Envenenado", "color": Color(0.55, 0.9, 0.35), "dano_dia": 2, "texto": "2 de daño cada día"},
@@ -41,25 +42,30 @@ func _pm() -> Node:
 func de(n: Node) -> Dictionary:
 	return n.get_meta("estados", {}) if n and is_instance_valid(n) else {}
 
+# Does the node have that state right now?
 func tiene(n: Node, estado: String) -> bool:
 	return de(n).has(estado)
 
+# Strength of a state (e.g. bleeding damage per tile); 0 if it doesn't have it
 func potencia(n: Node, estado: String) -> int:
 	var e: Dictionary = de(n).get(estado, {})
 	return int(e.get("potencia", 0))
 
+# Readable name of a state for the interface
 func nombre(estado: String) -> String:
 	return DEF.get(estado, {}).get("nombre", estado.capitalize())
 
+# One-line explanation for the tooltips
 func describir(estado: String) -> String:
 	return DEF.get(estado, {}).get("texto", "")
 
+# Icon of a state (null if there's no PNG yet)
 func icono(estado: String) -> Texture2D:
 	var ruta := CARPETA_ICONOS + estado + ".png"
 	return load(ruta) if ResourceLoader.exists(ruta) else null
 
-## Aplica (o renueva) un estado. Si ya lo tenía, se queda con lo más largo y lo más fuerte.
-## Devuelve false si no ha prendido (inmune: una habilidad con la etiqueta "inmune_<estado>")
+## Applies (or renews) a state. If they already had it, the longest and strongest one stays. Returns
+## false if it didn't stick (immune: an ability with the "inmune_<estado>" tag)
 func aplicar(n: Node, estado: String, dias: int = 1, pot: int = 1, fuente: Node = null) -> bool:
 	if n == null or not is_instance_valid(n) or estado == "":
 		return false
@@ -80,6 +86,7 @@ func aplicar(n: Node, estado: String, dias: int = 1, pot: int = 1, fuente: Node 
 			hud.registrar("%s: %s" % [str(n.get_meta("nombre_display", n.name)), nombre(estado)], DEF[estado]["color"])
 	return true
 
+# Removes one state
 func quitar(n: Node, estado: String) -> void:
 	if n == null or not is_instance_valid(n) or not n.has_meta("estados"):
 		return
@@ -87,11 +94,12 @@ func quitar(n: Node, estado: String) -> void:
 	est.erase(estado)
 	n.set_meta("estados", est)
 
+# Removes every state (new floor, death)
 func limpiar(n: Node) -> void:
 	if n and is_instance_valid(n) and n.has_meta("estados"):
 		n.remove_meta("estados")
 
-## Daño extra por moverse una casilla (sangrando). Lo llama Tactica.al_mover
+## Extra damage for moving one tile (sangrando). Called by Tactica.al_mover
 func dano_por_paso(n: Node) -> int:
 	var total := 0
 	for estado in de(n):
@@ -99,7 +107,7 @@ func dano_por_paso(n: Node) -> int:
 	return total
 
 # ==========================================
-# CADA DÍA
+# EVERY DAY
 # ==========================================
 func _process(_delta: float) -> void:
 	var pm := _pm()
@@ -114,6 +122,7 @@ func _process(_delta: float) -> void:
 		nuevo_dia()
 	_pintar_iconos()
 
+# Start of a day: every state does its effect (burn, poison...) and loses one day
 func nuevo_dia() -> void:
 	for n in Tactica.unidades():
 		var est: Dictionary = de(n).duplicate()
@@ -137,13 +146,14 @@ func nuevo_dia() -> void:
 			n.set_meta("estados", est)
 
 # ==========================================
-# ICONOS SOBRE LA CABEZA
+# ICONS OVER THE HEAD
 # ==========================================
 const TAM_ICONO := 0.14
 const ALTURA := 1.55
 
-var _raices := {} # instance_id de la ficha -> Node3D con sus iconos (cuelga del mapa, no de la ficha)
+var _raices := {} # Token instance_id -> Node3D with its icons (hangs from the map, not from the token)
 
+# Keeps the state icons over every character's head in sync
 func _pintar_iconos() -> void:
 	var dm := _dm()
 	if dm == null:
@@ -194,6 +204,7 @@ func _pintar_iconos() -> void:
 				_raices[id].queue_free()
 			_raices.erase(id)
 
+# Floating text over a character ("¡Arde!")
 func _texto(n: Node, t: String, color: Color) -> void:
 	var f := Tactica.ficha(n)
 	var esp := get_node_or_null("/root/Especiales")

@@ -1,6 +1,6 @@
 extends Node
 
-# 1. Máquina de estados nativa de GDScript
+# 1. Native GDScript state machine
 enum GameState {
 	EXPLORING_MAP,
 	CHARACTER_STATS_OPEN,
@@ -13,19 +13,20 @@ var current_state: GameState = GameState.EXPLORING_MAP
 
 func _ready():
 	print("[Main GDScript] Iniciado. Jefe al mando.")
-	# Títulos del HUD y de la pantalla de evento en gótica
+	# HUD and event screen titles in gothic type
 	Estilo.como_titulo(get_node_or_null("CanvasLayer/MarcadorTurnos"), 24)
 	Estilo.como_titulo(get_node_or_null("CanvasLayer2/PantallaEvento/Titulo"), 32)
-	# Pantalla de inventario (I) y panel de depuración de inventario y equipo (F10)
+	# Inventory screen (I) and inventory/equipment debug panel (F10)
 	add_child(preload("res://Scripts/GDD/pantalla_inventario.gd").new())
 	add_child(preload("res://Scripts/GDD/debug_inventario.gd").new())
-	# Subida de nivel: lo ganado y el draft de habilidades (1 de 3)
+	# Level up: what was gained and the ability draft (1 of 3)
 	add_child(preload("res://Scripts/GDD/pantalla_nivel.gd").new())
-	# El mapa ocupa toda la ventana (con aspect "expand" puede ser más ancha o alta que 1152x648):
-	# su padre es un Node2D, así que no hay anclas que lo hagan solo
+	# The map takes the whole window (with aspect "expand" it can be wider or taller than 1152x648):
+	# its parent is a Node2D, so there are no anchors to do it for us
 	get_viewport().size_changed.connect(_ajustar_mapa)
 	_ajustar_mapa()
 
+# The map container always covers the whole window
 func _ajustar_mapa() -> void:
 	if contenedor_mapa:
 		contenedor_mapa.position = Vector2.ZERO
@@ -35,13 +36,13 @@ func _process(_delta):
 	if Input.is_action_just_pressed("clic_izq"):
 		match current_state:
 			GameState.EXPLORING_MAP:
-				# Escudo anti-input bleeding: si el ratón está sobre cualquier control
-				# de la interfaz (botones, fichas, menú táctico...), el clic NO llega al mapa.
+				# Anti input bleeding shield: if the mouse is over any interface control (buttons,
+				# cards...), the click does NOT reach the map.
 				var bajo_raton := get_viewport().gui_get_hovered_control()
 				if bajo_raton != null and bajo_raton != contenedor_mapa:
 					return
 
-				# Apuntando una habilidad: el clic elige su objetivo
+				# Aiming an ability: the click picks its target
 				if not Progreso.apuntando.is_empty():
 					var dm = get_node_or_null("ContenedorMapa/SubViewport/DungeonManager")
 					if dm:
@@ -56,4 +57,4 @@ func _process(_delta):
 
 
 func _on_btn_volver_pressed() -> void:
-	pass # Replace with function body.
+	pass

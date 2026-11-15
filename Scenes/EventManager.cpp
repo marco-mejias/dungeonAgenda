@@ -22,8 +22,8 @@ void OnAwake(Caller* instance) {}
 void OnDestroy(Caller* instance) {}
 void OnReady(Caller* instance) {}
 
-// === EL NÚCLEO DE EVENTOS ===
-// tipo: "COFRE", "PUERTA", "EVENTO" (manual, cuesta PA) o "TRAMPA" (automático, gratis)
+// === THE EVENT CORE === tipo: "COFRE", "PUERTA", "EVENTO" (manual, costs PA) or "TRAMPA"
+// (automatic, free)
 void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -55,10 +55,10 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 	bool interactuo = false;
 	Vector3 pos_mundo(x + 0.5f, 0.45f, y + 0.5f);
 
-	// === A. COFRES ===
+	// === A. CHESTS ===
 	if (tipo == "COFRE") {
-		// El botín se tira una sola vez por cofre (tabla "cofre" del Catalogo). Lo que no cabe
-		// en la mochila se queda dentro y el cofre sigue cerrado hasta que alguien se lo lleve.
+		// Loot is rolled only once per chest ("cofre" table in the Catalogo). Whatever doesn't fit
+		// in the backpack stays inside and the chest stays closed until someone takes it.
 		Dictionary pendientes = dungeon->get_meta("botin_cofres", Dictionary());
 		Vector2i celda(x, y);
 		Array botin;
@@ -69,7 +69,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 			int piso = pm->get_meta("piso_actual", 1);
 			if (cat) botin = cat->call("tirar_botin", String("cofre"), piso);
 		}
-		// La llave del jefe (si es este cofre) se coge siempre, quepa o no el resto
+		// The boss key (if it is this chest) is always taken, whether the rest fits or not
 		if (zonas) zonas->call("al_abrir_cofre", x, y, act_char);
 		Array restos = inventario::EntregarBotin(act_char, botin, pos_mundo);
 		if (restos.is_empty()) {
@@ -81,13 +81,13 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 			UtilityFunctions::print("[EventManager] Cofre: no cabe todo en la mochila de ", act_char->get_name(), ".");
 			if (audio) audio->call("play_ui", "no");
 			if (feel) feel->call("sacudir_ficha", String(act_char->get_name()));
-			interactuo = restos.size() < botin.size(); // si no se llevó nada, ni gasta PA
+			interactuo = restos.size() < botin.size(); // If nothing was taken, no PA is spent
 		}
 		dungeon->set_meta("botin_cofres", pendientes);
 	}
-	// === B. PUERTAS ===
+	// === B. DOORS ===
 	else if (tipo == "PUERTA") {
-		// La de la sala del jefe solo se abre con la llave
+		// The boss room door only opens with the key
 		if (zonas && !(bool)zonas->call("puede_abrir", x, y, act_char)) {
 			if (audio) audio->call("play_ui", "no");
 			if (feel) feel->call("sacudir_ficha", String(act_char->get_name()));
@@ -97,7 +97,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 		if (feel) feel->call("sacudir", 0.12);
 		interactuo = true;
 	}
-	// === B2. HOGUERA: descansar (cura, recarga habilidades y pasa el día) ===
+	// === B2. CAMPFIRE: rest (heals, recharges abilities and ends the day) ===
 	else if (tipo == "HOGUERA") {
 		if (!zonas || !(bool)zonas->call("descansar", act_char)) {
 			if (audio) audio->call("play_ui", "no");
@@ -105,7 +105,7 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 		}
 		interactuo = true;
 	}
-	// === C. EVENTOS Y TRAMPAS (animación de texto + pantalla de evento) ===
+	// === C. EVENTS AND TRAPS (text animation + event screen) ===
 	else if (tipo == "EVENTO" || tipo == "TRAMPA") {
 		Ref<Resource> evento = ResourceLoader::get_singleton()->load(res_path);
 		if (evento.is_valid() && ui_manager) {
@@ -143,16 +143,16 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 		}
 	}
 
-	// === D. GASTO DE PA Y ACTUALIZACIÓN ===
+	// === D. PA SPENDING AND UPDATE ===
 	if (!interactuo) return;
 	if (audio) audio->call("play_ui", "clic");
 
 	act_char->set_meta("pa_actual", pa - coste);
 	if (ui_manager) ui_manager->call("UpdateWarriorUI");
 
-	// Durante un evento el turno se cierra al terminarlo (FinalizarEvento)
+	// During an event the turn closes when it ends (FinalizarEvento)
 	bool en_evento = dungeon->has_meta("bloqueo_evento") && (bool)dungeon->get_meta("bloqueo_evento");
-	// El cambio de héroe espera a que acaben la puerta, el botín o el evento (DungeonManager)
+	// The hero switch waits for the door, the loot or the event to finish (DungeonManager)
 	if (!en_evento && pa - coste <= 0) dungeon->call("PedirFinDeTurno");
 	dungeon->call("RefrescarLuces");
 }

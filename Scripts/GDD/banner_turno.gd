@@ -1,7 +1,7 @@
 extends Control
 
-# Franja que cruza la pantalla al cambiar de héroe ("TURNO DE IRONCAT") o de día ("DÍA 2").
-# anunciar(texto): la misma franja, más corta, al lanzar una habilidad ("INVOCAR GALLINA").
+# Strip that crosses the screen when changing hero ("IRONCAT'S TURN") or day ("DAY 2").
+# anunciar(texto): the same strip, shorter, when casting an ability ("SUMMON CHICKEN").
 
 var ORO: Color = Estilo.color("oro")
 
@@ -14,7 +14,7 @@ var ultimo_heroe := ""
 var ultimo_dia := -1
 var pendiente := ""
 var turno_enemigo := false
-var bloqueando := false # el mensaje actual impide actuar hasta que desaparezca
+var bloqueando := false # The current message blocks acting until it disappears
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -40,6 +40,7 @@ func _ready() -> void:
 	texto.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(texto)
 
+# Thin golden line above or below the strip
 func _linea(abajo: int) -> ColorRect:
 	var l := ColorRect.new()
 	l.color = Color(ORO, 0.9)
@@ -53,7 +54,7 @@ func _linea(abajo: int) -> ColorRect:
 	return l
 
 func _process(_delta: float) -> void:
-	# Mientras se lee un cambio de turno o de día, el DungeonManager y el HUD no aceptan acciones
+	# While a turn or day change is being read, the DungeonManager and the HUD don't take actions
 	var dm_b := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	if dm_b:
 		var activo := bloqueando and tween != null and tween.is_running() and not Engine.has_meta("test_sin_espera_banner")
@@ -74,7 +75,7 @@ func _process(_delta: float) -> void:
 	var nombre := str(act.get_meta("nombre_display", act.name)) if act else ""
 
 	if ultimo_dia == -1:
-		# Primer frame: solo memorizamos (la transición de entrada ya anuncia el piso)
+		# First frame: we only remember (the entry transition already announces the floor)
 		ultimo_dia = dia
 		ultimo_heroe = nombre
 		return
@@ -82,21 +83,22 @@ func _process(_delta: float) -> void:
 	if dia != ultimo_dia:
 		ultimo_dia = dia
 		ultimo_heroe = nombre
-		# Explorando el día pasa andando: se avisa, pero sin parar al jugador
+		# While exploring the day goes by walking: we tell the player, but without stopping them
 		mostrar("Día %d" % dia, 0.85, not explorando)
 		pendiente = "Turno de %s" % nombre if nombre != "" and not explorando else ""
 	elif nombre != "" and nombre != ultimo_heroe:
 		ultimo_heroe = nombre
-		# Explorando no hay turnos: cambiar de héroe no se anuncia
+		# While exploring there are no turns: switching heroes isn't announced
 		if not explorando:
 			mostrar("Turno de %s" % nombre)
 
-## Habilidad lanzada: la franja de los turnos pero más breve (no frena el combate)
+## Ability cast: the turn strip but shorter (it doesn't slow combat down)
 func anunciar(mensaje: String) -> void:
-	mostrar(mensaje, 0.45, false) # una habilidad no bloquea: ya la está haciendo el jugador
+	mostrar(mensaje, 0.45, false) # An ability doesn't block: the player is already doing it
 
+# Shows the strip with 'mensaje'; if 'bloquea', actions wait until it's gone
 func mostrar(mensaje: String, lectura: float = 0.85, bloquea: bool = true) -> void:
-	# No tapamos eventos ni la fogata
+	# We don't cover events or the campfire
 	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	var fogata := get_node_or_null("/root/Main/CanvasLayer3")
 	if (dm and dm.get_meta("bloqueo_evento", false)) or (fogata and fogata.visible):
@@ -116,6 +118,7 @@ func mostrar(mensaje: String, lectura: float = 0.85, bloquea: bool = true) -> vo
 	tween.tween_property(self, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(_siguiente)
 
+# If a message was queued while another one was showing, now it's its turn
 func _siguiente() -> void:
 	if pendiente != "":
 		var m := pendiente

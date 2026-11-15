@@ -1,40 +1,40 @@
 extends Node
 
-# Sigilo (autoload): hacia dónde mira cada enemigo, quién os ve y el modo SIGILO.
+# Sigilo (autoload): where each enemy is looking, who sees you and the STEALTH mode.
 #
-#   MIRADA       Cada enemigo mira hacia una dirección (meta "mirada": una de DIRS) y es de un tipo
+#   FACING       Every enemy looks in one direction (meta "mirada": one of DIRS) and has a type
 #                (meta "vigilancia"):
-#                  - CENTINELA: no se gira nunca (mira a la entrada / a la puerta del jefe).
-#                  - VIGÍA: gira 90° (sentido horario) al final de cada ronda. Su siguiente cono se ve
-#                    en fantasma: se puede planear.
-#                  - DORMIDO: sin cono; solo despierta si un héroe acaba pegado a él.
-#                En combate miran hacia donde se mueven y hacia quien les pega.
-#   VER          Binario: te ve si estás en su cono delantero (90°, su radio de detección, con línea
-#                de visión) o pegado a su costado. Por la espalda, nunca. Un héroe OCULTO no se ve
-#                pegado al costado si tiene una pared o columna al lado, ni al fondo del cono (últimas
-#                2 casillas) con la antorcha apagada. Si te ve: combate al instante con su pelotón.
-#   MODO SIGILO  Empieza cuando un héroe ve a un enemigo que no os ha visto. Hay turnos (PA) como
-#                en combate, pero los enemigos solo VIGILAN: al empezar cada ronda los vigías giran
-#                y se mira otra vez quién os ve (si os ven así, ellos juegan primero). Si pasa una
-#                ronda sin ningún enemigo desprevenido a la vista, se vuelve a explorar.
-#   ROMPERLO     Pegar a un enemigo desprevenido empieza el combate con SORPRESA (los pelotones que no
-#                os habían visto pierden su primer turno). Por la espalda de uno desprevenido: PUÑALADA
-#                (crítico seguro). Por la espalda en combate: ventaja.
-#   ACCIONES     ocultarse (1 PA; andar oculto cuesta 2 PA por casilla) y antorcha (gratis).
+#                  - CENTINELA: never turns (faces the entrance / the boss door).
+#                  - VIGIA: turns 90° (clockwise) at the end of every round. Its next cone shows
+#                    as a ghost: you can plan around it.
+#                  - DORMIDO: no cone; only wakes up if a hero ends right next to it.
+#                In combat they face where they move and whoever hits them.
+#   SEEING       Binary: it sees you if you're in its front cone (90°, its detection radius, with
+#                line of sight) or right next to its side. From behind, never. A HIDDEN hero isn't
+#                seen next to its side if there's a wall or column beside them, nor at the far end
+#                of the cone (last 2 tiles) with the torch out. If it sees you: instant combat.
+#   STEALTH MODE Starts when a hero sees an enemy that hasn't seen you. There are turns (PA) like
+#                in combat, but the enemies only KEEP WATCH: at the start of every round the
+#                lookouts turn and we check again who sees you (if they see you that way, they
+#                play first). If a round goes by with no unaware enemy in view, back to exploring.
+#   BREAKING IT  Hitting an unaware enemy starts combat with SURPRISE (the squads that hadn't seen
+#                you lose their first turn). From behind an unaware one: BACKSTAB (guaranteed
+#                critical). From behind in combat: advantage.
+#   ACTIONS      hide (1 PA; walking hidden costs 2 PA per tile) and torch (free).
 #
-# El C++ llama a: comprobar(heroe, x, y) en cada paso (0 nada, 1 empieza el sigilo, 2 te han visto)
-# y despertar_quien_vea() antes del turno enemigo. Tactica.modificadores pregunta por_la_espalda().
+# C++ calls: comprobar(heroe, x, y) on every step (0 nothing, 1 stealth starts, 2 you've been seen)
+# and despertar_quien_vea() before the enemy turn. Tactica.modificadores asks por_la_espalda().
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
 const CENTINELA := "centinela"
 const VIGIA := "vigia"
 const DORMIDO := "dormido"
-const DIRS := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)] # en sentido horario
+const DIRS := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)] # Clockwise
 const NOMBRES := {CENTINELA: "Centinela", VIGIA: "Vigía", DORMIDO: "Dormido"}
 const COLOR_SIGILO := Color(0.74, 0.58, 1.0)
-# Los héroes ven su luz + VISION_EXTRA (= Mazmorra.hpp); un enemigo solo ve a un héroe hasta
-# VENTAJA_VISTA casillas menos que lo que ve ese héroe: siempre los ves tú antes
+# Heroes see their light + VISION_EXTRA (= Mazmorra.hpp); an enemy only sees a hero up to
+# VENTAJA_VISTA tiles less than that hero sees: you always see them first
 const VISION_EXTRA := 3
 const VENTAJA_VISTA := 2
 
@@ -47,8 +47,8 @@ var combate_visto := false
 var _conos: Node3D
 var _firma_conos := ""
 var _t_conos := 0.0
-var _hp := {}    # instance_id -> vida (para girarse hacia quien le pega)
-var _pos := {}   # instance_id -> casilla (para mirar hacia donde anda)
+var _hp := {}    # instance_id -> health (to turn towards whoever hits it)
+var _pos := {}   # instance_id -> tile (to face where it walks)
 
 func _dm() -> Node:
 	return get_node_or_null(RUTA_DM)
@@ -57,14 +57,16 @@ func _pm() -> Node:
 	return get_node_or_null(RUTA_PM)
 
 # ==========================================
-# CONSULTAS
+# QUERIES
 # ==========================================
 func tipo(e: Node) -> String:
 	return str(e.get_meta("vigilancia", CENTINELA))
 
+# The direction an enemy is looking (east by default)
 func mirada(e: Node) -> Vector2i:
 	return e.get_meta("mirada", Vector2i(1, 0))
 
+# Enemies on the map
 func _enemigos() -> Array:
 	var out := []
 	for u in Tactica.unidades():
@@ -72,6 +74,7 @@ func _enemigos() -> Array:
 			out.append(u)
 	return out
 
+# Heroes on the map
 func _heroes() -> Array:
 	var out := []
 	for u in Tactica.unidades():
@@ -79,11 +82,11 @@ func _heroes() -> Array:
 			out.append(u)
 	return out
 
-## No os ha visto (o acaba de: la sorpresa le dura su primer turno)
+## It hasn't seen you (or just did: the surprise lasts its first turn)
 func desprevenido(e: Node) -> bool:
 	return e != null and is_instance_valid(e) and not Tactica.es_heroe(e) and (bool(e.get_meta("desprevenido", false)) or Estados.tiene(e, "sorprendido"))
 
-## Enemigos que no os han visto y que los héroes ven ahora mismo (lo que empieza el sigilo)
+## Enemies that haven't seen you and that the heroes see right now (what starts the stealth)
 func vigilantes() -> Array:
 	var out := []
 	for e in _enemigos():
@@ -91,10 +94,10 @@ func vigilantes() -> Array:
 			out.append(e)
 	return out
 
-const DIST_SIGILO := 8 # el sigilo sigue mientras un desprevenido esté así de cerca y a la vista
+const DIST_SIGILO := 8 # Stealth goes on while an unaware one is this close and in view
 
-## Desprevenidos cerca de algún héroe (a DIST_SIGILO o menos, con línea de visión), aunque no se
-## vean por la luz: apagar la antorcha no te saca del sigilo
+## Unaware ones close to some hero (DIST_SIGILO or less, with line of sight), even if the light
+## doesn't show them: putting out the torch doesn't take you out of stealth
 func acechados() -> Array:
 	var out := []
 	var heroes := _heroes()
@@ -108,7 +111,7 @@ func acechados() -> Array:
 				break
 	return out
 
-## ¿'a' está a la espalda de 'd' (y pegado)? Solo cuenta para quien tiene mirada (enemigos)
+## Is 'a' behind 'd' (and right next to it)? Only counts for whoever has a facing (enemies)
 func por_la_espalda(a: Node, d: Node) -> bool:
 	if a == null or d == null or not Tactica.es_heroe(a) or Tactica.es_heroe(d) or not d.has_meta("mirada"):
 		return false
@@ -119,21 +122,22 @@ func por_la_espalda(a: Node, d: Node) -> bool:
 	return rel.x * f.x + rel.y * f.y < 0
 
 func _linea(desde: Vector2i, hasta: Vector2i) -> bool:
-	return Tactica.linea_de_vision(desde, hasta) # sin llamar al C++ (mismo algoritmo)
+	return Tactica.linea_de_vision(desde, hasta) # Without calling C++ (same algorithm)
 
+# Is there a wall or column next to this tile? (cover to hide against)
 func _cobertura(c: Vector2i) -> bool:
 	for d in DIRS:
 		if Tactica.solido(c + d):
 			return true
 	return false
 
-## Hasta dónde ve 'e': su radio de detección, pero nunca más allá de lo que ve el héroe que MENOS ve
-## (con la antorcha encendida) menos VENTAJA_VISTA. Igual para todos los héroes: el cono que se
-## dibuja es justo donde te ven, seas quien seas, y siempre los veis vosotros antes
+## How far 'e' sees: its detection radius, but never beyond what the hero who sees the LEAST sees
+## (with the torch lit) minus VENTAJA_VISTA. Same for every hero: the drawn cone is exactly where
+## they see you, whoever you are, and you always see them first
 func alcance(e: Node, _h: Node = null) -> int:
 	return mini(int(e.get_meta("radio_deteccion", 6)), _luz_minima() + VISION_EXTRA - VENTAJA_VISTA)
 
-# La luz del héroe que menos ve (una vez por frame: se pregunta muchísimo)
+# The light of the hero who sees the least (once per frame: it's asked a lot)
 var _luz_frame := -1
 var _luz_min := 4
 
@@ -148,11 +152,13 @@ func _luz_minima() -> int:
 		_luz_min = luz if luz >= 0 else 4
 	return _luz_min
 
-# EL CONO es una sola forma para todo: RAYOS_CONO+1 rayos en abanico (90°) desde el centro de la
-# casilla del enemigo, cada uno hasta su alcance o hasta lo primero que tapa la vista. Con esos rayos
-# se dibuja la luz Y se decide si te ve: te ve si el centro de tu casilla queda dentro de la luz.
-var _rayos_de := {} # firma -> PackedFloat32Array (largo de cada rayo)
+# THE CONE is one single shape for everything: RAYOS_CONO+1 rays fanned out (90°) from the centre of
+# the enemy's tile, each one up to its reach or to the first thing that blocks sight. Those rays
+# draw the light AND decide whether it sees you: it sees you if the centre of your tile is inside
+# the light.
+var _rayos_de := {} # signature -> PackedFloat32Array (length of every ray)
 
+# Length of every ray of the cone of 'e' looking towards 'f' (cached by a signature)
 func _rayos(e: Node, f: Vector2i) -> PackedFloat32Array:
 	var p: Vector2i = e.get_meta("grid_pos")
 	var radio := float(alcance(e)) + 0.5
@@ -179,7 +185,7 @@ func _rayos(e: Node, f: Vector2i) -> PackedFloat32Array:
 	_rayos_de[firma] = largos
 	return largos
 
-## ¿Está el centro de la casilla 'c' dentro de la luz del cono de 'e' mirando hacia 'f'?
+## Is the centre of tile 'c' inside the light of the cone of 'e' looking towards 'f'?
 func en_luz(e: Node, c: Vector2i, f: Vector2i) -> bool:
 	var p: Vector2i = e.get_meta("grid_pos")
 	var v := Vector2(c - p)
@@ -195,7 +201,7 @@ func en_luz(e: Node, c: Vector2i, f: Vector2i) -> bool:
 	var largo := lerpf(largos[i], largos[i + 1], k - i)
 	return dist <= largo + 0.05
 
-## ¿Ve 'e' al héroe 'h' en la casilla 'c'? (binario)
+## Does 'e' see hero 'h' on tile 'c'? (binary)
 func ve(e: Node, c: Vector2i, h: Node = null) -> bool:
 	if e == null or not is_instance_valid(e) or e.get_meta("in_combat", false):
 		return false
@@ -206,7 +212,8 @@ func ve(e: Node, c: Vector2i, h: Node = null) -> bool:
 	var f := mirada(e)
 	var radio := alcance(e, h)
 	if en_luz(e, c, f):
-		# Oculto y sin antorcha: no te ve al fondo de su luz (las 2 últimas casillas)
+		# Hidden and without a torch: it doesn't see you at the far end of its light (the last 2
+		# tiles)
 		var lejos := Vector2(c - p).length() > radio - 1.5
 		return not (oculto and h.get_meta("antorcha_apagada", false) and lejos)
 	var d := c - p
@@ -216,10 +223,10 @@ func ve(e: Node, c: Vector2i, h: Node = null) -> bool:
 	return false
 
 # ==========================================
-# DETECCIÓN
+# DETECTION
 # ==========================================
-# Mira todos los enemigos desprevenidos contra todos los héroes ('mueve' está en 'en'). Los que os ven
-# se despiertan (con un "!"): el Modo despierta a su pelotón y empieza el combate.
+# Checks every unaware enemy against every hero ('mueve' is at 'en'). The ones that see you wake up
+# (with a "!"): Modo wakes their squad up and combat starts.
 func _detectar(mueve: Node = null, en: Vector2i = Vector2i(-99, -99)) -> bool:
 	var visto := false
 	var heroes := _heroes()
@@ -241,7 +248,8 @@ func _detectar(mueve: Node = null, en: Vector2i = Vector2i(-99, -99)) -> bool:
 			audio.play_sfx("fail")
 	return visto
 
-## C++ (DungeonManager, en cada paso de un héroe): 0 = nada, 1 = empieza el sigilo (se para), 2 = le han visto
+## C++ (DungeonManager, on every hero step): 0 = nothing, 1 = stealth starts (it stops), 2 = they've
+## been seen
 func comprobar(act: Node, x: int, y: int) -> int:
 	if _detectar(act, Vector2i(x, y)):
 		if en_sigilo:
@@ -252,12 +260,12 @@ func comprobar(act: Node, x: int, y: int) -> int:
 		return 1
 	return 0
 
-## C++ (EnemyManager, antes del turno enemigo)
+## C++ (EnemyManager, before the enemy turn)
 func despertar_quien_vea() -> bool:
 	return _detectar()
 
 # ==========================================
-# EL MODO SIGILO
+# STEALTH MODE
 # ==========================================
 func _empezar() -> void:
 	en_sigilo = true
@@ -269,6 +277,7 @@ func _empezar() -> void:
 	_hud("No os han visto: moveos con cuidado", COLOR_SIGILO)
 	cambio.emit(true)
 
+# Back to exploring: everyone stands up and the HUD says why
 func _salir(motivo: String) -> void:
 	en_sigilo = false
 	for h in _heroes():
@@ -276,7 +285,7 @@ func _salir(motivo: String) -> void:
 	_hud(motivo, COLOR_SIGILO)
 	cambio.emit(false)
 
-# Al empezar cada ronda (día): los vigías giran y se mira otra vez quién os ve
+# At the start of every round (day): the lookouts turn and we check again who sees you
 func _vigilar() -> void:
 	for e in _enemigos():
 		if e.get_meta("in_combat", false):
@@ -290,7 +299,7 @@ func _vigilar() -> void:
 		_salir("Fuera de su vista")
 	_firma_conos = ""
 
-# Os han visto al girarse: el combate empieza con su turno (después de la animación de sorpresa)
+# They saw you when turning: combat starts with their turn (after the surprise animation)
 func _juegan_ellos_primero() -> void:
 	await get_tree().create_timer(1.6).timeout
 	var dm := _dm()
@@ -300,9 +309,11 @@ func _juegan_ellos_primero() -> void:
 	if em:
 		em.call("IniciarTurnoEnemigos")
 
+# Next direction clockwise (lookouts)
 func _siguiente(f: Vector2i) -> Vector2i:
 	return DIRS[(DIRS.find(f) + 1) % DIRS.size()]
 
+# Cardinal direction that best points from 'desde' to 'hasta'
 func _hacia(desde: Vector2i, hasta: Vector2i) -> Vector2i:
 	var d := hasta - desde
 	if d == Vector2i.ZERO:
@@ -312,11 +323,11 @@ func _hacia(desde: Vector2i, hasta: Vector2i) -> Vector2i:
 	return Vector2i(0, signi(d.y))
 
 # ==========================================
-# ACCIONES
+# ACTIONS
 # ==========================================
 const COSTE_OCULTARSE := 1
 
-## Ocultarse (1 PA) o levantarse (gratis). Solo con turnos (sigilo o combate)
+## Hide (1 PA) or stand up (free). Only with turns (stealth or combat)
 func ocultarse(h: Node) -> bool:
 	if h == null:
 		return false
@@ -336,7 +347,7 @@ func ocultarse(h: Node) -> bool:
 	_refrescar()
 	return true
 
-## Encender / apagar la antorcha (gratis): menos luz, te ven menos (y ves menos)
+## Light / put out the torch (free): less light, they see you less (and you see less)
 func antorcha(h: Node) -> void:
 	if h == null:
 		return
@@ -345,7 +356,7 @@ func antorcha(h: Node) -> void:
 	_texto(h, "Antorcha apagada" if apagada else "Antorcha encendida", Color(1.0, 0.75, 0.35))
 	_refrescar()
 
-## Tactica.al_mover: oculto, cada casilla cuesta 1 PA más. Devuelve true si se queda sin PA (frena)
+## Tactica.al_mover: hidden, every tile costs 1 PA more. Returns true if they run out of PA (stops)
 func paso_oculto(h: Node) -> bool:
 	if not Tactica.es_heroe(h) or not Estados.tiene(h, "oculto") or not Modo.con_turnos():
 		return false
@@ -353,10 +364,10 @@ func paso_oculto(h: Node) -> bool:
 	h.set_meta("_pasos_mov", dados)
 	var pa := int(h.get_meta("pa_actual", 0)) - 1
 	h.set_meta("pa_actual", maxi(0, pa))
-	return pa - dados <= 0 # el C++ cobra al final las casillas andadas
+	return pa - dados <= 0 # C++ charges the walked tiles at the end
 
 # ==========================================
-# CADA FRAME
+# EVERY FRAME
 # ==========================================
 func _process(delta: float) -> void:
 	var dm := _dm()
@@ -377,13 +388,13 @@ func _process(delta: float) -> void:
 		_cono_de.clear()
 		_precalentar(dm)
 	_asignar_miradas(dm)
-	# ¿Ha empezado el combate? Si veníamos del sigilo y nadie os había visto, es una SORPRESA
+	# Has combat started? If we came from stealth and nobody had seen you, it's a SURPRISE
 	var combate: bool = Modo.en_combate
 	if combate != combate_visto:
 		combate_visto = combate
 		if combate:
 			_al_empezar_combate()
-	# Rondas del sigilo
+	# Stealth rounds
 	var dia := int(pm.get_meta("turno_actual", 1))
 	if dia_visto < 0:
 		dia_visto = dia
@@ -402,6 +413,7 @@ func _process(delta: float) -> void:
 		_t_conos = 0.2
 		_pintar_conos(dm)
 
+# Combat started: stealth ends, and if nobody had seen you it's a surprise
 func _al_empezar_combate() -> void:
 	var de_sigilo := en_sigilo
 	if en_sigilo:
@@ -417,7 +429,7 @@ func _al_empezar_combate() -> void:
 			me_vieron = true
 	if me_vieron:
 		return
-	# Lo ha empezado un golpe vuestro: los que no os habían visto pierden su primer turno
+	# One of your hits started it: the ones that hadn't seen you lose their first turn
 	var n := 0
 	for e in Modo.despiertos():
 		Estados.aplicar(e, "sorprendido", 1, 1, null)
@@ -425,8 +437,8 @@ func _al_empezar_combate() -> void:
 	if n > 0:
 		_hud("¡Sorpresa! Pierden su primer turno", COLOR_SIGILO)
 
-# Cada enemigo: si anda, mira hacia donde va; si le pegan, hacia el héroe más cercano. Y la marca de
-# "desprevenido" (la lee la tirada del golpe que lo despierta, antes de que se actualice)
+# Every enemy: if it walks, it faces where it goes; if it gets hit, the closest hero. And the
+# "unaware" mark (read by the roll of the hit that wakes it up, before it gets updated)
 func _seguir_en_combate() -> void:
 	for e in _enemigos():
 		var id: int = e.get_instance_id()
@@ -446,7 +458,7 @@ func _seguir_en_combate() -> void:
 		_hp[id] = hp
 
 # ==========================================
-# QUIÉN ES CADA UNO Y HACIA DÓNDE MIRA
+# WHO EACH ONE IS AND WHERE IT LOOKS
 # ==========================================
 func _asignar_miradas(dm: Node) -> void:
 	var con_centinela := {}
@@ -463,12 +475,12 @@ func _asignar_miradas(dm: Node) -> void:
 		var t := VIGIA
 		var f: Vector2i = DIRS[randi() % DIRS.size()]
 		if e.has_meta("jefe"):
-			# El jefe vigila su puerta
+			# The boss guards its door
 			t = CENTINELA
 			var puertas: Array = dm.get_meta("puertas_jefe", [])
 			f = _hacia(p, puertas[0] if not puertas.is_empty() else inicio)
 		elif sala >= 0 and not con_centinela.has(sala):
-			# El primero de cada campamento vigila por donde vienen los héroes
+			# The first one in every camp watches where the heroes come from
 			t = CENTINELA
 			f = _hacia(p, inicio)
 			con_centinela[sala] = true
@@ -480,7 +492,7 @@ func _asignar_miradas(dm: Node) -> void:
 		e.set_meta("vigilancia", t)
 		e.set_meta("mirada", f)
 
-# El sprite mira hacia su lado de la pantalla; los dormidos llevan "Zzz"
+# The sprite faces its side of the screen; the sleeping ones carry "Zzz"
 func _girar_sprites(dm: Node) -> void:
 	var cam := dm.get_node_or_null("Camera3D") as Camera3D
 	var derecha: Vector3 = cam.global_transform.basis.x if cam else Vector3.RIGHT
@@ -510,11 +522,11 @@ func _girar_sprites(dm: Node) -> void:
 			zzz.queue_free()
 
 # ==========================================
-# LOS CONOS DE LUZ EN EL SUELO
+# THE LIGHT CONES ON THE FLOOR
 # ==========================================
-# Cada enemigo que no os ha visto proyecta un cono de luz suave (Shaders/cono_vista.gdshader) hacia
-# donde mira: un abanico de RAYOS_CONO rayos que se cortan en las paredes (solo ilumina el suelo:
-# no enseña enemigos ni cofres). Los vigías llevan además, muy tenue, el cono de su siguiente giro.
+# Every enemy that hasn't seen you casts a soft light cone (Shaders/cono_vista.gdshader) where it
+# looks: a fan of RAYOS_CONO rays cut by the walls (it only lights the floor: it doesn't reveal
+# enemies or chests). Lookouts also carry, very faint, the cone of their next turn.
 const SHADER_CONO := preload("res://Shaders/cono_vista.gdshader")
 const RAYOS_CONO := 28
 const PASO_RAYO := 0.12
@@ -522,15 +534,16 @@ const INTENSIDAD_CONO := 0.26
 const INTENSIDAD_FANTASMA := 0.08
 
 var _material_cono: ShaderMaterial
-var _cono_de := {} # instance_id del enemigo -> {firma, nodos}
+var _cono_de := {} # Enemy instance_id -> {firma, nodos}
 
+# One material shared by every cone (each one sets its own instance uniforms)
 func _material() -> ShaderMaterial:
 	if _material_cono == null:
 		_material_cono = ShaderMaterial.new()
 		_material_cono.shader = SHADER_CONO
 	return _material_cono
 
-# Solo se rehace el cono del enemigo que ha cambiado (casilla, mirada, alcance, tipo o el mapa)
+# Only the cone of the enemy that changed is rebuilt (tile, facing, reach, type or the map)
 func _pintar_conos(dm: Node) -> void:
 	if _conos == null or not is_instance_valid(_conos):
 		_conos = Node3D.new()
@@ -563,7 +576,7 @@ func _pintar_conos(dm: Node) -> void:
 					n.queue_free()
 			_cono_de.erase(id)
 
-# Un cono: abanico de triángulos desde el enemigo; cada rayo llega hasta la primera pared
+# One cone: a fan of triangles from the enemy; each ray reaches the first wall
 func _cono(e: Node, f: Vector2i, intensidad: float, semilla: float) -> MeshInstance3D:
 	var p: Vector2i = e.get_meta("grid_pos")
 	var radio := float(alcance(e)) + 0.5
@@ -571,7 +584,7 @@ func _cono(e: Node, f: Vector2i, intensidad: float, semilla: float) -> MeshInsta
 	var y := Tactica.mundo(p).y + 0.04
 	var base := atan2(float(f.y), float(f.x))
 	var largos := _rayos(e, f)
-	var puntas := []   # [punto, distancia]
+	var puntas := []   # [point, distance]
 	for i in RAYOS_CONO + 1:
 		var a := base + lerpf(-PI * 0.25, PI * 0.25, float(i) / RAYOS_CONO)
 		puntas.append([origen + Vector2(cos(a), sin(a)) * largos[i], largos[i]])
@@ -597,15 +610,15 @@ func _cono(e: Node, f: Vector2i, intensidad: float, semilla: float) -> MeshInsta
 	_conos.add_child(mi)
 	return mi
 
-# El cono se para en lo que tapa la vista (muros, columnas, puertas cerradas), no en cofres o braseros
+# The cone stops at what blocks sight (walls, columns, closed doors), not at chests or braziers
 func _tapa(c: Vector2i) -> bool:
 	var l := Tactica.lado()
 	if c.x < 0 or c.y < 0 or c.x >= l or c.y >= l:
 		return true
 	return (Tactica.mapa_fijo()[c.x * l + c.y] & 2) != 0
 
-# Al empezar un piso: un cono y un "Zzz" invisibles un momento, para que Godot compile sus shaders
-# entonces y no a mitad de partida (el primer cono daba un tirón)
+# When a floor starts: an invisible cone and "Zzz" for a moment, so Godot compiles their shaders
+# then and not mid-game (the first cone caused a hitch)
 func _precalentar(dm: Node) -> void:
 	var cam := dm.get_node_or_null("Camera3D") as Camera3D
 	if cam == null:
@@ -644,12 +657,14 @@ func _refrescar() -> void:
 	if ui:
 		ui.call("UpdateWarriorUI")
 
+# Writes a line in the HUD log
 func _hud(texto: String, color: Color) -> void:
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud:
 		hud.registrar(texto, color)
 	print("[Sigilo] ", texto)
 
+# Floating text over a character ("!", "Zzz"...)
 func _texto(n: Node, t: String, color: Color) -> void:
 	var f := Tactica.ficha(n)
 	var esp := get_node_or_null("/root/Especiales")

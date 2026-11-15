@@ -1,13 +1,13 @@
 extends Node
 
-# Game feel centralizado (autoload "Feel"): pausa al golpear, sacudida de cámara,
-# golpe de zoom, destellos de pantalla y botín que vuela hasta la ficha del héroe.
-# Desde C++ se usa con get_node("/root/Feel")->call("sacudir", 0.4), etc.
+# Centralised game feel (autoload "Feel"): hit stop, camera shake, zoom punch, screen flashes and
+# loot flying to the hero's card. From C++ it's used with get_node("/root/Feel")->call("sacudir",
+# 0.4), etc.
 
 const HOJA_TILES := preload("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png")
 const RUTA_DUNGEON := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 
-var nivel := 1 # 0 = sin efectos, 1 = sutil, 2 = fuerte (opción del menú de pausa)
+var nivel := 1 # 0 = no effects, 1 = subtle, 2 = strong (pause menu option)
 var trauma := 0.0
 var capa: CanvasLayer
 var destello: ColorRect
@@ -32,11 +32,13 @@ func _process(delta: float) -> void:
 
 # --- API ---
 
+# Adds camera trauma (0..1); the shake fades on its own
 func sacudir(cantidad: float) -> void:
 	if nivel == 0:
 		return
 	trauma = minf(1.0, trauma + cantidad)
 
+# Hit stop: the game almost freezes for a moment so the hit feels heavy
 func pausa_impacto(segundos: float) -> void:
 	if nivel == 0 or Engine.time_scale < 0.5:
 		return
@@ -44,7 +46,7 @@ func pausa_impacto(segundos: float) -> void:
 	await get_tree().create_timer(segundos * (1.0 if nivel == 1 else 1.5), true, false, true).timeout
 	Engine.time_scale = 1.0
 
-# Acercamiento brusco de la cámara que vuelve solo (críticos)
+# Sudden camera push-in that recovers on its own (criticals)
 func golpe_camara(fuerza: float) -> void:
 	if nivel == 0:
 		return
@@ -52,19 +54,20 @@ func golpe_camara(fuerza: float) -> void:
 	if cam:
 		cam.set_meta("punch", fuerza * (1.0 if nivel == 1 else 1.6))
 
+# Full-screen colour flash that fades out
 func destello_pantalla(color: Color, duracion: float = 0.3) -> void:
 	destello.color = color
 	var tw := create_tween()
 	tw.tween_property(destello, "color:a", 0.0, duracion)
 
-# Un icono del tileset (región) sale del punto 3D y vuela hasta la ficha del héroe
+# A tileset icon (region) leaves the 3D point and flies to the hero's card
 func volar_a_ficha(desde: Vector3, heroe: String, region: Rect2, texto: String) -> void:
 	var at := AtlasTexture.new()
 	at.atlas = HOJA_TILES
 	at.region = region
 	volar_textura_a_ficha(desde, heroe, at, texto)
 
-# Igual, con cualquier textura (el icono de un objeto del catálogo)
+# Same thing, with any texture (the icon of a catalogue item)
 func volar_textura_a_ficha(desde: Vector3, heroe: String, textura: Texture2D, texto: String) -> void:
 	var cam: Camera3D = get_node_or_null(RUTA_DUNGEON + "/Camera3D")
 	var cont: SubViewportContainer = get_node_or_null("/root/Main/ContenedorMapa")
@@ -98,7 +101,7 @@ func volar_textura_a_ficha(desde: Vector3, heroe: String, textura: Texture2D, te
 		destino = ficha.global_position + Vector2(22, 22)
 
 	var tw := create_tween()
-	# Salta hacia arriba y luego vuela a la ficha
+	# Jumps up and then flies to the card
 	tw.tween_property(icono, "position:y", icono.position.y - 36, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.parallel().tween_property(icono, "scale", Vector2(1.4, 1.4), 0.22)
 	tw.tween_property(icono, "position", destino - icono.size * 0.5, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -115,6 +118,7 @@ func volar_textura_a_ficha(desde: Vector3, heroe: String, textura: Texture2D, te
 	if audio:
 		audio.play_ui("open")
 
+# The hero card does a little pulse when the loot reaches it
 func _latido_ficha(heroe: String) -> void:
 	var ficha: Control = get_node_or_null("/root/Main/CanvasLayer/PanelFichas/" + heroe)
 	if not ficha:
@@ -124,7 +128,7 @@ func _latido_ficha(heroe: String) -> void:
 	tw.tween_property(ficha, "scale", Vector2(1.06, 1.06), 0.08)
 	tw.tween_property(ficha, "scale", Vector2.ONE, 0.15)
 
-# La ficha tiembla (p.ej. al intentar algo sin PA)
+# The card shakes (e.g. when trying something without PA)
 func sacudir_ficha(heroe: String) -> void:
 	var ficha: Control = get_node_or_null("/root/Main/CanvasLayer/PanelFichas/" + heroe)
 	if not ficha or ficha.has_meta("temblando"):

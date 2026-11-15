@@ -1,7 +1,7 @@
 /* Jenova C++ Node Base Script (Meteora) - InputManager */
 
-// El vigía: convierte el ratón en una casilla de la cuadrícula lanzando un rayo
-// desde la Camera3D contra el plano del suelo (y = 0). No necesita físicas.
+// The lookout: turns the mouse into a grid tile by casting a ray from the Camera3D against the
+// floor plane (y = 0). No physics needed.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -21,7 +21,8 @@ namespace {
 	Vector2i last_hovered_cell = Vector2i(-1000, -1000);
 	bool debug_key_pressed = false;
 
-	// Posición del ratón en píxeles del SubViewport (el contenedor reduce la resolución con stretch_shrink)
+	// Mouse position in SubViewport pixels (the container lowers the resolution with
+	// stretch_shrink)
 	bool RatonEnViewport(Camera3D* cam, Vector2& out) {
 		Node* sub = cam->get_viewport();
 		Control* contenedor = sub ? Object::cast_to<Control>(sub->get_parent()) : nullptr;
@@ -34,6 +35,7 @@ namespace {
 		return true;
 	}
 
+	// Grid tile under the mouse (-1, -1 if it's off the map)
 	Vector2i CasillaBajoRaton(Node* dungeon) {
 		Camera3D* cam = Object::cast_to<Camera3D>(dungeon->get_node_or_null("Camera3D"));
 		Vector2 mp;
@@ -42,7 +44,7 @@ namespace {
 		Vector3 origen = cam->project_ray_origin(mp);
 		Vector3 dir = cam->project_ray_normal(mp);
 		if (std::abs(dir.y) < 0.0001f) return Vector2i(-1, -1);
-		// Con dos alturas: el rayo choca primero con el suelo alto si lo hay bajo el ratón
+		// With two heights: the ray hits the high floor first if there is one under the mouse
 		for (int nivel = alturas::ALTO; nivel >= 0; nivel--) {
 			float t = (nivel * alturas::PASO - origen.y) / dir.y;
 			if (t < 0) continue;
@@ -60,7 +62,7 @@ void OnAwake(Caller* instance) {}
 void OnDestroy(Caller* instance) {}
 void OnReady(Caller* instance) {}
 
-// === 1. EL ONPROCESS (EL VIGÍA) ===
+// === 1. ONPROCESS (THE LOOKOUT) ===
 void OnProcess(Caller* instance, double _delta) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -72,19 +74,19 @@ void OnProcess(Caller* instance, double _delta) {
 		dungeon->call("ActualizarHover", hover.x, hover.y);
 	}
 
-	// === F9: MODO DEBUG ===
+	// === F9: DEBUG MODE ===
 	Input* input = Input::get_singleton();
 	bool f9 = input->is_physical_key_pressed(KEY_F9);
 	if (f9 && !debug_key_pressed) dungeon->call("ToggleModoDebug");
 	debug_key_pressed = f9;
 }
 
-// Fuerza a recalcular el hover (p.ej. después de moverse)
+// Forces the hover to be recomputed (e.g. after moving)
 void RefrescarHover(Caller* instance) {
 	last_hovered_cell = Vector2i(-1000, -1000);
 }
 
-// === 2. GESTIÓN DEL CLIC IZQUIERDO (lo llama main.gd solo si el ratón no está sobre la UI) ===
+// === 2. LEFT CLICK (main.gd only calls it if the mouse is not over the UI) ===
 void HandleMapClick(Caller* instance, double mouse_x, double mouse_y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -100,8 +102,8 @@ void HandleMapClick(Caller* instance, double mouse_x, double mouse_y) {
 		return;
 	}
 
-	// El InputManager no tiene map_data: el DungeonManager decide si es caminar,
-	// interactuar, abrir el menú táctico o cerrar un menú abierto.
+	// The InputManager has no map_data: the DungeonManager decides whether it is walking,
+	// interacting or nothing.
 	dungeon->call("ProcesarClicEnCasilla", celda.x, celda.y);
 }
 

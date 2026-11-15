@@ -1,18 +1,19 @@
 class_name PixelHD
 extends RefCounted
 
-# Escalado de pixel art "a mayor resolución" con Scale2x (EPX): cada píxel se convierte en 4 y
-# las esquinas siguen las diagonales vecinas, así los bordes salen suavizados en vez de en bloques.
-# Dos pasadas = x4 (un sprite de 16x16 pasa a 64x64). Se ve al mismo tamaño en pantalla, pero
-# con escalones cuatro veces más finos. No inventa detalle: redondea lo que ya hay.
+# "Higher resolution" pixel art scaling with Scale2x (EPX): every pixel becomes 4 and the corners
+# follow the neighbouring diagonals, so the edges come out smoothed instead of blocky. Two passes =
+# x4 (a 16x16 sprite becomes 64x64). It shows at the same size on screen, but with steps four times
+# finer. It doesn't invent detail: it rounds what's already there.
 
 static var _cache := {}
 
 static func _igual(a: Color, b: Color) -> bool:
 	if a.a < 0.5 and b.a < 0.5:
-		return true # todo lo transparente cuenta como lo mismo
+		return true # Everything transparent counts as the same
 	return a.is_equal_approx(b)
 
+# One Scale2x (EPX) pass: every pixel becomes 2x2, corners follow the neighbours
 static func escalar2x(src: Image) -> Image:
 	var w := src.get_width()
 	var h := src.get_height()
@@ -42,7 +43,7 @@ static func escalar2x(src: Image) -> Image:
 			dst.set_pixel(x * 2 + 1, y * 2 + 1, e3)
 	return dst
 
-# Imagen x4 (dos pasadas de Scale2x)
+# x4 image (two Scale2x passes)
 static func imagen_x4(src: Image) -> Image:
 	var im := src.duplicate() as Image
 	if im.is_compressed():
@@ -50,7 +51,7 @@ static func imagen_x4(src: Image) -> Image:
 	im.convert(Image.FORMAT_RGBA8)
 	return escalar2x(escalar2x(im))
 
-# Textura x4 de otra textura (también de una AtlasTexture: se queda solo con su región)
+# x4 texture from another texture (an AtlasTexture too: it keeps only its region)
 static func textura_x4(tex: Texture2D) -> Texture2D:
 	if tex == null:
 		return null

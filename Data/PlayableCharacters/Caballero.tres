@@ -11,7 +11,7 @@
 [resource]
 script = ExtResource("1_l4g75")
 nombre_display = "IronCat"
-retrato_path = "uid://dbfvxgwybojdm"
+retrato_path = ""
 vida_max = 125
 magia = 4
 velocidad = 6

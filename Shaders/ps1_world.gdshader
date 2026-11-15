@@ -1,6 +1,6 @@
-// PS1-style world shader: vertex snapping, affine texture mapping, per-vertex lighting,
-// per-cell fog of war, per-pixel line of sight (cone-shaped black shadows behind walls, columns
-// and closed doors) and screen-door cutaway for walls that hide the active hero.
+// PS1-style world shader: vertex snapping, affine texture mapping, per-vertex lighting, per-cell
+// fog of war, per-pixel line of sight (cone-shaped black shadows behind walls, columns and closed
+// doors) and screen-door cutaway for walls that hide the active hero.
 shader_type spatial;
 render_mode vertex_lighting, specular_disabled, cull_disabled, depth_draw_opaque;
 
@@ -16,23 +16,23 @@ uniform bool use_fog = true;
 uniform sampler2D fog_tex : filter_nearest, repeat_disable;
 uniform float grid_size = 35.0;
 
-// Línea de visión por píxel: lo que ningún héroe ve queda en negro, con sombras cónicas detrás de
-// los muros. occ_tex: 1 = tapa la vista (muro, columna, puerta cerrada). vistaN = (x, z, radio, activo)
+// Per-pixel line of sight: whatever no hero sees stays black, with cone shadows behind the walls.
+// occ_tex: 1 = blocks sight (wall, column, closed door). vistaN = (x, z, radius, active)
 uniform sampler2D occ_tex : filter_nearest, repeat_disable;
 uniform vec4 vista0 = vec4(0.0);
 uniform vec4 vista1 = vec4(0.0);
 uniform vec4 vista2 = vec4(0.0);
 uniform vec4 vista3 = vec4(0.0);
-uniform vec4 luces[8];  // braseros a la vista (x, z, radio, activo): iluminan como un héroe
-uniform bool ver_todo = false;   // modo debug
-uniform bool es_muro = false;    // muros y columnas: su propia casilla sí tapa (caras de detrás)
+uniform vec4 luces[8];  // Braziers in view (x, z, radius, active): they light like a hero
+uniform bool ver_todo = false;   // Debug mode
+uniform bool es_muro = false;    // Walls and columns: their own tile does block (back faces)
 
 // Cutaway: walls between the camera and the focused hero are dithered out
 uniform bool use_cutaway = false;
 uniform vec3 focus_pos = vec3(0.0);
 uniform vec3 cam_pos = vec3(0.0, 10.0, 10.0);
 
-// Fuerza del temblor de vértices en píxeles de baja resolución (opción del menú de pausa)
+// Vertex jitter strength in low-res pixels (pause menu option)
 global uniform float ps1_jitter;
 
 varying vec3 aff_uv;
@@ -76,13 +76,14 @@ void vertex() {
 	aff_uv = vec3(UV * clip.w, clip.w);
 }
 
+// Does tile c block sight? (outside the map counts as a wall)
 bool tapa(ivec2 c) {
 	if (c.x < 0 || c.y < 0 || float(c.x) >= grid_size || float(c.y) >= grid_size) return true;
 	return texelFetch(occ_tex, c, 0).r > 0.5;
 }
 
-// ¿Llega un rayo desde 'o' (dentro de la casilla del héroe) hasta el punto p? Recorre exactamente
-// las casillas que cruza (DDA), sin pasos fijos: el borde de la sombra sale recto, sin dientes.
+// Does a ray from 'o' (inside the hero's tile) reach point p? It walks exactly the tiles it crosses
+// (DDA), with no fixed steps: the shadow edge comes out straight, without teeth.
 bool rayo(vec2 o, vec2 p) {
 	vec2 d = o - p;
 	float largo = length(d);
@@ -90,7 +91,7 @@ bool rayo(vec2 o, vec2 p) {
 	vec2 dir = d / largo;
 	ivec2 propia = ivec2(floor(p));
 	ivec2 destino = ivec2(floor(o));
-	vec2 q = p + dir * 0.03; // un pelo hacia el héroe (las caras de muro están justo en el borde)
+	vec2 q = p + dir * 0.03; // A hair towards the hero (wall faces sit right on the edge)
 	ivec2 c = ivec2(floor(q));
 	if (c != propia && c != destino && tapa(c)) return false;
 	ivec2 paso = ivec2(sign(dir));
@@ -108,15 +109,16 @@ bool rayo(vec2 o, vec2 p) {
 	return true;
 }
 
-// Cuánto ve el héroe 'v' el punto p (0..1). Se lanzan varios rayos desde puntos de su casilla
-// alrededor de él y se promedian: el borde de la sombra es una penumbra suave.
+// How much hero 'v' sees point p (0..1). Several rays are cast from points of their tile around
+// them and averaged: the shadow edge is a soft penumbra.
 const int RAYOS = 6;
 const float RADIO_PENUMBRA = 0.16;
+// How much light source v (x, z, radius, active) sees point p
 float ve(vec4 v, vec2 p) {
 	if (v.w < 0.5) return 0.0;
 	if (length(v.xy - p) > v.z) return 0.0;
 	ivec2 propia = ivec2(floor(p));
-	// En un muro, si al acercarnos al héroe seguimos dentro, es una cara de detrás: a la sombra
+	// On a wall, if we're still inside when moving closer to the hero, it's a back face: in shadow
 	if (es_muro && tapa(propia) && ivec2(floor(p + normalize(v.xy - p) * 0.03)) == propia) return 0.0;
 	vec2 celda = floor(v.xy);
 	float suma = 0.0;
@@ -149,10 +151,10 @@ void fragment() {
 	if (!use_fog || ver_todo) {
 		ALBEDO = rgb;
 	} else {
-		// Lo que ve algún héroe ahora mismo, píxel a píxel (las sombras salen cónicas)
+		// Whatever some hero sees right now, pixel by pixel (the shadows come out cone-shaped)
 		float visto;
 		if (es_muro && is_top > 0.5) {
-			visto = fog_state > 0.99 ? 1.0 : 0.0; // la tapa de un muro: lo que diga su casilla
+			visto = fog_state > 0.99 ? 1.0 : 0.0; // The top of a wall: whatever its tile says
 		} else {
 			visto = max(max(ve(vista0, wpos.xz), ve(vista1, wpos.xz)), max(ve(vista2, wpos.xz), ve(vista3, wpos.xz)));
 			for (int i = 0; i < 8 && visto < 1.0; i++) {
@@ -160,7 +162,8 @@ void fragment() {
 			}
 		}
 		float g = dot(rgb, vec3(0.3, 0.59, 0.11));
-		// Explorado pero fuera de la vista: casi negro y desaturado (se intuye la forma); sin explorar: negro
+		// Explored but out of view: almost black and desaturated (you can make out the shape);
+		// unexplored: black
 		vec3 apagado = mix(vec3(g), rgb, 0.3) * vec3(0.2, 0.2, 0.27) * clamp(fog_state * 2.0, 0.0, 1.0);
 		ALBEDO = mix(apagado, rgb, visto);
 	}

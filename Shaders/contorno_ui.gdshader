@@ -1,6 +1,7 @@
 shader_type canvas_item;
 
-// Contorno pixelado alrededor de lo opaco de un sprite (resaltar el objeto bajo el ratón en la mochila)
+// Pixelated outline around the opaque part of a sprite (highlight the item under the mouse in the
+// backpack)
 uniform vec4 color : source_color = vec4(0.94, 0.82, 0.48, 1.0);
 uniform float brillo = 1.15;
 

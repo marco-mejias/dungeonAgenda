@@ -1,13 +1,13 @@
 extends Node
 
-# Indicadores (autoload): cuando un héroe o un enemigo gana o pierde algo (daño, curación, buffs,
-# debuffs), sale sobre su cabeza el icono de la stat con el número durante ~2 s: rojo si pierde,
-# verde si gana. Varios cambios a la vez se apilan hacia arriba.
+# Indicadores (autoload): when a hero or an enemy gains or loses something (damage, healing, buffs,
+# debuffs), the stat icon with the number shows over their head for ~2 s: red if they lose, green if
+# they gain. Several changes at once stack upwards.
 #
-# No hace falta avisarle: cada frame compara las stats de todos los personajes con las del frame
-# anterior. Solo hay que llamar a revisar(nodo) justo antes de quitar a alguien del mapa (un enemigo
-# que muere), para que su último golpe también se vea.
-# Los iconos son placeholders en Assets/UI/Indicadores (ver LEEME.md).
+# No need to tell it anything: every frame it compares every character's stats with the previous
+# frame's. You only have to call revisar(nodo) right before removing someone from the map (an enemy
+# that dies), so their last hit is seen too. The icons are placeholders in Assets/UI/Indicadores
+# (see LEEME.md).
 
 const STATS := {
 	"hp_actual": "vida", "velocidad": "velocidad", "fuerza": "fuerza", "defensa": "defensa",
@@ -19,20 +19,21 @@ const NOMBRES := {
 }
 const CARPETA := "res://Assets/UI/Indicadores/"
 const DURACION := 2.0
-const ALTO_ICONO := 0.17  # unidades de mundo
-const SEPARACION := 0.2   # entre indicadores apilados
-const SUBIDA := 0.15      # lo que suben mientras duran
-const ALTURA := 1.05      # sobre los pies de la ficha
+const ALTO_ICONO := 0.17  # World units
+const SEPARACION := 0.2   # Between stacked indicators
+const SUBIDA := 0.15      # How much they rise while they last
+const ALTURA := 1.05      # Above the token's feet
 
-var memoria := {}   # instance_id -> {stat: valor}
-var activos: Array = [] # {nodo, ficha (WeakRef o null), base: Vector3, fila, t}
+var memoria := {}   # instance_id -> {stat: value}
+var activos: Array = [] # {nodo, ficha (WeakRef or null), base: Vector3, fila, t}
 var texturas := {}
-var mostrados := 0 # cuántos se han enseñado (lo mira el test)
+var mostrados := 0 # How many have been shown (the test checks it)
 
+# Icon for a stat (cached)
 func icono(stat: String) -> Texture2D:
 	if not texturas.has(stat):
 		var ruta: String = CARPETA + str(STATS.get(stat, stat)) + ".png"
-		# Las stats que no salen flotando (luz, hambre) usan el icono del HUD
+		# The stats that don't float (light, hunger) use the HUD icon
 		var extra: String = "res://Assets/UI/Iconos/" + str(EXTRA.get(stat, stat)) + ".png"
 		texturas[stat] = load(ruta) if ResourceLoader.exists(ruta) else (load(extra) if ResourceLoader.exists(extra) else null)
 	return texturas[stat]
@@ -40,17 +41,20 @@ func icono(stat: String) -> Texture2D:
 const EXTRA := {"radio_luz": "radio_luz", "hambre_actual": "hambre", "pa_actual": "pa"}
 const NOMBRES_EXTRA := {"radio_luz": "Luz", "hambre_actual": "Hambre", "pa_actual": "PA"}
 
+# Readable stat name for the log
 func nombre(stat: String) -> String:
 	return NOMBRES.get(stat, NOMBRES_EXTRA.get(stat, stat.capitalize()))
 
 func _dm() -> Node:
 	return get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 
-# Mientras algo tapa el mapa (evento, menú en pausa, mochila) no se compara: lo que cambie se
-# enseña al volver. Los cambios de equipo en la mochila no son buffs: se apuntan sin enseñarse.
+# While something covers the map (event, pause menu, backpack) nothing is compared: whatever changes
+# shows when you come back. Equipment changes in the backpack aren't buffs: they're stored without
+# showing.
 func _en_pausa(dm: Node) -> bool:
 	return get_tree().paused or dm.get_meta("bloqueo_evento", false)
 
+# Is the backpack screen open?
 func _mochila_abierta() -> bool:
 	for n in get_tree().get_nodes_in_group("pantalla_inventario"):
 		if n.has_method("esta_abierta") and n.esta_abierta():
@@ -74,8 +78,8 @@ func _process(delta: float) -> void:
 		if not vistos.has(id):
 			memoria.erase(id)
 
-# [datos, ficha]: los héroes guardan sus stats en el PartyManager y su ficha está en el mapa;
-# los enemigos son su propia ficha
+# [datos, ficha]: heroes keep their stats in the PartyManager and their token is on the map; enemies
+# are their own token
 func _personajes(dm: Node) -> Array:
 	var out := []
 	var pm := get_node_or_null("/root/Main/PartyManager")
@@ -89,7 +93,7 @@ func _personajes(dm: Node) -> Array:
 			out.append([c, c])
 	return out
 
-## Compara ya las stats de 'datos' (p. ej. un enemigo que va a desaparecer) y enseña lo que cambió
+## Compares the stats of 'datos' right now (e.g. an enemy about to disappear) and shows what changed
 func revisar(datos: Node) -> void:
 	var dm := _dm()
 	if datos == null or dm == null:
@@ -97,6 +101,7 @@ func revisar(datos: Node) -> void:
 	var ficha: Node = datos if datos is Node3D else dm.get_node_or_null(NodePath(str(datos.name)))
 	_revisar(datos, ficha, true)
 
+# Compares a character's stats with the last frame and shows the differences
 func _revisar(datos: Node, ficha: Node, mostrar: bool) -> void:
 	var id := datos.get_instance_id()
 	var ahora := {}
@@ -111,12 +116,12 @@ func _revisar(datos: Node, ficha: Node, mostrar: bool) -> void:
 		if antes.has(s) and int(ahora[s]) != int(antes[s]):
 			mostrar_en(ficha, s, int(ahora[s]) - int(antes[s]))
 
-## Enseña un indicador sobre la cabeza de 'ficha' (lo sigue si se mueve)
+## Shows an indicator over the head of 'ficha' (follows it if it moves)
 func mostrar_en(ficha: Node3D, stat: String, cambio: int) -> void:
 	var dm := _dm()
 	if dm == null or cambio == 0:
 		return
-	# Al registro del HUD: "Zombi: -6 Vida"
+	# To the HUD log: "Zombi: -6 Vida"
 	var hud := get_tree().get_first_node_in_group("hud")
 	if hud and stat != "xp":
 		var quien := str(ficha.get_meta("nombre_display", ficha.name))
@@ -159,6 +164,7 @@ func mostrar_en(ficha: Node3D, stat: String, cambio: int) -> void:
 	mostrados += 1
 	_colocar(a)
 
+# Keeps an indicator over its token (stacked by row)
 func _colocar(a: Dictionary) -> void:
 	var raiz: Node3D = a["nodo"]
 	var f = a["ficha"].get_ref() if a["ficha"] != null else null
@@ -167,11 +173,11 @@ func _colocar(a: Dictionary) -> void:
 	var t: float = a["t"]
 	var y := ALTURA + float(a["fila"]) * SEPARACION + SUBIDA * clampf(t / DURACION, 0.0, 1.0)
 	raiz.global_position = a["base"] + Vector3(0, y, 0)
-	# De cara a la cámara (así el número queda a la derecha del icono en pantalla)
+	# Facing the camera (so the number stays to the right of the icon on screen)
 	var cam := raiz.get_viewport().get_camera_3d()
 	if cam:
 		raiz.global_basis = cam.global_basis
-	# Aparece con un pequeño rebote y se desvanece al final
+	# Pops in with a small bounce and fades out at the end
 	var s := 1.0
 	if t < 0.12:
 		s = lerpf(0.4, 1.25, t / 0.12)
@@ -184,6 +190,7 @@ func _colocar(a: Dictionary) -> void:
 		if c is Label3D:
 			c.outline_modulate.a = alfa
 
+# Rises, fades and removes the indicators that are done
 func _animar(delta: float) -> void:
 	for i in range(activos.size() - 1, -1, -1):
 		var a: Dictionary = activos[i]

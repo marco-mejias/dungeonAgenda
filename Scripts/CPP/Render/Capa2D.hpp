@@ -1,8 +1,8 @@
 #pragma once
-// Capa 2D del DungeonRenderer: elementos de interfaz anclados a posiciones 3D
-// (bocadillos de cómic, "!" y barra de vida de enemigos). La capa vive en el SubViewport del mundo
-// pero se DIBUJA en la ventana principal (custom_viewport), a resolución completa: el texto se lee
-// nítido aunque el mundo vaya pixelado. Anclar() pasa de píxeles del mundo a los de la ventana.
+// DungeonRenderer 2D layer: interface elements anchored to 3D positions (comic bubbles, "!" and
+// enemy health bars). The layer lives in the world SubViewport but is DRAWN on the main window
+// (custom_viewport), at full resolution: text reads sharp even though the world is pixelated.
+// Anclar() converts from world pixels to window pixels.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/camera3d.hpp>
@@ -22,16 +22,17 @@ namespace render {
 
 using namespace godot;
 
-// Estilos de bocadillo
+// Bubble styles
 const int B_NORMAL = 0;
 const int B_SIN_PA = 1;
 const int B_HOVER = 2;
 
 
+// Bubble box for each style (normal, no PA, hover)
 inline Ref<StyleBoxFlat> EstiloGlobo(int estilo) {
 	Ref<StyleBoxFlat> s;
 	s.instantiate();
-	// Cuero oscuro con ribete dorado (como el HUD); sin PA, el ribete rojo; en hover, más dorado
+	// Dark leather with a golden trim (like the HUD); no PA, red trim; on hover, more golden
 	s->set_bg_color(Color(0.12, 0.08, 0.06, 0.95));
 	s->set_border_color(estilo == B_SIN_PA ? Color(0.75, 0.25, 0.2) : (estilo == B_HOVER ? Color(0.9, 0.72, 0.38) : Color(0.6, 0.46, 0.24)));
 	s->set_border_width_all(1);
@@ -44,6 +45,7 @@ inline Ref<StyleBoxFlat> EstiloGlobo(int estilo) {
 	return s;
 }
 
+// Filled triangle (the bubble tail)
 inline Polygon2D* Triangulo(const String& nombre, Vector2 a, Vector2 b, Vector2 c, Color color) {
 	Polygon2D* p = memnew(Polygon2D);
 	p->set_name(nombre);
@@ -54,7 +56,7 @@ inline Polygon2D* Triangulo(const String& nombre, Vector2 a, Vector2 b, Vector2 
 	return p;
 }
 
-// wrapper (posición + zoom) > Escala (animación de aparición) > Cola + Globo > Texto
+// wrapper (position + zoom) > Escala (pop-in animation) > Cola + Globo > Texto
 inline Control* CrearBocadillo(const String& nombre, const String& texto, int estilo) {
 	Control* wrapper = memnew(Control);
 	wrapper->set_name(nombre);
@@ -94,15 +96,15 @@ inline Control* CrearBocadillo(const String& nombre, const String& texto, int es
 	return wrapper;
 }
 
-// Tamaño de la capa según el zoom de la cámara (dibujada a resolución completa: no depende de la
-// reducción del mundo)
+// Layer size from the camera zoom (drawn at full resolution: it doesn't depend on the world
+// downscale)
 inline float EscalaZoom(Camera3D* cam) {
 	float z = cam && cam->has_meta("zoom_factor") ? (float)cam->get_meta("zoom_factor") : 2.0f;
 	return UtilityFunctions::clampf(z * 0.5f, 0.75f, 1.3f) * 1.25f;
 }
 
-// Coloca un elemento 2D sobre un punto 3D; lo oculta si queda detrás de la cámara. El punto se
-// proyecta en el SubViewport del mundo y se pasa a la ventana (origen y reducción del contenedor)
+// Places a 2D element over a 3D point; hides it if it ends up behind the camera. The point is
+// projected in the world SubViewport and converted to the window (container origin and downscale)
 inline void Anclar(Control* c, Camera3D* cam, Vector3 mundo, float escala) {
 	if (!c || !cam) return;
 	if (cam->is_position_behind(mundo)) { c->set_visible(false); return; }
@@ -117,6 +119,7 @@ inline void Anclar(Control* c, Camera3D* cam, Vector3 mundo, float escala) {
 	c->set_scale(Vector2(escala, escala));
 }
 
+// Resizes the bubble to its text and centres it over its anchor
 inline void ColocarGlobo(Control* wrapper) {
 	PanelContainer* globo = Object::cast_to<PanelContainer>(wrapper->get_node_or_null("Escala/Globo"));
 	if (!globo) return;
@@ -125,6 +128,7 @@ inline void ColocarGlobo(Control* wrapper) {
 	globo->set_position(Vector2(std::round(-sz.x * 0.5f), std::round(-sz.y - 5.0f)));
 }
 
+// "!" and health bar that float over an enemy
 inline Control* CrearUIEnemigo(const String& nombre) {
 	Control* ui = memnew(Control);
 	ui->set_name(nombre);
@@ -157,7 +161,7 @@ inline Control* CrearUIEnemigo(const String& nombre) {
 	return ui;
 }
 
-// Segundo frame de la animación idle de cada sprite (Dungeon_Character_2: pares de frames)
+// Second idle frame of every sprite (Dungeon_Character_2: frame pairs)
 inline int Pareja(int f) {
 	switch (f) {
 		case 0: return 1; case 1: return 0; case 2: return 3; case 3: return 2;

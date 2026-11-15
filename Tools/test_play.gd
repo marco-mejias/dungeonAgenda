@@ -1,7 +1,7 @@
 extends SceneTree
-# Test de humo jugable: arranca main.tscn, simula una partida y guarda capturas.
-#   godot --path . -s res://Tools/test_play.gd -- <carpeta_capturas>
-# (sin --headless para que haya render y las capturas salgan)
+# Playable smoke test: starts main.tscn, simulates a game and saves screenshots.
+#   godot --path . -s res://Tools/test_play.gd -- <screenshots_folder>
+# (without --headless so there's rendering and the screenshots come out)
 
 var out_dir := "user://test_shots"
 var dm: Node
@@ -14,8 +14,8 @@ var espera_hasta := 0.0
 var memo := {}
 
 func _initialize():
-	Engine.set_meta("tirada_forzada", 15) # d20 fijo: los ataques del guion aciertan siempre (sin crítico)
-	Engine.set_meta("test_sin_espera_banner", true) # el guion no espera a que se lea "Turno de X" (salvo donde lo prueba)
+	Engine.set_meta("tirada_forzada", 15) # Fixed d20: the script's attacks always hit (no critical)
+	Engine.set_meta("test_sin_espera_banner", true) # The script doesn't wait for "Turno de X" to be read (except where it tests it)
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		out_dir = args[0]
@@ -23,7 +23,7 @@ func _initialize():
 	change_scene_to_file("res://Scenes/main.tscn")
 	_definir_pasos()
 
-# ---------- utilidades ----------
+# ---------- utilities ----------
 
 func ahora() -> float:
 	return Time.get_ticks_msec() / 1000.0
@@ -72,7 +72,7 @@ func bocadillos(canal: int) -> Array:
 				out.append(h)
 	return out
 
-# ¿Está su retrato en la barra de arriba del HUD? ("Enemigo0" = hay algún enemigo en la barra)
+# Is their portrait on the HUD top bar? ("Enemigo0" = there's some enemy on the bar)
 func ficha_visible(nombre: String) -> bool:
 	var hud = ui.get_node_or_null("HUD")
 	if hud == null:
@@ -84,11 +84,11 @@ func ficha_visible(nombre: String) -> bool:
 		return false
 	return hud.slots.has(nombre) and hud.slots[nombre].visible
 
-# Teletransporte (debug) a una casilla libre junto a 'objetivo'
+# Teleport (debug) to a free tile next to 'objetivo'
 func junto_a(objetivo: Vector2i) -> bool:
 	for d in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
 		if objetivo + d == dm.get_meta("casilla_salida", Vector2i(-1, -1)):
-			continue # pisar la escalera saca al héroe del piso
+			continue # Stepping on the stairs takes the hero off the floor
 		dm.call("TeletransporteDebug", objetivo.x + d.x, objetivo.y + d.y)
 		if pos_activa() == objetivo + d:
 			return true
@@ -101,7 +101,7 @@ func raton_a_celda(c: Vector2i) -> void:
 	var p_canvas := cont.global_position + p_sub * cont.stretch_shrink
 	Input.warp_mouse(root.get_final_transform() * p_canvas)
 
-# La cámara está anclada al héroe activo, sin desplazamiento lateral
+# The camera is anchored to the active hero, with no side offset
 func _check_camara_centrada(cuando: String) -> void:
 	var cam: Camera3D = dm.get_node("Camera3D")
 	var token: Node3D = dm.get_node_or_null(str(activo().name)) if activo() else null
@@ -111,7 +111,7 @@ func _check_camara_centrada(cuando: String) -> void:
 	var d := Vector2(piv.x, piv.z).distance_to(Vector2(token.position.x, token.position.z))
 	check(d < 0.25 and absf(cam.h_offset) < 0.3, "%s la cámara está centrada en el héroe (a %.2f, h_offset %.2f)" % [cuando, d, cam.h_offset])
 
-# Lo que tiene un héroe (para ver si un cofre le ha dado algo)
+# What a hero has (to see whether a chest gave them something)
 func _riqueza(h: Node) -> String:
 	var objetos := 0
 	for e in h.get_meta("inventario", []):
@@ -124,7 +124,7 @@ func _indice_de(heroe: String, id: String) -> int:
 			return int(e["indice"])
 	return -1
 
-# Ratón simulado en coordenadas del lienzo (pulsar/soltar si 'boton', o solo mover)
+# Simulated mouse in canvas coordinates (press/release if 'boton', or just move)
 func _raton(pos: Vector2, pulsado: bool, boton: bool) -> void:
 	var ventana := root.get_final_transform() * pos
 	if boton:
@@ -155,7 +155,7 @@ func _heroes() -> Array:
 			out.append(h)
 	return out
 
-# Inventario, equipo, peso, consumibles e intercambio (deja a los héroes como estaban)
+# Inventory, equipment, weight, consumables and swapping (leaves the heroes as they were)
 func _check_inventario() -> void:
 	var cat := root.get_node("Catalogo")
 	check(cat.objetos.size() >= 15, "el catálogo carga los objetos de Data/Objetos (%d)" % cat.objetos.size())
@@ -178,7 +178,7 @@ func _check_inventario() -> void:
 					bono += m.plano
 	check(int(h.get_meta("defensa")) == int(base["defensa"]) + bono, "la defensa final suma el equipo (%d + %d = %d)" % [base["defensa"], bono, h.get_meta("defensa")])
 
-	# Apilado y límite de peso
+	# Stacking and weight limit
 	var inv0: Array = pm.call("DescribirInventario", n)
 	var entran: int = pm.call("AnadirObjeto", n, "pocion_vida", 2)
 	var inv1: Array = pm.call("DescribirInventario", n)
@@ -189,7 +189,7 @@ func _check_inventario() -> void:
 	check(caben < 10 and peso <= cap + 0.01, "la mochila tiene límite: caben %d cotas (%.1f / %.1f kg)" % [caben, peso, cap])
 	h.set_meta("inventario", guardado[h][0].duplicate(true))
 
-	# Antorcha en la ranura de luz: +1 de radio y se puede quitar
+	# Torch in the light slot: +1 radius and it can be removed
 	var radio0 := int(h.get_meta("radio_luz"))
 	pm.call("AnadirObjeto", n, "antorcha", 1)
 	var err: String = pm.call("Equipar", n, _indice_de(n, "antorcha"))
@@ -197,14 +197,14 @@ func _check_inventario() -> void:
 	err = pm.call("Desequipar", n, "luz")
 	check(err == "" and int(h.get_meta("radio_luz")) == radio0, "al quitarla vuelve la luz de antes (%d)" % h.get_meta("radio_luz"))
 
-	# Restricción de clase: un mago no se pone la cota de malla
+	# Class restriction: a mage can't wear the chainmail
 	for o in _heroes():
 		if o.get_meta("clase") == "Mago":
 			pm.call("AnadirObjeto", str(o.name), "cota_malla", 1)
 			err = pm.call("Equipar", str(o.name), _indice_de(str(o.name), "cota_malla"))
 			check(err.contains("clase"), "el mago no puede ponerse la cota de malla ('%s')" % err)
 
-	# Poción: cura y se gasta
+	# Potion: heals and gets spent
 	h.set_meta("hp_actual", int(h.get_meta("hp_max")) - 30)
 	var pociones := 0
 	for e in pm.call("DescribirInventario", n):
@@ -217,7 +217,7 @@ func _check_inventario() -> void:
 			quedan += int(e["cantidad"])
 	check(err == "" and int(h.get_meta("hp_actual")) == int(h.get_meta("hp_max")) - 5 and quedan == pociones - 1, "la poción cura 25 PV y se gasta (%d -> %d pociones)" % [pociones, quedan])
 
-	# Dar objetos: solo pegados (fuera de la fogata)
+	# Giving items: only when adjacent (outside the campfire)
 	var pegado: Node = null
 	var lejos: Node = null
 	var pos: Vector2i = h.get_meta("grid_pos")
@@ -237,7 +237,7 @@ func _check_inventario() -> void:
 		err = pm.call("DarObjeto", n, 0, str(pegado.name), 1)
 		check(err == "" and float(pm.call("PesoInventario", str(pegado.name))) > antes - 0.01, "%s le da un objeto a %s, que está pegado ('%s')" % [n, pegado.name, err])
 
-	# Todo como estaba
+	# Everything as it was
 	for o in guardado:
 		o.set_meta("inventario", guardado[o][0])
 		o.set_meta("equipo", guardado[o][1])
@@ -245,7 +245,7 @@ func _check_inventario() -> void:
 	ui.call("UpdateWarriorUI")
 	captura("01b_ficha_con_equipo")
 
-# Coloca al héroe activo a 3-4 casillas de un enemigo (con línea de visión) y lo despierta
+# Puts the active hero 3-4 tiles from an enemy (with line of sight) and wakes it up
 func _xp_total(h: Node) -> int:
 	var prog = root.get_node("Progreso")
 	var total := int(h.get_meta("xp", 0))
@@ -253,7 +253,7 @@ func _xp_total(h: Node) -> int:
 		total += prog.xp_para(n)
 	return total
 
-# Tres casillas libres en línea (A, B, destino): el activo en A y otro héroe en B
+# Three free tiles in a line (A, B, destination): the active one on A and another hero on B
 func _preparar_cruce() -> void:
 	var a := activo()
 	var otro: Node = null
@@ -273,7 +273,7 @@ func _preparar_cruce() -> void:
 			for d in [Vector2i(1, 0), Vector2i(0, 1)]:
 				var c0 := Vector2i(x, y)
 				if libre.call(c0) and libre.call(c0 + d) and libre.call(c0 + d * 2) and not bool(dm.call("EsEventoManual", (c0 + d * 2).x, (c0 + d * 2).y)):
-					otro.set_meta("pa_actual", maxi(1, int(otro.get_meta("pa_actual", 0)))) # sin PA no se le puede elegir
+					otro.set_meta("pa_actual", maxi(1, int(otro.get_meta("pa_actual", 0)))) # Without PA they can't be picked
 					pm.call("CambiarPersonajeActivo", str(otro.name))
 					dm.call("TeletransporteDebug", (c0 + d).x, (c0 + d).y)
 					pm.call("CambiarPersonajeActivo", str(a.name))
@@ -287,7 +287,7 @@ func _preparar_cruce() -> void:
 						return
 	print("[test] AVISO no hay tres casillas libres en línea para probar el cruce")
 
-# Un evento que se investiga con clic, con el héroe a 3 casillas
+# An event investigated by clicking, with the hero 3 tiles away
 func _preparar_evento_lejano() -> void:
 	var libres: PackedByteArray = dm.call("ObtenerTransitables")
 	var lado := int(Engine.get_meta("alturas_lado", 40))
@@ -310,7 +310,8 @@ func _preparar_evento_lejano() -> void:
 				return
 	print("[test] AVISO no hay ningún evento manual con sitio para probar el acercamiento")
 
-# Si al andar ha saltado un evento (proximidad), se cierra para que no bloquee el resto del guion
+# If an event triggered while walking (proximity), close it so it doesn't block the rest of the
+# script
 func _cerrar_evento(donde: String) -> void:
 	var pe = root.get_node_or_null("Main/CanvasLayer2/PantallaEvento")
 	if pe == null:
@@ -336,7 +337,7 @@ func _preparar_turno_enemigo() -> void:
 					dm.call("CalcularMapaDeLuces")
 					e.set_meta("in_combat", true)
 					if e.has_meta("desobediente"):
-						e.remove_meta("desobediente") # se pone al tirar su ataque (acierte o falle)
+						e.remove_meta("desobediente") # Set when rolling its attack (hit or miss)
 					memo["ia_enemigo"] = e
 					memo["ia_pos"] = pos
 					memo["ia_heroe"] = h
@@ -346,7 +347,7 @@ func _preparar_turno_enemigo() -> void:
 					return
 	print("[test] AVISO no hay sitio para probar la IA")
 
-# Equipa un arco al héroe activo y lo coloca a 2-3 casillas en línea recta de un enemigo
+# Equips a bow on the active hero and places them 2-3 tiles in a straight line from an enemy
 func _preparar_arco() -> void:
 	var h := activo()
 	if h == null:
@@ -367,10 +368,9 @@ func _preparar_arco() -> void:
 					return
 	print("[test] AVISO no hay sitio para probar el arco")
 
-# ---------- guion ----------
-# Cada paso devuelve los segundos a esperar antes del siguiente.
+# ---------- script ---------- Every step returns the seconds to wait before the next one.
 
-# La estructura del piso (Zonas.gd + Mazmorra.hpp: AsignarZonas)
+# The floor structure (Zonas.gd + Mazmorra.hpp: AsignarZonas)
 func _check_zonas() -> void:
 	var zonas = root.get_node("Zonas")
 	var lista: Array = dm.get_meta("zonas", [])
@@ -381,11 +381,11 @@ func _check_zonas() -> void:
 	var salida: Vector2i = dm.get_meta("casilla_salida")
 	var sala_jefe: Dictionary = zonas.zonas("jefe")[0]
 	check((sala_jefe["caja"] as Rect2i).has_point(salida), "la escalera está en la sala del jefe")
-	# Hoguera en la entrada
+	# Campfire at the entrance
 	var hoguera: Vector2i = dm.get_meta("casilla_hoguera", Vector2i(-1, -1))
 	var entrada: Dictionary = zonas.zonas("entrada")[0]
 	check(hoguera.x >= 0 and (entrada["caja"] as Rect2i).has_point(hoguera) and hoguera in dm.get_meta("lista_braseros", []), "hay una hoguera en la entrada %s" % hoguera)
-	# Campamentos: su pelotón (3+, el mismo id) alrededor de su cofre
+	# Camps: their squad (3+, same id) around their chest
 	var bien := true
 	for z in zonas.zonas("campamento"):
 		var suyos: Array = zonas.miembros(int(z["indice"]))
@@ -396,7 +396,7 @@ func _check_zonas() -> void:
 			bien = false
 			print("[test] campamento ", z, " con ", suyos.size(), " enemigos")
 	check(bien, "cada campamento tiene su pelotón (3+) y su cofre")
-	# El jefe: reforzado, con la puerta cerrada hasta tener la llave
+	# The boss: buffed, with the door locked until you have the key
 	var jefe: Node = zonas.jefe()
 	check(jefe != null and jefe.get_meta("jefe", false) and int(jefe.get_meta("hp_max", 0)) >= 20, "hay jefe reforzado (%s, %s PV)" % [jefe.get_meta("nombre_display", "") if jefe else "-", jefe.get_meta("hp_max", 0) if jefe else 0])
 	var puertas: Array = dm.get_meta("puertas_jefe", [])
@@ -407,13 +407,13 @@ func _check_zonas() -> void:
 		zonas.al_abrir_cofre(llave.x, llave.y, activo())
 		check(zonas.tiene_llave() and zonas.puede_abrir(puertas[0].x, puertas[0].y, activo()), "con la llave del cofre del campamento, sí")
 		dm.set_meta("llave_jefe", false)
-	# Hoguera: cura a todos y pasa el día
+	# Campfire: heals everyone and the day goes by
 	var h := activo()
 	h.set_meta("hp_actual", 1)
 	var dia := int(pm.get_meta("turno_actual", 1))
 	check(zonas.descansar(h), "se puede descansar en la hoguera explorando")
 	check(int(h.get_meta("hp_actual")) == int(h.get_meta("hp_max")) and int(pm.get_meta("turno_actual", 1)) == dia + 1, "descansar cura y pasa el día")
-	# La mazmorra se agita: refuerzos a los campamentos que siguen en pie
+	# The dungeon stirs: reinforcements to the camps still standing
 	var antes := (dm.get_meta("lista_enemigos", []) as Array).size()
 	var llegados: int = zonas.agitar()
 	check(llegados > 0 and (dm.get_meta("lista_enemigos", []) as Array).size() == antes + llegados, "al agitarse la mazmorra llegan refuerzos (%d)" % llegados)
@@ -428,7 +428,7 @@ func _definir_pasos():
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			check(alc.size() > 0, "hay casillas alcanzables (%d)" % (alc.size() / 2))
 			check(ficha_visible(str(activo().name)), "la ficha del héroe activo se ve")
-			# Al empezar no hay enemigos despiertos: se explora (sin PA ni área de andar)
+			# At the start no enemies are awake: we explore (no PA and no walk area)
 			var modo = root.get_node("Modo")
 			check(not modo.en_combate and dm.get_meta("modo_exploracion", false), "se empieza explorando (sin turnos)")
 			check(ui.get_node("HUD").lbl_modo.text == "Explorando", "y el HUD lo dice ('%s')" % ui.get_node("HUD").lbl_modo.text)
@@ -438,7 +438,7 @@ func _definir_pasos():
 			return 0.3,
 		func():
 			_check_inventario()
-			# Panel de depuración (F10)
+			# Debug panel (F10)
 			var dbg: CanvasLayer = null
 			for c in root.get_node("Main").get_children():
 				if c.get_script() and str(c.get_script().resource_path).ends_with("debug_inventario.gd"):
@@ -461,7 +461,7 @@ func _definir_pasos():
 				check(dbg.caja_inv.get_child_count() > 0, "el panel lista el inventario (%d filas)" % dbg.caja_inv.get_child_count())
 				captura("01c_panel_debug")
 				dbg.alternar()
-			# Pantalla de inventario (I)
+			# Inventory screen (I)
 			var inv = _nodo_con_script("pantalla_inventario.gd")
 			memo["inventario"] = inv
 			check(inv != null, "existe la pantalla de inventario")
@@ -479,7 +479,8 @@ func _definir_pasos():
 				var inv_n: Array = pm.call("DescribirInventario", n)
 				check(inv.objetos.size() == inv_n.size(), "el saco tiene un objeto por cada entrada del inventario (%d)" % inv.objetos.size())
 				check(inv.capas["heroe"].texture != null and inv.capas["mano_principal"].texture != null, "el héroe se ve con su arma puesta")
-				# La cota puede no caber si el botín aleatorio ya llenó la mochila: entonces, la antorcha
+				# The chainmail might not fit if the random loot already filled the backpack: then,
+				# the torch
 				var i_cota := _indice_de(n, "cota_malla")
 				var nombre_obj := "Cota de malla"
 				if i_cota < 0:
@@ -505,15 +506,15 @@ func _definir_pasos():
 				check(int(activo().get_meta("radio_luz")) == radio0, "y quitarla: %s" % inv.lbl_msg.text)
 				memo["radio_arrastre"] = radio0
 				inv._refrescar(true)
-			return 1.5, # que los objetos caigan al fondo del saco
+			return 1.5, # Let the items fall to the bottom of the sack
 		func():
-			# Arrastrar con el ratón la antorcha de la mochila a la ranura de luz
+			# Drag the torch with the mouse from the backpack to the light slot
 			var inv = memo.get("inventario")
 			if inv:
 				var n: String = inv.heroe
 				var origen: Control = inv.nodo_de_objeto(_indice_de(n, "antorcha"))
 				var destino: Control = inv.muneco
-				# Que ningún otro objeto del saco la tape y que no siga rebotando
+				# Make sure no other item in the sack covers it and that it stops bouncing
 				origen.move_to_front()
 				var ent: int = inv._entrada_de(origen)
 				if ent >= 0:
@@ -545,18 +546,18 @@ func _definir_pasos():
 				check(not inv.esta_abierta(), "la mochila se cierra")
 			return 0.2,
 		func():
-			# Hover sobre la casilla alcanzable más lejana: debe salir la ruta y el coste
+			# Hover the furthest reachable tile: the path and the cost must show
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			var p := pos_activa()
 			var mejor := p
 			for i in range(0, alc.size(), 2):
 				var c := Vector2i(alc[i], alc[i + 1])
-				# Cerca (explorando se puede ir a todo lo explorado: lejos despertaría a alguien)
+				# Close by (exploring you can go anywhere explored: far away would wake someone up)
 				var d := absi(c.x - p.x) + absi(c.y - p.y)
 				if d <= 4 and d > absi(mejor.x - p.x) + absi(mejor.y - p.y):
 					mejor = c
 			memo["destino"] = mejor
-			# El ratón real (si alguien lo mueve) no debe pisar el hover simulado
+			# The real mouse (if someone moves it) mustn't overwrite the simulated hover
 			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_DISABLED
 			dm.call("ActualizarHover", mejor.x, mejor.y)
 			return 0.3,
@@ -592,7 +593,7 @@ func _definir_pasos():
 					if h and h.get_meta("grid_pos") != memo["grupo_antes"][n]:
 						siguieron += 1
 				check(siguieron > 0, "el resto del grupo sigue al que anda (%d se han movido)" % siguieron)
-				# Fila india: cada uno pegado al de delante
+				# Single file: each one right behind the one ahead
 				var modo = root.get_node("Modo")
 				var delante: Vector2i = pos_activa()
 				var en_fila := true
@@ -608,8 +609,8 @@ func _definir_pasos():
 					posiciones.append(pm.get_node(n).get_meta("grid_pos"))
 				check(en_fila and modo.fila.size() > 0, "van en fila india, cada uno pegado al de delante (%s: %s, salió de %s)" % [modo.fila, posiciones, memo["pos_antes"]])
 			if not root.get_node("Modo").en_combate:
-				_check_camara_centrada("tras caminar") # al empezar un combate la cámara enfoca al enemigo un momento
-			# Vistazo (lo que hace el minimapa o el arrastre): la cámara se va a otro punto...
+				_check_camara_centrada("tras caminar") # When a fight starts the camera focuses on the enemy for a moment
+			# Peek (what the minimap or the drag does): the camera goes to another point...
 			var cam: Camera3D = dm.get_node("Camera3D")
 			var p := pos_activa()
 			var lado := int(Engine.get_meta("alturas_lado", 40))
@@ -622,7 +623,7 @@ func _definir_pasos():
 			var dxz := Vector2(piv.x, piv.z).distance_to(Vector2(memo["vistazo"].x, memo["vistazo"].z))
 			check(dxz < 1.0, "durante el vistazo la cámara va al punto (a %.2f)" % dxz)
 			captura("03b_vistazo")
-			# ...y al soltar vuelve sola al héroe
+			# ...and on release it comes back to the hero on its own
 			cam.remove_meta("vistazo")
 			return 2.0,
 		func():
@@ -641,13 +642,14 @@ func _definir_pasos():
 			return 0.2,
 		func():
 			captura("05_hud")
-			# HUD nuevo: clicar en tu héroe ya no abre un menú flotante; las acciones están en la rueda
-			check(ui.get_node_or_null("MenuTactico_Instancia") == null, "clicar en tu héroe no abre menú flotante (la rueda lo sustituye)")
+			# New HUD: clicking your hero doesn't open a floating menu any more; the actions are on
+			# the bar
+			check(not dm.get_meta("is_moving", false), "clicar en tu héroe no hace nada (las acciones están en la barra)")
 			var hud = ui.get_node("HUD")
 			for id in ["mochila", "atacar", "dia"]:
 				check(hud.botones.has(id) and hud.botones[id].is_visible_in_tree(), "la barra tiene el botón '%s'" % id)
 			check(hud.botones["pasar"].is_visible_in_tree() == root.get_node("Modo").en_combate, "FIN DEL TURNO solo se ve en combate")
-			# Habilidades: cada héroe empieza con la de su clase, en la barra de abajo (Z X C V)
+			# Abilities: every hero starts with their class one, on the bottom bar (Z X C V)
 			var prog = root.get_node("Progreso")
 			var lista_h: Array = prog.lista(activo())
 			check(lista_h.size() == 1 and prog.INICIALES.get(str(activo().get_meta("clase")), "") == lista_h[0]["id"], "el héroe empieza con la habilidad de su clase (%s)" % [lista_h])
@@ -657,7 +659,7 @@ func _definir_pasos():
 					visibles_hab += 1
 			check(visibles_hab == prog.max_ranuras(activo()), "la barra tiene %d ranuras de habilidad (%s: %d)" % [visibles_hab, activo().get_meta("clase"), prog.max_ranuras(activo())])
 			check(int(activo().get_meta("nivel", 0)) == 1 and hud.lbl_nivel.text == "NV 1", "empieza en nivel 1 (%s)" % hud.lbl_nivel.text)
-			# Pasar el ratón por ATACAR / HABILIDAD enseña su alcance (rojo / azul)
+			# Hovering ATTACK / ABILITY shows its reach (red / blue)
 			var mm_alc: MultiMesh = dm.get_node("DungeonRenderer/Alcance").multimesh
 			hud.botones["atacar"].mouse_entered.emit()
 			var rojos := 0
@@ -676,7 +678,7 @@ func _definir_pasos():
 			check(azules > 0, "al pasar por una habilidad se ve su alcance en azul (%d casillas)" % azules)
 			captura("05a_rango_habilidad")
 			hud.huecos_hab[0].mouse_exited.emit()
-			# El bloque del héroe activo: medidores con su vida y PA
+			# The active hero block: gauges with their health and PA
 			var hp := int(activo().get_meta("hp_actual"))
 			var hp_max := int(activo().get_meta("hp_max"))
 			check(hud.medidores["hp_actual"].texto.text == "%d/%d" % [hp, hp_max], "el corazón del retrato lleva la vida (%s)" % hud.medidores["hp_actual"].texto.text)
@@ -690,7 +692,7 @@ func _definir_pasos():
 			var con_turnos: bool = root.get_node("Modo").en_combate
 			check(slot_act.get_node("PA").visible == (con_turnos and int(activo().get_meta("pa_actual")) > 0) and slot_act.get_node("PA").text == str(int(activo().get_meta("pa_actual"))), "el retrato de arriba lleva sus PA en amarillo solo en combate (%s, combate %s)" % [slot_act.get_node("PA").text, con_turnos])
 			check(not ui.get_node("PanelFichas").visible, "las fichas viejas de la izquierda no se ven")
-			# Bocadillo al pasar el ratón por encima de un héroe
+			# Bubble when hovering over a hero
 			var p: Vector2i = memo["pos_antes"]
 			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_DISABLED
 			dm.call("ActualizarHover", p.x, p.y)
@@ -701,7 +703,7 @@ func _definir_pasos():
 			captura("05b_bocadillo_heroe")
 			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_INHERIT
 			check(not dm.get_meta("is_moving", false) and pos_activa() == memo["pos_antes"], "y no provoca movimiento")
-			# Clic en otro héroe: pasa a ser el activo y su ficha queda fijada
+			# Click on another hero: they become the active one and their card stays pinned
 			var otro: Node = null
 			for h in pm.get_children():
 				if h.name != "DatosEquipo" and h != activo() and not h.get_meta("ha_escapado") and int(h.get_meta("pa_actual")) > 0:
@@ -713,7 +715,7 @@ func _definir_pasos():
 				check(activo() == otro, "clicar a %s en el mapa lo selecciona" % otro.name)
 			return 0.3,
 		func():
-			# La barra de arriba: todos los héroes; clicar un retrato selecciona a ese héroe
+			# The top bar: all the heroes; clicking a portrait selects that hero
 			var hud = ui.get_node("HUD")
 			var n_heroes := 0
 			for h in pm.get_children():
@@ -731,7 +733,7 @@ func _definir_pasos():
 			return 0.3,
 		func():
 			captura("06_barra_heroes")
-			# Mientras se lee el cambio de turno no se puede actuar
+			# While the turn change is being read you can't act
 			Engine.remove_meta("test_sin_espera_banner")
 			ui.get_node("Banner").mostrar("Turno de prueba")
 			memo["pos_banner"] = pos_activa()
@@ -749,14 +751,14 @@ func _definir_pasos():
 			_preparar_cruce()
 			return 0.2,
 		func():
-			# Cruzar a un compañero: A --> (B) --> destino
+			# Walk through a teammate: A --> (B) --> destination
 			if memo.has("cruce"):
 				var c: Array = memo["cruce"]
 				dm.call("ProcesarClicEnCasilla", c[2].x, c[2].y)
 			return 1.4,
 		func():
-			if memo.has("cruce") and (dm.get_meta("bloqueo_evento", false) or root.get_node("Modo").en_combate and pos_activa() != memo["cruce"][2]):
-				# Por el camino ha saltado una trampa o un enemigo le ha visto: no se puede probar aquí
+			if memo.has("cruce") and (dm.get_meta("bloqueo_evento", false) or root.get_node("Modo").con_turnos() and pos_activa() != memo["cruce"][2]):
+				# On the way a trap triggered or an enemy saw them: it can't be tested here
 				print("[test] AVISO algo frenó la prueba de cruzar (trampa o enemigo)")
 				_cerrar_evento("al cruzar")
 				memo.erase("cruce")
@@ -765,7 +767,8 @@ func _definir_pasos():
 				var b: Node = memo["cruce_b"]
 				check(pos_activa() == c[2], "un héroe puede cruzar por encima de un compañero (%s -> %s, quiere %s)" % [c[0], pos_activa(), c[2]])
 				check(b.get_meta("grid_pos") == c[1], "y el compañero sigue en su sitio")
-				# Con 1 PA solo llegaría a la casilla del compañero: no puede acabar ahí, no se mueve
+				# With 1 PA they'd only reach the teammate's tile: they can't end there, so they
+				# don't move
 				dm.call("TeletransporteDebug", c[0].x, c[0].y)
 				activo().set_meta("pa_actual", 1)
 				memo["cruce_pa1"] = true
@@ -778,7 +781,8 @@ func _definir_pasos():
 				if root.get_node("Modo").en_combate:
 					check(pos_activa() == c[0], "pero nunca acaba en la misma casilla que otro (se queda en %s)" % pos_activa())
 				else:
-					# Explorando no hay PA que recorten la ruta: llega, y el compañero (de su grupo) se aparta
+					# Exploring there's no PA cutting the path: they arrive, and the teammate (from
+					# their group) steps aside
 					var b_cruce: Node = memo["cruce_b"]
 					check(pos_activa() != b_cruce.get_meta("grid_pos"), "nunca acaban dos en la misma casilla (%s / %s)" % [pos_activa(), b_cruce.get_meta("grid_pos")])
 				activo().set_meta("pa_actual", 6)
@@ -795,7 +799,8 @@ func _definir_pasos():
 				var ev: Vector2i = memo["evento_lejano"]
 				var p := pos_activa()
 				if absi(p.x - ev.x) + absi(p.y - ev.y) > 1 and (activo().get_meta("in_combat", false) or root.get_node("Modo").en_combate):
-					# Un enemigo le ha visto por el camino y le ha frenado (es lo correcto): no se puede probar aquí
+					# An enemy saw them on the way and stopped them (which is correct): it can't be
+					# tested here
 					print("[test] AVISO un enemigo frenó al héroe antes de llegar al evento")
 				else:
 					check(p != ev and absi(p.x - ev.x) + absi(p.y - ev.y) == 1, "al clicar un evento lejano el héroe se pone a su lado, no encima (%s, evento %s)" % [p, ev])
@@ -808,7 +813,8 @@ func _definir_pasos():
 			var cofres: Array = dm.get_meta("lista_cofres", [])
 			check(cofres.size() > 0, "hay cofres (%d)" % cofres.size())
 			if cofres.size() > 0:
-				# El primero con una casilla libre al lado (alguno puede estar encajonado junto a la escalera)
+				# The first one with a free tile next to it (some may be boxed in next to the
+				# stairs)
 				var elegido: Vector2i = cofres[0]
 				var llega := false
 				for c in cofres:
@@ -824,7 +830,7 @@ func _definir_pasos():
 			check(b.size() > 0, "junto al cofre aparece un bocadillo")
 			if b.size() > 0:
 				var con_pa: bool = str(b[0].get_meta("texto")).contains("PA")
-				check(con_pa == root.get_node("Modo").en_combate, "el bocadillo indica el coste solo en combate: '%s'" % str(b[0].get_meta("texto")).replace("\n", " | "))
+				check(con_pa == root.get_node("Modo").con_turnos(), "el bocadillo indica el coste solo con turnos (combate o sigilo): '%s'" % str(b[0].get_meta("texto")).replace("\n", " | "))
 			captura("08_bocadillo_cofre")
 			var c: Vector2i = memo.get("cofre", Vector2i(-1, -1))
 			memo["riqueza_cofre"] = _riqueza(activo())
@@ -835,23 +841,23 @@ func _definir_pasos():
 			var h: Node = memo["heroe_cofre"]
 			check(_riqueza(h) != memo["riqueza_cofre"], "el botín del cofre llega a %s (%s -> %s)" % [h.name, memo["riqueza_cofre"], _riqueza(h)])
 			captura("09_cofre_abierto")
-			# Puerta: nos ponemos al lado y la abrimos
+			# Door: we stand next to it and open it
 			var puertas: Array = dm.get_meta("lista_puertas", []).filter(func(q): return not q in dm.get_meta("puertas_jefe", []))
 			memo["puerta"] = null
 			if puertas.size() > 0 and junto_a(puertas[0]):
 				memo["puerta"] = puertas[0]
-				# Sin modo debug y con los PA justos: el cambio de héroe tiene que esperar a la puerta
+				# No debug mode and with just enough PA: the hero switch has to wait for the door
 				memo["debug_puerta"] = dm.get_meta("debug_mode", false)
 				if memo["debug_puerta"]:
 					dm.call("ToggleModoDebug")
 				activo().set_meta("pa_actual", 2)
 				memo["heroe_puerta"] = activo()
-				memo["puerta_en_combate"] = root.get_node("Modo").en_combate
+				memo["puerta_en_combate"] = root.get_node("Modo").con_turnos()
 				dm.call("ProcesarClicEnCasilla", puertas[0].x, puertas[0].y)
 				check(activo() == memo["heroe_puerta"], "al abrir la puerta con los últimos PA no se cambia de héroe en el acto")
 			else:
 				print("[test] AVISO este piso no tiene puertas accesibles")
-			# Braseros: ocupan su casilla
+			# Braziers: they take up their tile
 			var braseros: Array = dm.get_meta("lista_braseros", [])
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			var pisable := false
@@ -862,7 +868,8 @@ func _definir_pasos():
 			return 1.0,
 		func():
 			if memo.has("heroe_puerta"):
-				# Explorando no hay turnos ni PA que gastar: solo en combate pasa al siguiente
+				# Exploring there are no turns or PA to spend: only with turns (combat or stealth)
+				# does it move on to the next one
 				if memo.get("puerta_en_combate", false):
 					check(activo() != memo["heroe_puerta"], "cuando acaba la puerta pasa al siguiente héroe (%s)" % (activo().name if activo() else "nadie"))
 				else:
@@ -897,7 +904,7 @@ func _definir_pasos():
 					hay_ataque = true
 			check(hay_ataque, "junto al enemigo el bocadillo ofrece atacar")
 			check(ficha_visible("Enemigo0"), "la ficha del enemigo en pantalla se ve")
-			# Tarjeta de previsión al pasar sobre el enemigo
+			# Preview card when hovering the enemy
 			dm.get_node("InputManager").process_mode = Node.PROCESS_MODE_DISABLED
 			dm.call("ActualizarHover", e.x, e.y)
 			return 0.2,
@@ -919,7 +926,7 @@ func _definir_pasos():
 			captura("10_bocadillo_enemigo")
 			var nodo := dm.get_node_or_null("Enemy_%d_%d" % [e.x, e.y])
 			if nodo:
-				# Que aguante el golpe: así se ve el contraataque
+				# Let it survive the hit: that way the counterattack shows
 				nodo.set_meta("hp_max", 999)
 				nodo.set_meta("hp_actual", 999)
 			memo["hp0"] = int(nodo.get_meta("hp_actual")) if nodo else -1
@@ -948,11 +955,12 @@ func _definir_pasos():
 			check(nuevos >= 1, "sobre el enemigo sale el corazón con el daño (%d indicadores)" % nuevos)
 			check(not dm.get_node("Camera3D").has_meta("encuadre"), "al acabar el ataque la cámara vuelve al héroe")
 			var atacante: Node = memo["atacante"]
-			# Contraataca si su arma llega a 1 casilla (un arco no): lo mismo que anuncia la previsión
+			# Counterattacks if its weapon reaches 1 tile (a bow doesn't): same as the preview
+			# announces
 			var herido: bool = int(atacante.get_meta("hp_actual")) < int(memo["hp_atacante"])
 			check(herido == (int(memo["contra_previsto"]) > 0), "el %s %s, como anunciaba la previsión (%s: %d -> %d PV)" % [memo["enemigo_nombre"], "contraataca" if herido else "no contraataca", atacante.name, memo["hp_atacante"], atacante.get_meta("hp_actual")])
 			if is_instance_valid(nodo):
-				nodo.set_meta("hp_actual", 5) # que el resto del guion no tenga que pelear con él
+				nodo.set_meta("hp_actual", 5) # So the rest of the script doesn't have to fight it
 			check(not dm.get_meta("is_moving", false), "al acabar la secuencia el tablero se desbloquea")
 			captura("11_combate")
 			_preparar_arco()
@@ -967,7 +975,7 @@ func _definir_pasos():
 				memo["arquero"] = activo()
 				memo["hp_h_arco"] = int(activo().get_meta("hp_actual"))
 				dm.call("ProcesarClicEnCasilla", e.x, e.y)
-			return 2.8, # d20 + proyectil
+			return 2.8, # d20 + projectile
 		func():
 			if memo.has("nodo_arco"):
 				var nodo = memo["nodo_arco"]
@@ -979,13 +987,13 @@ func _definir_pasos():
 			_preparar_turno_enemigo()
 			return 0.5,
 		func():
-			# Objetos de broma: están en el catálogo y sus efectos de equipo funcionan
+			# Joke items: they're in the catalogue and their equipment effects work
 			var cat = root.get_node("Catalogo")
 			for id in ["chancleta_inquisicion", "escudo_carton", "pocion_malir_sal", "espada_multiusos", "casco_cubo_basura", "boton_panico", "mascara_no_estoy", "grano_oro"]:
 				check(cat.existe(id), "el objeto %s está en el catálogo" % id)
 			var h := activo()
 			var n := str(h.name)
-			# Casco de basura: +4 de defensa (sobre lo que da sin nada en la cabeza)
+			# Trash helmet: +4 defense (over what you get with nothing on your head)
 			var cabeza_antes := str(h.get_meta("equipo", {}).get("cabeza", ""))
 			if cabeza_antes != "":
 				pm.call("Desequipar", n, "cabeza")
@@ -994,10 +1002,10 @@ func _definir_pasos():
 				var err = pm.call("Equipar", n, _indice_de(n, "casco_cubo_basura"))
 				check(err == "" and int(h.get_meta("defensa")) == def0 + 4, "el casco de basura da +4 de defensa (%d -> %d) %s" % [def0, h.get_meta("defensa"), err])
 				pm.call("Desequipar", n, "cabeza")
-				pm.call("QuitarObjeto", n, _indice_de(n, "casco_cubo_basura"), 1) # que no llene la mochila
+				pm.call("QuitarObjeto", n, _indice_de(n, "casco_cubo_basura"), 1) # So it doesn't fill the backpack
 			if cabeza_antes != "":
 				pm.call("Equipar", n, _indice_de(n, cabeza_antes))
-			# Escudo de cartón: +5 el primer turno de combate
+			# Cardboard shield: +5 on the first combat turn
 			var mano_antes := str(h.get_meta("equipo", {}).get("mano_secundaria", ""))
 			if mano_antes != "":
 				pm.call("Desequipar", n, "mano_secundaria")
@@ -1010,10 +1018,10 @@ func _definir_pasos():
 				pm.call("QuitarObjeto", n, _indice_de(n, "escudo_carton"), 1)
 			if mano_antes != "":
 				pm.call("Equipar", n, _indice_de(n, mano_antes))
-			# La gallina ahora es una habilidad global: se aprende y se lanza desde la barra
+			# The chicken is now a global ability: learnt and cast from the bar
 			var prog = root.get_node("Progreso")
 			h.set_meta("pa_actual", maxi(int(h.get_meta("pa_actual")), 6))
-			h.set_meta("habilidades", []) # sitio libre (los drafts automáticos del guion pueden haberlas llenado)
+			h.set_meta("habilidades", []) # Free room (the script's automatic drafts may have filled them)
 			prog.aprender(h, "gallina")
 			var i_gal := -1
 			for k in prog.lista(h).size():
@@ -1034,7 +1042,7 @@ func _definir_pasos():
 			var e_gal: Dictionary = prog.lista(memo["heroe_gal"])[memo["i_gal"]]
 			check(int(e_gal["usos"]) == 0 and int(e_gal["enfriamiento"]) == 3, "gasta su uso y se pone a recargar (%s)" % [e_gal])
 			check(prog.motivo_no_usar(memo["heroe_gal"], memo["i_gal"]) != "", "y no se puede volver a lanzar ('%s')" % prog.motivo_no_usar(memo["heroe_gal"], memo["i_gal"]))
-			# Matar da XP; con Sed de sangre, al matar se cura (una pasiva)
+			# Killing gives XP; with Bloodthirst, killing heals (a passive)
 			var h := activo()
 			prog.aprender(h, "sed_sangre")
 			h.set_meta("hp_actual", maxi(1, int(h.get_meta("hp_max")) - 30))
@@ -1057,7 +1065,7 @@ func _definir_pasos():
 				check(not is_instance_valid(memo["victima"]) or str(memo["victima"].name).ends_with("_muerto"), "una habilidad puede matar a un enemigo")
 				check(_xp_total(h) > int(memo["xp_total"]), "matar da XP (%d -> %d)" % [memo["xp_total"], _xp_total(h)])
 				check(int(h.get_meta("hp_actual")) > int(memo["hp_sed"]), "Sed de sangre cura al matar (%d -> %d)" % [memo["hp_sed"], h.get_meta("hp_actual")])
-			# Subir de nivel: stats según la clase y el draft
+			# Level up: stats by class and the draft
 			memo["nivel_antes"] = int(h.get_meta("nivel"))
 			memo["hp_max_antes"] = int(h.get_meta("hp_max"))
 			prog.pendientes.clear()
@@ -1082,7 +1090,7 @@ func _definir_pasos():
 				var antes: Dictionary = prog._buscar(h, id).duplicate()
 				pn.elegir(0)
 				if pn.visible:
-					# Ranuras llenas: olvida la primera
+					# Slots full: forgets the first one
 					pn.olvidar(str(prog.lista(h)[0]["id"]))
 				var ahora: Dictionary = prog._buscar(h, id)
 				check(ahora.size() > 0 and (antes.is_empty() or int(ahora["pilas"]) > int(antes["pilas"])), "elegir una carta la aprende (o la apila): %s" % id)
@@ -1090,7 +1098,7 @@ func _definir_pasos():
 			memo.erase("probando_draft")
 			return 0.3,
 		func():
-			# POSICIONAMIENTO: flanqueo, ataque de oportunidad, estados, empujón y Retirada
+			# POSITIONING: flanking, attack of opportunity, states, push and Retreat
 			var tac = root.get_node("Tactica")
 			var est = root.get_node("Estados")
 			var h := activo()
@@ -1108,7 +1116,7 @@ func _definir_pasos():
 			memo["e_tac"] = e
 			var pe: Vector2i = e.get_meta("grid_pos")
 			var ph := pos_activa()
-			# Flanqueo: un aliado al otro lado del enemigo
+			# Flanking: an ally on the other side of the enemy
 			var opuesto: Vector2i = pe + (pe - ph)
 			var otro: Node = null
 			for o in _heroes():
@@ -1127,26 +1135,26 @@ func _definir_pasos():
 				dm.call("ColocarHeroe", str(otro.name), sitio_otro.x, sitio_otro.y, 1)
 			else:
 				print("[test] AVISO no hay sitio al otro lado del enemigo para probar el flanqueo")
-			# Ataque de oportunidad: alejarse de un enemigo despierto le da un golpe gratis
+			# Attack of opportunity: moving away from an awake enemy gives it a free hit
 			e.set_meta("in_combat", true)
 			if e.has_meta("reaccion_dia"):
 				e.remove_meta("reaccion_dia")
 			est.quitar(h, "desenganchado")
 			tac.al_mover(h, ph, ph + (ph - pe))
 			check(int(e.get_meta("reaccion_dia", -1)) == int(pm.get_meta("turno_actual")), "alejarse de un enemigo provoca su ataque de oportunidad")
-			# Estados: ardiendo quema al empezar el día
+			# States: ardiendo burns at the start of the day
 			est.aplicar(e, "ardiendo", 2, 1, h)
 			check(est.tiene(e, "ardiendo"), "se puede prender fuego a un enemigo")
 			var hp0 := int(e.get_meta("hp_actual"))
 			est.nuevo_dia()
 			check(int(e.get_meta("hp_actual")) < hp0 and est.de(e)["ardiendo"]["dias"] == 1, "al empezar el día arder quita vida (%d -> %d) y se gasta un día" % [hp0, e.get_meta("hp_actual")])
-			# Empujón: lejos del héroe hasta 5 casillas (o choca y queda aturdido)
+			# Push: away from the hero up to 5 tiles (or it hits something and gets stunned)
 			var antes: Vector2i = e.get_meta("grid_pos")
 			var hp_antes := int(e.get_meta("hp_actual"))
 			var movidas: int = tac.empujar(e, tac.dir_hacia(ph, antes), 5, h)
 			check(movidas > 0 or est.tiene(e, "aturdido") or int(e.get_meta("hp_actual")) < hp_antes, "un empujón mueve al enemigo o lo estampa (%d casillas, aturdido %s, vida %d -> %d)" % [movidas, est.tiene(e, "aturdido"), hp_antes, e.get_meta("hp_actual")])
 			check(e.get_meta("grid_pos") == antes + tac.dir_hacia(ph, antes) * movidas, "y el mapa lo sabe (%s)" % e.get_meta("grid_pos"))
-			# Retirada: acción básica de la rueda
+			# Retreat: basic action
 			h.set_meta("pa_actual", maxi(int(h.get_meta("pa_actual")), 4))
 			root.get_node("Progreso").lanzar_accion("retirada")
 			captura("11f_posicionamiento")
@@ -1154,7 +1162,8 @@ func _definir_pasos():
 		func():
 			var est = root.get_node("Estados")
 			check(est.tiene(activo(), "desenganchado"), "la Retirada quita los ataques de oportunidad hasta mañana")
-			# Pelotones: el enemigo despierto despierta a todo su pelotón, y hay combate mientras quede alguno
+			# Squads: the awake enemy wakes up its whole squad, and there's combat while any of them
+			# is left
 			var modo = root.get_node("Modo")
 			if memo.has("e_tac") and is_instance_valid(memo["e_tac"]) and memo["e_tac"].has_meta("peloton"):
 				var id: int = memo["e_tac"].get_meta("peloton")
@@ -1166,7 +1175,7 @@ func _definir_pasos():
 						if not e.get_meta("in_combat", false):
 							dormidos += 1
 				check(dormidos == 0 and modo.en_combate, "si despierta uno, despierta todo su pelotón (%d de %d) y hay combate" % [total - dormidos, total])
-			# Grupos de héroes: el del activo, el primero
+			# Hero groups: the active one's first
 			var grupos: Array = modo.grupos_heroes()
 			check(not grupos.is_empty() and activo() in grupos[0], "los héroes cercanos forman grupo; el del activo va primero (%d grupos)" % grupos.size())
 			return 0.2,
@@ -1176,16 +1185,16 @@ func _definir_pasos():
 				check(gal.is_visible_in_tree(), "la gallina se ve en el mapa")
 			captura("11d_gallina")
 			if is_instance_valid(gal):
-				# Fuera: que su huevo no se meta en el guion del turno enemigo
+				# Out: so its egg doesn't get into the enemy turn script
 				gal.queue_free()
 				root.get_node("Especiales").gallina = null
-			# Se acaba el día: todos sin PA -> juegan los enemigos despiertos
+			# The day ends: everyone out of PA -> the awake enemies play
 			memo["turno_antes"] = int(pm.get_meta("turno_actual"))
 			for h in _heroes():
 				h.set_meta("pa_actual", 0)
 			pm.call("TerminarTurnoPersonaje")
 			check(dm.get_meta("turno_enemigo", false), "al acabar el día empieza el turno enemigo")
-			return 0.3, # el guion espera solo a que acabe (el tablero está bloqueado mientras)
+			return 0.3, # The script just waits for it to end (the board is locked meanwhile)
 		func():
 			check(not dm.get_meta("turno_enemigo", false) and int(pm.get_meta("turno_actual")) == int(memo["turno_antes"]) + 1, "tras el turno enemigo empieza el día %d" % pm.get_meta("turno_actual"))
 			if memo.has("ia_enemigo"):
@@ -1202,30 +1211,31 @@ func _definir_pasos():
 					var hp: Vector2i = h.get_meta("grid_pos")
 					ahora_d = absi(ep.x - hp.x) + absi(ep.y - hp.y)
 				var herido := int(h.get_meta("hp_actual")) < int(memo["ia_hp"])
-				# Actuar = moverse o tirar su ataque (puede ir a por otro héroe o fallar la tirada)
+				# Acting = moving or rolling its attack (it can go for another hero or miss the
+				# roll)
 				check(herido or tiro or se_movio, "el %s despierto actúa: distancia %d -> %d, %s" % [memo["ia_nombre"], antes, ahora_d, "ataca a %s" % h.name if herido else ("tira su ataque" if tiro else "sin atacar")])
 			captura("11c_turno_enemigo")
 			return 0.1,
 		func():
-			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			# One at a time: switching to the next hero waits for the previous thing to end
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
 				dm.call("TeletransporteDebug", salida.x, salida.y)
 			return 1.1,
 		func():
-			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			# One at a time: switching to the next hero waits for the previous thing to end
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
 				dm.call("TeletransporteDebug", salida.x, salida.y)
 			return 1.1,
 		func():
-			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			# One at a time: switching to the next hero waits for the previous thing to end
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
 				dm.call("TeletransporteDebug", salida.x, salida.y)
 			return 1.1,
 		func():
-			# Uno a uno: el cambio al siguiente héroe espera a que acabe lo anterior
+			# One at a time: switching to the next hero waits for the previous thing to end
 			var salida: Vector2i = dm.get_meta("casilla_salida")
 			if activo() != null and not root.get_node("Main/CanvasLayer3").visible:
 				dm.call("TeletransporteDebug", salida.x, salida.y)
@@ -1279,12 +1289,12 @@ func _definir_pasos():
 			check(root.get_node("Main/CapaTransicion/Negro").color.a < 0.05, "la transición termina")
 			check(int(pm.get_meta("piso_actual")) == 2, "estamos en el piso 2")
 			check(activo() != null, "hay personaje activo en el piso 2")
-			# Al llegar solo se conoce lo que se ve desde la entrada
+			# On arrival you only know what's seen from the entrance
 			var exploradas: PackedInt32Array = dm.call("DebugExploradas")
 			var inicio_p: Vector2i = dm.get_meta("casilla_inicio")
 			var lejos := 0
 			for i in range(0, exploradas.size(), 2):
-				if absi(exploradas[i] - inicio_p.x) + absi(exploradas[i + 1] - inicio_p.y) > 9:
+				if absi(exploradas[i] - inicio_p.x) + absi(exploradas[i + 1] - inicio_p.y) > 9 + 3:  # Light + stealth VISION_EXTRA
 					lejos += 1
 			check(exploradas.size() > 0 and lejos == 0, "en el piso nuevo no hay salas reveladas lejos de la entrada (%d exploradas, %d lejos)" % [exploradas.size() / 2, lejos])
 			var inicio: Vector2i = dm.get_meta("casilla_inicio")
@@ -1294,10 +1304,10 @@ func _definir_pasos():
 				var gp: Vector2i = h.get_meta("grid_pos")
 				check(abs(gp.x - inicio.x) + abs(gp.y - inicio.y) <= 3, "%s aparece junto al inicio %s (está en %s)" % [h.name, inicio, gp])
 			dm.call("ToggleModoDebug")
-			return 3.0, # la cámara se desliza hasta el nuevo héroe activo
+			return 3.0, # The camera slides to the new active hero
 		func():
-			# Picking: proyectamos una casilla a píxeles del SubViewport y lanzamos el mismo rayo
-			# contra el suelo que usa el InputManager (con h_offset incluido); debe volver a la misma casilla
+			# Picking: we project a tile to SubViewport pixels and cast the same ray against the
+			# floor the InputManager uses (h_offset included); it must come back to the same tile
 			var cam: Camera3D = dm.get_node("Camera3D")
 			var alc: PackedInt32Array = dm.call("DebugAlcance")
 			var ok := alc.size() >= 2
@@ -1324,7 +1334,7 @@ func _definir_pasos():
 				rueda(true)
 			return 1.0,
 		func():
-			# Dos alturas: subimos al héroe activo a una sala alta
+			# Two heights: we move the active hero up to a high room
 			var lado := int(Engine.get_meta("alturas_lado", 0))
 			var niveles: PackedByteArray = Engine.get_meta("alturas", PackedByteArray())
 			var libres: PackedByteArray = dm.call("ObtenerTransitables")
@@ -1345,7 +1355,8 @@ func _definir_pasos():
 				var ficha: Node3D = dm.get_node(str(activo().name))
 				check(absf(ficha.position.y - 0.4) < 0.01, "en la sala alta la ficha está a su altura (y = %.2f)" % ficha.position.y)
 				captura("15b_sala_alta")
-				# Si al subir ha saltado un evento de proximidad, se cierra para no liar el resto del guion
+				# If a proximity event triggered when going up, close it so it doesn't mess up the
+				# rest of the script
 				_cerrar_evento("en la sala alta")
 				var p0: Vector2i = memo["pos_baja"]
 				dm.call("TeletransporteDebug", p0.x, p0.y)
@@ -1369,7 +1380,7 @@ func _definir_pasos():
 					con_prob += 1
 			check(con_prob == 3, "cada opción del evento enseña su probabilidad (%d de 3)" % con_prob)
 			check(pe.get_node("Foto").texture != null, "el evento enseña su ilustración")
-			# Todos los eventos tienen su arte (aunque sea placeholder)
+			# Every event has its art (even if it's a placeholder)
 			var sin_arte: Array = []
 			for f in DirAccess.get_files_at("res://Data/Events"):
 				if not f.ends_with(".tres"):
@@ -1401,7 +1412,7 @@ func _definir_pasos():
 			return 0.8,
 		func():
 			check(not dm.get_meta("bloqueo_evento", false), "al cerrar el evento el tablero se desbloquea")
-			# Minimapa: algo explorado tiene que estar pintado
+			# Minimap: something explored has to be painted
 			var mapa: TextureRect = ui.get_node("Minimapa/Mascara/Mapa")
 			var img := mapa.texture.get_image()
 			var pintados := 0
@@ -1410,7 +1421,7 @@ func _definir_pasos():
 					if img.get_pixel(x, y).a > 0.5:
 						pintados += 1
 			check(pintados > 10, "el minimapa muestra lo explorado (%d casillas)" % pintados)
-			# Opciones visuales del menú de pausa: PS1 baja + CRT
+			# Pause menu visual options: low PS1 + CRT
 			var menu := root.get_node("Main/CanvasMenuPausa")
 			memo["ajustes"] = menu.ajustes.duplicate()
 			menu.ajustes["resolucion"] = 3
@@ -1434,15 +1445,15 @@ func _process(_delta):
 		dm = root.get_node_or_null("Main/ContenedorMapa/SubViewport/DungeonManager")
 		pm = root.get_node_or_null("Main/PartyManager")
 		ui = root.get_node_or_null("Main/CanvasLayer")
-		espera_hasta = ahora() + 2.2 # fundido de entrada "PISO 1"
+		espera_hasta = ahora() + 2.2 # "PISO 1" fade in
 		return false
 	if ahora() < espera_hasta:
 		return false
-	# Los pasos de movimiento esperan a que termine el tween (los eventos se gestionan aparte)
+	# Movement steps wait for the tween to end (events are handled separately)
 	if dm.get_meta("is_moving", false):
 		return false
-	# Las subidas de nivel abren el draft cuando les toca: fuera del paso que lo prueba, se elige la
-	# primera carta (o se olvida la primera habilidad) para que el guion siga
+	# Level ups open the draft when their time comes: outside the step that tests it, the first card
+	# is picked (or the first ability forgotten) so the script goes on
 	var pn = root.get_node_or_null("Main/PantallaNivel")
 	if pn and pn.visible and not memo.get("probando_draft", false):
 		pn.elegir(0)

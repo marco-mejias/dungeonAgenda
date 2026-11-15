@@ -2,25 +2,24 @@
 class_name Efecto
 extends Resource
 
-# Una pieza de efecto reutilizable: la usan los consumibles (al usarlos), las armas
-# (al golpear), las opciones de los eventos y, más adelante, las habilidades.
-# El motor que los aplica está en Scripts/CPP/Inventario/Efectos.hpp.
+# A reusable effect piece: used by consumables (when used), weapons (on hit), event options and,
+# later on, abilities. The engine that applies them lives in Scripts/CPP/Inventario/Inventario.hpp.
 
 enum Tipo {
-	CURAR,          # +valor de vida (sin pasar del máximo)
-	DANAR,          # -valor de vida
-	CORDURA,        # +/- valor de cordura
-	HAMBRE,         # +/- valor de saciedad
-	PA,             # +/- valor de PA este turno
-	ORO,            # +/- valor de oro
-	COMIDA,         # +/- valor de raciones en la bolsa
-	MODIFICAR_STAT, # +valor a 'stat' durante 'duracion_turnos' días (0 = hasta el final del piso)
-	DAR_OBJETO,     # mete 'objeto' x valor en el inventario
+	CURAR,          # +valor health (not over the max)
+	DANAR,          # -valor health
+	CORDURA,        # +/- valor sanity
+	HAMBRE,         # +/- valor satiety
+	PA,             # +/- valor PA this turn
+	ORO,            # +/- valor gold
+	COMIDA,         # +/- valor rations in the bag
+	MODIFICAR_STAT, # +valor to 'stat' for 'duracion_turnos' days (0 = until the end of the floor)
+	DAR_OBJETO,     # Puts 'objeto' x valor in the inventory
 }
 
 @export var tipo: Tipo = Tipo.CURAR
 @export var valor: int = 10
-@export_range(0, 100, 1, "suffix:%") var probabilidad: int = 100 # 100 = siempre
+@export_range(0, 100, 1, "suffix:%") var probabilidad: int = 100 # 100 = always
 
 @export_group("Solo MODIFICAR_STAT")
 @export_enum("hp_max", "velocidad", "fuerza", "defensa", "magia", "suerte", "radio_luz", "sanidad_max", "hambre_max") var stat: String = "fuerza"
@@ -29,6 +28,7 @@ enum Tipo {
 @export_group("Solo DAR_OBJETO")
 @export var objeto: ObjetoData
 
+# Short readable text for the effect ("Cura 10")
 func describir() -> String:
 	match tipo:
 		Tipo.CURAR: return "Cura %d" % valor

@@ -1,7 +1,7 @@
 extends CanvasLayer
 
-# Fundido a negro con el rótulo del piso ("Piso 2", en gótica). Bloquea el ratón mientras se ve.
-#   fundido("Piso 2", callable_a_mitad)  -> negro, llama al callable, enseña el rótulo y vuelve
+# Fade to black with the floor title ("Piso 2", in gothic type). It blocks the mouse while visible.
+#   fundido("Piso 2", callable_a_mitad)  -> black, calls the callable, shows the title and comes back
 
 const T_FUNDIDO := 0.55
 const T_ROTULO := 0.9
@@ -11,7 +11,7 @@ const T_ROTULO := 0.9
 
 func _ready() -> void:
 	layer = 20
-	# Entrada al juego: empezamos en negro con "PISO 1"
+	# Game entry: we start in black with "PISO 1"
 	negro.color.a = 1.0
 	Estilo.como_titulo(rotulo, 48)
 	rotulo.text = "Piso 1"
@@ -23,6 +23,7 @@ func _ready() -> void:
 	tw.tween_property(negro, "color:a", 0.0, T_FUNDIDO)
 	tw.tween_callback(_soltar_raton)
 
+# Fades to black, calls 'a_mitad' while the screen is black, shows the title and fades back
 func fundido(texto: String, a_mitad: Callable) -> void:
 	negro.mouse_filter = Control.MOUSE_FILTER_STOP
 	rotulo.text = texto

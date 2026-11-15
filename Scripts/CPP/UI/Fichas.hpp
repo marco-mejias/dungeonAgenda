@@ -1,7 +1,7 @@
 #pragma once
-// Fichas de personaje del HUD (columna izquierda): estilo de ventana PS1, barras con icono,
-// rombos de PA animados, ficha de héroe y de enemigo, y qué fichas se ven en cada momento
-// (AUTO = quien sale en pantalla + el héroe activo; además las fijadas y el enemigo bajo el cursor).
+// HUD character cards: PS1 window style, bars with icons, animated PA diamonds, hero and enemy
+// cards, and which cards are visible at each moment (AUTO = whoever is on screen + the active hero;
+// plus the pinned ones and the enemy under the cursor).
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node3d.hpp>
@@ -29,11 +29,13 @@ using namespace godot;
 
 const int MAX_FICHAS_ENEMIGO = 4;
 
+// Is this card pinned by the player?
 inline bool EstaFijada(const std::vector<String>& fijadas, const String& nombre) {
 	for (const String& n : fijadas) if (n == nombre) return true;
 	return false;
 }
 
+// Stats block of the card ("Fuerza 3  Defensa 2 ...")
 inline String GenerarTextoStats(Node* character) {
 	if (!character) return "";
 	
@@ -49,7 +51,7 @@ inline String GenerarTextoStats(Node* character) {
 		   "Magia: "     + String::num_int64(mag) + "\n" +
 		   "Suerte: "    + String::num_int64(lck);
 
-	// Arma y carga de la mochila (solo los héroes tienen equipo)
+	// Weapon and backpack load (only heroes have equipment)
 	if (character->has_meta("equipo")) {
 		Ref<Resource> arma = inventario::Arma(character);
 		texto += "\nArma: " + (arma.is_valid() ? inventario::NombreDe(arma) : String::utf8("pu\xC3\xB1os"));
@@ -58,20 +60,22 @@ inline String GenerarTextoStats(Node* character) {
 	return texto;
 }
 
-// Estilo "piedra tallada": las cajas y colores salen del autoload Estilo (Scripts/GDD/estilo.gd)
+// "Carved stone" style: boxes and colours come from the Estilo autoload (Scripts/GDD/estilo.gd)
 inline Node* Estilo(Node* ctx) { return ctx ? ctx->get_node_or_null("/root/Estilo") : nullptr; }
 
+// A StyleBox from the Estilo autoload
 inline Ref<StyleBox> Caja(Node* ctx, const char* nombre) {
 	Node* e = Estilo(ctx);
 	return e ? Ref<StyleBox>(e->call("caja", String(nombre))) : Ref<StyleBox>();
 }
 
+// A palette colour from the Estilo autoload (or 'si_falta' if it isn't loaded)
 inline Color ColorEstilo(Node* ctx, const char* nombre, Color si_falta) {
 	Node* e = Estilo(ctx);
 	return e ? Color(e->call("color", String(nombre))) : si_falta;
 }
 
-// Cada barra con su color fijo (vida roja, hambre verde, cordura violeta); se hace una vez por ficha
+// Every bar with its fixed colour (red health, green hunger, violet sanity); done once per card
 inline void EstilarBarras(Control* ficha) {
 	if (ficha->has_meta("barras_estiladas")) return;
 	const char* filas[3] = { "Vida", "Hambre", "Cordura" };
@@ -84,7 +88,7 @@ inline void EstilarBarras(Control* ficha) {
 	ficha->set_meta("barras_estiladas", true);
 }
 
-// Marco de la ficha: "ficha", "ficha_activa" (oro), "ficha_enemigo" (rojo) o "ficha_alerta"
+// Card frame: "ficha", "ficha_activa" (gold), "ficha_enemigo" (red) or "ficha_alerta"
 inline void PintarMarco(Control* ficha, const char* nombre) {
 	EstilarBarras(ficha);
 	if (ficha->has_meta("marco") && String(ficha->get_meta("marco")) == String(nombre)) return;
@@ -94,11 +98,13 @@ inline void PintarMarco(Control* ficha, const char* nombre) {
 	ficha->add_theme_stylebox_override("panel", caja);
 }
 
+// Sets the text of a Label inside the card, if it exists
 inline void FijarTexto(Control* ficha, const char* ruta, const String& texto) {
 	Label* l = Object::cast_to<Label>(ficha->get_node_or_null(ruta));
 	if (l) l->set_text(texto);
 }
 
+// Fills one bar of the card (health, hunger, sanity) and its number
 inline void FijarBarra(Control* ficha, const char* fila, int valor, int maximo) {
 	String base = String("V/Cabecera/Info/") + fila;
 	ProgressBar* barra = Object::cast_to<ProgressBar>(ficha->get_node_or_null(NodePath(base + "/Barra")));
@@ -107,7 +113,7 @@ inline void FijarBarra(Control* ficha, const char* fila, int valor, int maximo) 
 	if (l) l->set_text(String::num_int64(valor));
 }
 
-// PA como rombos (llenos = disponibles)
+// PA as diamonds (full = available)
 inline void PintarPA(Control* ficha, int pa, int pa_max) {
 	HBoxContainer* caja = Object::cast_to<HBoxContainer>(ficha->get_node_or_null("V/Cabecera/Info/Fila/PA"));
 	if (!caja) return;
@@ -135,7 +141,7 @@ inline void PintarPA(Control* ficha, int pa, int pa_max) {
 		bool recien_gastado = i >= pa && i < pa_antes;
 		bool recien_ganado = i < pa && i >= pa_antes;
 		if (recien_gastado || recien_ganado) {
-			// Los rombos que cambian destellan y se vacían/llenan uno detrás de otro
+			// The diamonds that change flash and empty/fill one after another
 			r->set_color(recien_gastado ? Color(1, 1, 1) : VACIO);
 			Ref<Tween> tw = r->create_tween();
 			float retraso = 0.07f * (recien_gastado ? (pa_antes - 1 - i) : (i - pa_antes));
@@ -149,6 +155,7 @@ inline void PintarPA(Control* ficha, int pa, int pa_max) {
 	}
 }
 
+// Fills a hero card: name, bars, PA diamonds, equipment and active frame
 inline void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
 	FijarTexto(f, "V/Cabecera/Info/Fila/Nombre", p->get_meta("nombre_display", p->get_name()));
 	FijarBarra(f, "Vida", p->get_meta("hp_actual", 0), p->get_meta("hp_max", 100));
@@ -160,7 +167,7 @@ inline void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
 	FijarTexto(f, "V/Detalle/Recursos/Oro", String::num_int64((int)p->get_meta("oro", 0)));
 	FijarTexto(f, "V/Detalle/Recursos/Comida", "Comida: " + String::num_int64((int)p->get_meta("comida_bolsa", 0)));
 
-	// Las 4 casillas de la ficha muestran lo que lleva puesto
+	// The 4 card slots show what they're wearing
 	const char* const RANURAS_FICHA[4] = { "mano_principal", "mano_secundaria", "cuerpo", "cabeza" };
 	for (int s = 1; s <= 4; s++) {
 		TextureRect* slot = Object::cast_to<TextureRect>(f->get_node_or_null(NodePath("V/Detalle/Slots/Slot" + String::num_int64(s))));
@@ -182,6 +189,7 @@ inline void RellenarFichaHeroe(Control* f, Node* p, Node* activo) {
 	PintarMarco(f, p == activo ? "ficha_activa" : "ficha");
 }
 
+// Fills an enemy card: name, health, strength and defense
 inline void RellenarFichaEnemigo(Control* f, Node3D* e) {
 	FijarTexto(f, "V/Cabecera/Info/Fila/Nombre", e->get_meta("nombre_display", "Enemigo"));
 	FijarBarra(f, "Vida", e->get_meta("hp_actual", 1), e->get_meta("hp_max", 1));
@@ -192,7 +200,7 @@ inline void RellenarFichaEnemigo(Control* f, Node3D* e) {
 	int frame = e->get_meta("frame", 11);
 	if (!f->has_meta("frame_pintado") || (int)f->get_meta("frame_pintado") != frame) {
 		f->set_meta("frame_pintado", frame);
-		// Se carga la primera vez que hace falta (no al cargar la DLL)
+		// Loaded the first time it's needed (not when loading the DLL)
 		static Ref<Texture2D> hoja = ResourceLoader::get_singleton()->load("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png");
 		Ref<AtlasTexture> retrato;
 		retrato.instantiate();
@@ -205,7 +213,8 @@ inline void RellenarFichaEnemigo(Control* f, Node3D* e) {
 	PintarMarco(f, alerta ? "ficha_alerta" : "ficha_enemigo");
 }
 
-// Qué fichas se ven: fijadas, el activo y lo que hay en pantalla (en AUTO) y el enemigo bajo el cursor
+// Which cards are visible: pinned ones, the active hero and whatever is on screen (in AUTO) and the
+// enemy under the cursor
 inline void ActualizarVisibilidad(Control* panel, Node* pm, Node* dm, const TypedArray<Node>& heroes, bool modo_auto, const std::vector<String>& fijadas) {
 	if (!panel || !pm || !dm) return;
 	Camera3D* cam = Object::cast_to<Camera3D>(dm->get_node_or_null("Camera3D"));

@@ -7,9 +7,9 @@ class_name EventoData
 @export var ilustracion: Texture2D
 
 @export_category("Arte (Assets/Eventos/<evento>/)")
-## Cómo se ve en el mapa: 16x16, o una tira de 16 px de alto con varios fotogramas (se anima)
+## How it looks on the map: 16x16, or a 16 px tall strip with several frames (it gets animated)
 @export var sprite_mapa: Texture2D
-## Imagen al ganar / perder (si la opción no tiene la suya)
+## Image on win / lose (if the option doesn't have its own)
 @export var imagen_exito: Texture2D
 @export var imagen_fracaso: Texture2D
 
@@ -21,10 +21,10 @@ enum TipoTrigger { MANUAL, PROXIMIDAD, CONDICIONAL }
 @export var gatillo: TipoTrigger = TipoTrigger.MANUAL
 
 @export_group("Si es de PROXIMIDAD")
-@export var radio_activacion: int = 3 # A cuántas casillas de distancia salta
+@export var radio_activacion: int = 3 # How many tiles away it triggers
 
 @export_group("Si es CONDICIONAL")
-# La estadística que va a mirar (puedes añadir más si quieres)
+# The stat it will look at (you can add more if you want)
 @export_enum("ninguno", "hp_actual", "hambre_actual", "sanidad_actual") var stat_objetivo: String = "ninguno"
-# El valor por DEBAJO del cual el evento saltará (Ej: Si sanidad < 30)
+# The value BELOW which the event triggers (e.g. if sanity < 30)
 @export var valor_critico: int = 30

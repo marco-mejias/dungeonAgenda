@@ -1,29 +1,29 @@
 extends Control
 
-# Minimapa de lo explorado (esquina superior derecha). Gira con la cámara para que
-# "arriba" sea siempre hacia donde mira y acompaña su zoom. M lo oculta/muestra.
-# Mantener pulsado = vistazo de la cámara a ese punto; al soltar vuelve al héroe.
+# Minimap of what's been explored (top right corner). It rotates with the camera so "up" is always
+# where it's looking, and follows its zoom. M hides/shows it. Holding the button = camera peek at
+# that point; on release it goes back to the hero.
 
 const GRID := 40 # = mazmorra::GRID_SIZE
 const LADO := 132.0
-# Zoom del minimapa: ZOOM_BASE con la cámara a su distancia de referencia; sigue al zoom de la cámara
+# Minimap zoom: ZOOM_BASE with the camera at its reference distance; it follows the camera zoom
 const ZOOM_BASE := 2.2
 const ZOOM_MIN := 1.0
 const ZOOM_MAX := 4.5
-# Códigos que devuelve DungeonManager.ObtenerMinimapa()
+# Codes returned by DungeonManager.ObtenerMinimapa()
 const COLORES := {
-	0: Color(0, 0, 0, 0),             # sin explorar
-	1: Color(0.22, 0.18, 0.28, 0.95), # suelo explorado
-	2: Color(0.42, 0.36, 0.5, 1.0),   # suelo a la vista
-	3: Color(0.62, 0.42, 0.32, 1.0),  # muro
-	4: Color(0.75, 0.5, 0.2, 1.0),    # puerta cerrada
-	5: Color(1.0, 0.82, 0.25, 1.0),   # cofre
-	6: Color(0.3, 0.6, 1.0, 1.0),     # escalera
-	7: Color(1.0, 0.25, 0.2, 1.0),    # enemigo a la vista
-	8: Color(0.55, 0.85, 1.0, 1.0),   # héroe
-	9: Color(1.0, 1.0, 1.0, 1.0),     # héroe activo
-	10: Color(1.0, 0.55, 0.15, 1.0),  # brasero
-	11: Color(1.0, 0.3, 0.9, 1.0),    # evento
+	0: Color(0, 0, 0, 0),             # Unexplored
+	1: Color(0.22, 0.18, 0.28, 0.95), # Explored floor
+	2: Color(0.42, 0.36, 0.5, 1.0),   # Floor in view
+	3: Color(0.62, 0.42, 0.32, 1.0),  # Wall
+	4: Color(0.75, 0.5, 0.2, 1.0),    # Closed door
+	5: Color(1.0, 0.82, 0.25, 1.0),   # Chest
+	6: Color(0.3, 0.6, 1.0, 1.0),     # Stairs
+	7: Color(1.0, 0.25, 0.2, 1.0),    # Enemy in view
+	8: Color(0.55, 0.85, 1.0, 1.0),   # Hero
+	9: Color(1.0, 1.0, 1.0, 1.0),     # Active hero
+	10: Color(1.0, 0.55, 0.15, 1.0),  # Brazier
+	11: Color(1.0, 0.3, 0.9, 1.0),    # Event
 }
 
 var imagen: Image
@@ -56,7 +56,7 @@ func _ready() -> void:
 	marco.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(marco)
 
-	# Máscara circular: los hijos solo se dibujan donde se dibuja este panel
+	# Circular mask: children are only drawn where this panel is drawn
 	var mascara := Panel.new()
 	mascara.name = "Mascara"
 	var sm := StyleBoxFlat.new()
@@ -92,14 +92,14 @@ func _process(delta: float) -> void:
 	if not dm:
 		return
 
-	# Centrado en lo que mira la cámara y girado para que su dirección quede hacia arriba
+	# Centred on what the camera is looking at and rotated so its direction points up
 	var cam := dm.get_node_or_null("Camera3D")
 	if cam:
 		var yaw: float = cam.get_meta("yaw", 45.0)
 		yaw_actual = lerp(yaw_actual, yaw, min(1.0, 10.0 * delta))
 		var y := deg_to_rad(yaw_actual)
 		mapa.rotation = -PI * 0.5 - atan2(-cos(y), -sin(y))
-		# zoom_factor = 2 a la distancia de referencia: más cerca = más zoom también aquí
+		# zoom_factor = 2 at the reference distance: closer = more zoom here too
 		var zoom_cam: float = cam.get_meta("zoom_factor", 2.0)
 		var objetivo := clampf(ZOOM_BASE * zoom_cam * 0.5, ZOOM_MIN, ZOOM_MAX)
 		zoom_actual = lerp(zoom_actual, objetivo, min(1.0, 10.0 * delta))
@@ -108,7 +108,7 @@ func _process(delta: float) -> void:
 		mapa.pivot_offset = Vector2(pivote.x, pivote.z) / GRID * mapa.size
 		mapa.position = mapa.get_parent().size * 0.5 - mapa.pivot_offset
 
-	# Al soltar el botón se acaba el vistazo y la cámara vuelve al héroe
+	# On button release the peek ends and the camera goes back to the hero
 	if vistazo and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		vistazo = false
 		if cam and cam.has_meta("vistazo"):
@@ -126,6 +126,7 @@ func _process(delta: float) -> void:
 			imagen.set_pixel(x, yy, COLORES.get(datos[x * GRID + yy], Color(0, 0, 0, 0)))
 	textura.update(imagen)
 
+# Click on the minimap: the camera peeks at that tile while the button is held
 func _on_mapa_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 		var local := mapa.get_local_mouse_position()
@@ -133,7 +134,7 @@ func _on_mapa_input(ev: InputEvent) -> void:
 		var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 		var cam: Node = dm.get_node_or_null("Camera3D") if dm else null
 		if cam and celda.x >= 0 and celda.y >= 0 and celda.x < GRID and celda.y < GRID:
-			# El punto se fija al pulsar (el mapa se recentra mientras la cámara viaja)
+			# The point is fixed on press (the map re-centres while the camera travels)
 			cam.set_meta("vistazo", Vector3(celda.x, 0, celda.y))
 			vistazo = true
 		accept_event()

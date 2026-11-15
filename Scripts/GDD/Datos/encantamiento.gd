@@ -2,8 +2,8 @@
 class_name Encantamiento
 extends Resource
 
-# Hueco para los objetos encantados (todavía no salen al azar): un nombre que se
-# añade al del objeto, bonos de stats y efectos extra al golpear.
+# Slot for enchanted items (they don't drop randomly yet): a name added to the item's, stat bonuses
+# and extra on-hit effects.
 
 @export var nombre: String = "de Fuego"
 @export var modificadores: Array[ModificadorStat] = []

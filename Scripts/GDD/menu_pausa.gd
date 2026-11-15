@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 const RUTA_AJUSTES := "user://ajustes.cfg"
-# Resolución interna del mapa: cuánto se reduce el SubViewport (más = más pixelado)
+# Internal map resolution: how much the SubViewport shrinks (more = more pixelated)
 const RESOLUCIONES := [["PS1 (baja)", 3], ["Media", 2], ["Alta", 1]]
 const SACUDIDAS := [["Desactivada", 0], ["Sutil", 1], ["Fuerte", 2]]
 
@@ -21,7 +21,7 @@ var chk_pantalla: CheckBox
 var ajustes := {"resolucion": 2, "jitter": 1.5, "tramado": true, "crt": false, "sacudida": 1}
 
 func _ready() -> void:
-	# El menú empieza oculto cuando estás jugando
+	# The menu starts hidden while you're playing
 	self.visible = false
 	panel_opciones.visible = true
 	$ColorRect.color = Estilo.color("velo")
@@ -30,6 +30,7 @@ func _ready() -> void:
 	_cargar_ajustes()
 	_aplicar_ajustes()
 
+# Texts and title style of the pause menu
 func _traducir() -> void:
 	var titulo: Label = caja.get_node("Label")
 	titulo.text = "Opciones"
@@ -38,27 +39,29 @@ func _traducir() -> void:
 	_estilo_etiqueta(caja.get_node("Label3"), "VOLUMEN DE EFECTOS")
 	btn_volver.text = "VOLVER"
 	btn_volver.custom_minimum_size = Vector2(0, 40)
-	# Que el botón use el estilo PS1 del tema en vez de los grises antiguos
+	# Make the button use the theme's PS1 style instead of the old greys
 	for e in ["normal", "hover"]:
 		btn_volver.remove_theme_stylebox_override(e)
 
+# Small soft label for an option
 func _estilo_etiqueta(l: Label, texto: String) -> Label:
 	l.text = texto
 	l.add_theme_font_size_override("font_size", 11)
 	l.add_theme_color_override("font_color", Estilo.color("texto_suave"))
 	return l
 
-# Esta función lee las teclas que pulsas en todo momento
+# This function reads the keys you press at all times
 func _input(event: InputEvent) -> void:
-	# "ui_cancel" es la tecla ESCAPE por defecto en Godot
+	# "ui_cancel" is the ESCAPE key by default in Godot
 	if event.is_action_pressed("ui_cancel"):
 		alternar_pausa()
 
+# Pauses or resumes the game (ESC) and shows/hides the menu
 func alternar_pausa() -> void:
 	var esta_pausado = get_tree().paused
 	get_tree().paused = not esta_pausado
 
-	# Mostramos u ocultamos la capa ENTERA
+	# We show or hide the WHOLE layer
 	self.visible = get_tree().paused
 
 	if get_tree().paused:
@@ -70,10 +73,11 @@ func alternar_pausa() -> void:
 	else:
 		_guardar_ajustes()
 
-# --- OPCIONES VISUALES ---
+# --- VISUAL OPTIONS ---
 
+# Adds the visual options (resolution, dithering, CRT, fullscreen, screen shake) under the volume sliders
 func _crear_opciones_visuales() -> void:
-	# Hueco para los controles nuevos: ensanchamos la caja centrada
+	# Room for the new controls: we widen the centred box
 	caja.offset_left = -140
 	caja.offset_right = 140
 	caja.offset_top = -250
@@ -103,7 +107,7 @@ func _crear_opciones_visuales() -> void:
 	elementos.append(chk_tramado)
 	chk_crt = _casilla("SCANLINES CRT", "crt")
 	elementos.append(chk_crt)
-	# Pantalla completa a la resolución del monitor (la lleva el autoload Ventana; también F11)
+	# Fullscreen at the monitor resolution (handled by the Ventana autoload; F11 too)
 	chk_pantalla = CheckBox.new()
 	chk_pantalla.text = "PANTALLA COMPLETA  (F11)"
 	chk_pantalla.focus_mode = Control.FOCUS_NONE
@@ -126,6 +130,7 @@ Juega en una ventana aparte o con el juego exportado."
 		caja.move_child(e, pos)
 		pos += 1
 
+# Dropdown bound to one setting
 func _opciones(lista: Array, clave: String) -> OptionButton:
 	var o := OptionButton.new()
 	o.focus_mode = Control.FOCUS_NONE
@@ -135,6 +140,7 @@ func _opciones(lista: Array, clave: String) -> OptionButton:
 	o.item_selected.connect(func(i): _cambiar(o.get_item_id(i), clave))
 	return o
 
+# Checkbox bound to one setting
 func _casilla(texto: String, clave: String) -> CheckBox:
 	var c := CheckBox.new()
 	c.text = texto
@@ -143,15 +149,18 @@ func _casilla(texto: String, clave: String) -> CheckBox:
 	c.toggled.connect(_cambiar.bind(clave))
 	return c
 
+# A setting changed: apply it right away
 func _cambiar(valor, clave: String) -> void:
 	ajustes[clave] = valor
 	_aplicar_ajustes()
 
+# Selects the dropdown item with that id
 func _seleccionar(o: OptionButton, id: int) -> void:
 	for i in o.item_count:
 		if o.get_item_id(i) == id:
 			o.select(i)
 
+# Reads the saved settings (user://ajustes.cfg)
 func _cargar_ajustes() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(RUTA_AJUSTES) == OK:
@@ -163,13 +172,15 @@ func _cargar_ajustes() -> void:
 	chk_tramado.set_pressed_no_signal(bool(ajustes["tramado"]))
 	chk_crt.set_pressed_no_signal(bool(ajustes["crt"]))
 
+# Saves the settings
 func _guardar_ajustes() -> void:
 	var cfg := ConfigFile.new()
-	cfg.load(RUTA_AJUSTES) # sin perder otras secciones ([video] de la ventana)
+	cfg.load(RUTA_AJUSTES) # Without losing other sections ([video] for the window)
 	for k in ajustes.keys():
 		cfg.set_value("graficos", k, ajustes[k])
 	cfg.save(RUTA_AJUSTES)
 
+# Applies every setting: map resolution, post-process shaders, vertex jitter and Feel level
 func _aplicar_ajustes() -> void:
 	var contenedor := get_node_or_null("/root/Main/ContenedorMapa") as SubViewportContainer
 	if contenedor:
@@ -184,13 +195,13 @@ func _aplicar_ajustes() -> void:
 	if feel:
 		feel.nivel = int(ajustes["sacudida"])
 
-# --- BOTÓN VOLVER ---
+# --- BACK BUTTON ---
 func _on_return_pressed() -> void:
 	AudioManager.play_ui("clic")
-	# Al darle al botón, quitamos la pausa (que ocultará el menú automáticamente)
+	# When the button is pressed we unpause (which hides the menu automatically)
 	alternar_pausa()
 
-# --- CONTROL DE VOLUMEN (Igual que en el Menú Principal) ---
+# --- VOLUME CONTROL (same as in the Main Menu) ---
 func _on_slider_musica_value_changed(value: float) -> void:
 	var bus_index = AudioServer.get_bus_index("Musica")
 	AudioServer.set_bus_volume_db(bus_index, linear_to_db(value))

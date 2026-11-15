@@ -5,11 +5,11 @@ class_name OpcionEvento
 @export_enum("hp_actual", "hp_max", "velocidad", "fuerza", "defensa", "magia", "suerte", "sanidad_actual", "ninguna") var stat_usada: String = "fuerza"
 
 @export_category("Dificultad y RNG")
-## Facilidad: la dificultad del d20 es CD = 16 - 5 x multiplicador (1.0 -> CD 11, 2.0 -> CD 6)
+## Ease: the d20 difficulty is DC = 16 - 5 x multiplier (1.0 -> DC 11, 2.0 -> DC 6)
 @export_range(0.1, 3.0) var multiplicador_dificultad: float = 1.0 
 
 @export_category("Arte de la resolución")
-## Imagen al ganar / perder con ESTA opción (si no hay, la del evento)
+## Image on win / lose with THIS option (if there's none, the event's one)
 @export var imagen_exito: Texture2D
 @export var imagen_fracaso: Texture2D
 
@@ -24,9 +24,9 @@ class_name OpcionEvento
 @export var parametro_fracaso: int = 0
 
 @export_category("Efectos (nuevo sistema)")
-# Se aplican al héroe además de la función de arriba (que sigue funcionando)
+# Applied to the hero on top of the function above (which still works)
 @export var efectos_exito: Array[Efecto] = []
 @export var efectos_fracaso: Array[Efecto] = []
-## Extra con un 20 natural (éxito crítico) / un 1 natural (pifia), además de los de arriba
+## Extra on a natural 20 (critical success) / a natural 1 (fumble), on top of the ones above
 @export var efectos_critico: Array[Efecto] = []
 @export var efectos_pifia: Array[Efecto] = []

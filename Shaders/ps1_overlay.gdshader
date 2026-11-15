@@ -1,15 +1,15 @@
-// Overlay de casillas (alcance de movimiento / interactuables / enemigos).
-// Por instancia (MultiMesh custom data): rgb = color, a = máscara de bordes / 15
-//   bit 1 = norte (-Z), 2 = sur (+Z), 4 = oeste (-X), 8 = este (+X)
-// Pinta solo el contorno de los lados exteriores del área (sin relleno), que se enciende y se apaga
-// despacio (un respiro de ~2.5 s) en vez de estar siempre a tope.
+// Tile overlay (movement reach / interactables / enemies).
+// Per instance (MultiMesh custom data): rgb = colour, a = border mask / 15
+//   bit 1 = north (-Z), 2 = south (+Z), 4 = west (-X), 8 = east (+X)
+// It only paints the outline of the outer sides of the area (no fill), which fades in and out
+// slowly (a ~2.5 s breath) instead of always being at full strength.
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled;
 
-uniform float periodo = 2.5;      // segundos de un respiro completo
-uniform float minimo = 0.25;      // lo más apagado que se queda el contorno
+uniform float periodo = 2.5;      // Seconds of a full breath
+uniform float minimo = 0.25;      // The dimmest the outline gets
 uniform float border = 0.07;
-// Fuerza del temblor de vértices en píxeles de baja resolución (opción del menú de pausa)
+// Vertex jitter strength in low-res pixels (pause menu option)
 global uniform float ps1_jitter;
 
 varying flat vec4 data;

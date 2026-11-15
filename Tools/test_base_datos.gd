@@ -1,5 +1,5 @@
 extends SceneTree
-# Test del panel "Base de datos" (fuera del editor):
+# Test for the "Base de datos" panel (outside the editor):
 #   godot --headless --path . -s res://Tools/test_base_datos.gd
 
 var fallos: Array[String] = []
@@ -40,7 +40,7 @@ func _init() -> void:
 	check(filas(panel) == 1, "buscar 'pocion' encuentra la poción (%d)" % filas(panel))
 	panel.buscar.text = ""
 
-	# Crear y duplicar un consumible de prueba (y borrarlos después)
+	# Create and duplicate a test consumable (and delete them afterwards)
 	var ruta: String = panel.crear(3, "prueba temporal")
 	check(ruta == "res://Data/Objetos/Consumibles/prueba_temporal.tres", "crea el consumible en su carpeta (%s)" % ruta)
 	var nuevo: ObjetoData = load(ruta) if ruta != "" else null

@@ -1,8 +1,8 @@
 extends SceneTree
-# Build headless de Jenova:
+# Headless Jenova build:
 #   godot --headless --editor --path . -s res://Tools/build_jenova.gd [-- rebuild]
-# Espera a que el plugin de Jenova esté listo, compila y deja unos frames para
-# que Jenova termine de volcar el módulo a su base de datos antes de salir.
+# Waits for the Jenova plugin to be ready, compiles and leaves a few frames so Jenova finishes
+# dumping the module into its database before quitting.
 var frames := 0
 var lanzado := false
 var done_at := -1
@@ -14,7 +14,7 @@ func _process(_delta):
 		if frames - done_at > 120:
 			quit(0 if ok else 1)
 		return false
-	# Jenova procesa frames mientras compila: sin este flag volveríamos a entrar aquí
+	# Jenova processes frames while compiling: without this flag we'd come in here again
 	if lanzado or frames < 30:
 		return false
 	var inst = ClassDB.class_call_static("JenovaEditorPlugin", "GetInstance")

@@ -1,7 +1,7 @@
 extends Control
 
-# Dado 3D low poly (icosaedro de caras planas) para las tiradas de los eventos.
-# Se dibuja en un SubViewport pequeño y pixelado dentro de la pantalla de evento.
+# Low poly 3D die (flat-faced icosahedron) for the event rolls. Drawn in a small
+# pixelated SubViewport inside the event screen.
 #   tirar(resultado, exito, duracion)  /  ocultar()
 
 const RESOLUCION := 72
@@ -66,6 +66,7 @@ func _ready() -> void:
 	sello.offset_top = -26
 	sello.offset_bottom = -4
 
+# Centred label with an outline (number and stamp)
 func _etiqueta(tam: int) -> Label:
 	var l := Label.new()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -78,7 +79,7 @@ func _etiqueta(tam: int) -> Label:
 	add_child(l)
 	return l
 
-# Icosaedro con caras planas (cada cara su normal y un tono de marfil)
+# Icosahedron with flat faces (each face its own normal and an ivory tone)
 func _icosaedro() -> ArrayMesh:
 	var t := (1.0 + sqrt(5.0)) / 2.0
 	var v := [
@@ -108,9 +109,10 @@ func _icosaedro() -> ArrayMesh:
 			st.add_vertex(p)
 	return st.commit()
 
-var sello_texto := "" # si no está vacío, sustituye a ÉXITO/FALLO (p. ej. ¡CRÍTICO! en combate)
-var solo_sellos_especiales := false # combate: un acierto normal no lleva sello (solo crítico o fallo)
+var sello_texto := "" # If not empty, it replaces SUCCESS/MISS (e.g. CRITICAL! in combat)
+var solo_sellos_especiales := false # Combat: a normal hit has no stamp (only critical or miss)
 
+# Spins the die for 'duracion' seconds and lands on 'resultado'
 func tirar(resultado: int, exito: bool, duracion: float = 1.5, texto_sello: String = "") -> void:
 	sello_texto = texto_sello
 	visible = true
@@ -128,6 +130,7 @@ func tirar(resultado: int, exito: bool, duracion: float = 1.5, texto_sello: Stri
 	if audio:
 		audio.play_sfx("dice")
 
+# The die stops: number and SUCCESS/MISS stamp in green or red
 func _mostrar_resultado(resultado: int, exito: bool) -> void:
 	girando = false
 	var color := Color(0.45, 1.0, 0.5) if exito else Color(1.0, 0.4, 0.35)
@@ -153,5 +156,5 @@ func _process(delta: float) -> void:
 	if visible and girando and dado:
 		dado.rotate(eje, velocidad * delta)
 	elif visible and dado:
-		# En reposo flota un poco
+		# At rest it floats a little
 		dado.rotate_y(delta * 0.4)

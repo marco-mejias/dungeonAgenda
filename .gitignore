@@ -14,3 +14,10 @@
 .agents/
 .claude/
 skills-lock.json
+
+# Paquetes de Jenova (compilador MSVC y SDK de Godot): los descarga su gestor de paquetes
+Jenova/Packages/
+
+# Comprimidos y copias de seguridad de Blender (los packs van descomprimidos)
+*.zip
+*.blend1

@@ -1,8 +1,7 @@
 /* Jenova C++ Node Base Script (Meteora) - DungeonRenderer (3D) */
 
-// La "mano visual": no tiene lógica de juego. El DungeonManager le pasa la cuadrícula
-// y le da órdenes (construir el mundo, pintar alcance/ruta, actualizar niebla, abrir cofres,
-// mostrar bocadillos...).
+// The "visual hand": it has no game logic. The DungeonManager passes it the grid and gives it
+// orders (build the world, paint reach/path, update the fog, open chests, show bubbles...).
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node3d.hpp>
@@ -53,20 +52,20 @@ using namespace jenova::sdk;
 using namespace render;
 
 namespace {
-	// Tipos de overlay de alcance
+	// Reach overlay types
 	const int O_ANDAR = 0;
 	const int O_INTERACTUAR = 1;
 	const int O_ENEMIGO = 2;
-	const int O_RANGO_ATAQUE = 3;    // alcance del arma (hover en ATACAR de la rueda): rojo
-	const int O_RANGO_HABILIDAD = 4; // alcance de la habilidad (hover en HABILIDAD): azul
+	const int O_RANGO_ATAQUE = 3;    // Weapon reach (hover on ATTACK): red
+	const int O_RANGO_HABILIDAD = 4; // Ability reach (hover on ABILITY): blue
 	bool EsArea(int tipo) { return tipo == O_ANDAR || tipo == O_RANGO_ATAQUE || tipo == O_RANGO_HABILIDAD; }
 
 	Node3D* self = nullptr;
 	int grid = 0;
 	std::vector<uint8_t> tipos;
 	std::vector<uint8_t> niebla;
-	// Niebla suavizada: valor actual por casilla (0 = oculto, 0.5 = explorado, 1 = visible)
-	// que persigue al objetivo para que las casillas se revelen con un fundido tramado
+	// Smoothed fog: current value per tile (0 = hidden, 0.5 = explored, 1 = visible) that chases
+	// its target so the tiles reveal with a dithered fade
 	std::vector<float> niebla_actual;
 	std::vector<float> niebla_objetivo;
 	bool niebla_animando = false;
@@ -81,7 +80,7 @@ namespace {
 
 	CPUParticles3D* m_motas = nullptr;
 	DirectionalLight3D* m_luna = nullptr;
-	// Capa 2D dentro del SubViewport: elementos anclados a posiciones 3D (ver Render/Capa2D.hpp)
+	// 2D layer inside the SubViewport: elements anchored to 3D positions (see Render/Capa2D.hpp)
 	CanvasLayer* m_capa2d = nullptr;
 	Control* m_raiz2d = nullptr;
 	Control* m_coste = nullptr;
@@ -91,11 +90,12 @@ namespace {
 	Ref<Texture2D> m_atlas;
 	Ref<Image> m_fog_img;
 	Ref<ImageTexture> m_fog_tex;
-	Ref<Image> m_occ_img;        // qué casillas tapan la vista (muros, columnas, puertas cerradas)
+	Ref<Image> m_occ_img;        // Which tiles block sight (walls, columns, closed doors)
 	Ref<ImageTexture> m_occ_tex;
 	Ref<ShaderMaterial> m_mat_suelo, m_mat_muro, m_mat_puerta, m_mat_cofre, m_mat_piedra, m_mat_marco;
 	std::vector<Ref<ShaderMaterial>> m_mats_mundo;
 
+	// Wall or outside the map
 	bool EsMuro(int x, int y) {
 		if (x < 0 || y < 0 || x >= grid || y >= grid) return true;
 		return tipos[x * grid + y] == T_MURO;
@@ -103,8 +103,8 @@ namespace {
 
 	Node* Dungeon() { return self ? self->get_parent() : nullptr; }
 
-	// Línea de visión del shader: dónde están los héroes (sus fichas, también mientras andan) y hasta
-	// dónde ven (radio_luz). Lo que no ve ninguno queda a la sombra.
+	// Shader line of sight: where the heroes are (their tokens, also while walking) and how far
+	// they see (radio_luz). Whatever none of them sees stays in shadow.
 	void ActualizarVista(Node* dungeon) {
 		if (m_mats_mundo.empty()) return;
 		Node* pm = dungeon->get_node_or_null("/root/Main/PartyManager");
@@ -118,7 +118,7 @@ namespace {
 				if ((h->has_meta("esta_muerto") && (bool)h->get_meta("esta_muerto")) || (h->has_meta("ha_escapado") && (bool)h->get_meta("ha_escapado"))) continue;
 				Node3D* ficha = Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(String(h->get_name()))));
 				if (!ficha || !ficha->is_visible()) continue;
-				// = Mazmorra.hpp RadioVision: luz + 3 (VISION_EXTRA); sin antorcha, 2
+				// = Mazmorra.hpp RadioVision: light + 3 (VISION_EXTRA); without torch, 2
 				int vision = (h->has_meta("radio_luz") ? (int)h->get_meta("radio_luz") : 4) + 3;
 				if (h->has_meta("antorcha_apagada") && (bool)h->get_meta("antorcha_apagada")) vision = std::min(vision, 2);
 				float radio = vision + 0.5f;
@@ -126,7 +126,7 @@ namespace {
 				vistas[n++] = Vector4(p.x, p.z, radio, 1.0f);
 			}
 		}
-		// Braseros a la vista: también iluminan (mismo radio que Mazmorra::RADIO_BRASERO + 0.5)
+		// Braziers in view: they light too (same radius as Mazmorra::RADIO_BRASERO + 0.5)
 		Array luces;
 		PackedInt32Array bras = dungeon->call("BraserosVisibles");
 		for (int i = 0; i + 1 < bras.size() && luces.size() < 8; i += 2)
@@ -148,6 +148,7 @@ namespace {
 		return d ? Object::cast_to<Camera3D>(d->get_node_or_null("Camera3D")) : nullptr;
 	}
 
+	// One world material (PS1 shader) with the tiles for the sides and the top
 	Ref<ShaderMaterial> CrearMaterialMundo(Vector4 lado, Vector4 tapa, bool cutaway, bool tile_instancia) {
 		Ref<ShaderMaterial> mat;
 		mat.instantiate();
@@ -164,6 +165,7 @@ namespace {
 		return mat;
 	}
 
+	// Empty prop node on a tile; 'solo_si_visible' hides it while its tile isn't in view
 	Node3D* CrearProp(const String& nombre, int x, int y, bool solo_si_visible) {
 		Node3D* prop = memnew(Node3D);
 		prop->set_name(nombre);
@@ -175,6 +177,7 @@ namespace {
 		return prop;
 	}
 
+	// Wall torch: a flame sprite and a small light, looking towards 'hacia'
 	void CrearAntorcha(int x, int y, Vector2i hacia) {
 		Node3D* prop = CrearProp(NombreProp("Antorcha", x, y), x, y, false);
 
@@ -206,6 +209,7 @@ namespace {
 		polillas->set_position(Vector3(hacia.x * 0.75f, 0.7f, hacia.y * 0.75f));
 	}
 
+	// Scatters up to 10 wall torches over walls next to the floor
 	void ColocarAntorchas() {
 		std::vector<Vector2i> puestas;
 		const Vector2i dirs[4] = { Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0) };
@@ -235,13 +239,14 @@ namespace {
 		}
 	}
 
+	// Creates the 2D layer for bubbles and enemy health bars (once)
 	void CrearCapa2D() {
 		if (m_capa2d) return;
 		m_capa2d = memnew(CanvasLayer);
 		m_capa2d->set_name("Capa2D");
 		m_capa2d->set_layer(2);
 		self->add_child(m_capa2d);
-		// Se dibuja en la ventana principal (nítida), no en el mundo pixelado
+		// Drawn on the main window (sharp), not in the pixelated world
 		if (self->get_tree() && self->get_tree()->get_root()) m_capa2d->set_custom_viewport(self->get_tree()->get_root());
 
 		m_raiz2d = memnew(Control);
@@ -261,9 +266,10 @@ namespace {
 	}
 
 	// ==========================================
-	// ANIMACIÓN POR FRAME (OnProcess)
+	// PER-FRAME ANIMATION (OnProcess)
 	// ==========================================
 
+	// Token of the active hero on the map
 	Node3D* TokenActivo(Node* dungeon) {
 		Node* pm = self->get_node_or_null("/root/Main/PartyManager");
 		Node* act = pm ? Object::cast_to<Node>(pm->call("GetActiveCharacter")) : nullptr;
@@ -271,7 +277,7 @@ namespace {
 	}
 
 	void ActualizarCutaway(Camera3D* cam, Node3D* token_activo) {
-		// Cutaway: los muros entre la cámara y el héroe activo se tramean
+		// Cutaway: the walls between the camera and the active hero get dithered
 		if (cam && m_mat_muro.is_valid()) {
 			Vector3 foco = cam->has_meta("pivote") ? (Vector3)cam->get_meta("pivote") : Vector3();
 			if (token_activo && token_activo->is_visible()) foco = token_activo->get_global_position();
@@ -281,7 +287,7 @@ namespace {
 	}
 
 	void ActualizarMarcador(Node* dungeon, Node3D* token_activo, float t) {
-		// Marcador del héroe activo: rombo dorado girando sobre su cabeza
+		// Active hero marker: golden diamond spinning over their head
 		if (!m_marcador) {
 			Ref<PrismMesh> prisma;
 			prisma.instantiate();
@@ -307,9 +313,9 @@ namespace {
 		}
 	}
 
-	// Idle de los sprites y la UI 2D de cada enemigo. Devuelve los nombres de UI que siguen vivas.
+	// Sprite idle and the 2D UI of every enemy. Returns the names of the UI that are still alive.
 	std::vector<String> AnimarFichas(Node* dungeon, Camera3D* cam, float escala, float t) {
-		// Idle: los sprites alternan sus dos frames; y UI 2D de los enemigos
+		// Idle: sprites alternate their two frames; and the enemies' 2D UI
 		TypedArray<Node> hijos = dungeon->get_children();
 		std::vector<String> uis_vivas;
 		for (int i = 0; i < hijos.size(); i++) {
@@ -320,7 +326,8 @@ namespace {
 
 			if (!cuerpo->has_meta("frame_a")) cuerpo->set_meta("frame_a", cuerpo->get_frame());
 			int fa = cuerpo->get_meta("frame_a");
-			// Los héroes los anima el autoload Apariencia (mismo reloj en el mapa y en la mochila)
+			// Heroes are animated by the Apariencia autoload (same clock on the map and in the
+			// backpack)
 			if (!cuerpo->has_meta("anim_externa")) {
 				int fase = (int)(t * 1.8f + (ficha->get_instance_id() % 7) * 0.37f) % 2;
 				cuerpo->set_frame(fase == 0 ? fa : Pareja(fa));
@@ -365,7 +372,8 @@ namespace {
 	}
 
 	void RecolocarCapa2D(Camera3D* cam, float escala, const std::vector<String>& uis_vivas) {
-		// Bocadillos y coste: recolocar sobre su punto 3D; quitar la UI de enemigos que ya no existen
+		// Bubbles and cost: reposition over their 3D point; remove the UI of enemies that no longer
+		// exist
 		if (m_raiz2d && cam) {
 			TypedArray<Node> elems = m_raiz2d->get_children();
 			for (int i = 0; i < elems.size(); i++) {
@@ -388,7 +396,7 @@ namespace {
 	}
 
 	void AnimarNiebla(double delta) {
-		// Niebla: cada casilla se acerca a su objetivo (el shader trama la aparición)
+		// Fog: every tile moves towards its target (the shader dithers the appearance)
 		if (niebla_animando && m_fog_img.is_valid() && (int)niebla_actual.size() == grid * grid) {
 			bool sigue = false;
 			float paso = (float)delta * 3.2f;
@@ -407,15 +415,15 @@ namespace {
 		}
 	}
 
-	// Motas, parpadeo de luces, llamas y gemas
+	// Dust motes, light flicker, flames and gems
 	void AnimarAmbiente(Camera3D* cam, float t) {
-		// Las motas de polvo siguen a la cámara
+		// Dust motes follow the camera
 		if (m_motas && cam && cam->has_meta("pivote")) {
 			Vector3 piv = cam->get_meta("pivote");
 			m_motas->set_position(piv + Vector3(0, 1.4f, 0));
 		}
 
-		// Parpadeo de antorchas (incluye la luz de los héroes)
+		// Torch flicker (includes the heroes' light)
 		TypedArray<Node> luces = self->get_tree()->get_nodes_in_group("antorchas");
 		for (int i = 0; i < luces.size(); i++) {
 			OmniLight3D* luz = Object::cast_to<OmniLight3D>(luces[i]);
@@ -425,7 +433,7 @@ namespace {
 			luz->set_param(Light3D::PARAM_ENERGY, base * f);
 		}
 
-		// Llamas de los braseros: pequeño latido de tamaño
+		// Brazier flames: a small size pulse
 		TypedArray<Node> llamas = self->get_tree()->get_nodes_in_group("llamas");
 		for (int i = 0; i < llamas.size(); i++) {
 			Node3D* l = Object::cast_to<Node3D>(llamas[i]);
@@ -434,8 +442,7 @@ namespace {
 			l->set_scale(Vector3(1.0f + 0.05f * std::sin(t * 13.0f + i), k, 1.0f));
 		}
 
-		// Gemas de evento flotando
-		// Sprites de evento: recorren sus fotogramas (220 ms, como los héroes)
+		// Event gems floating. Event sprites: they loop their frames (220 ms, like the heroes)
 		TypedArray<Node> sprites_ev = self->get_tree()->get_nodes_in_group("sprites_evento");
 		for (int i = 0; i < sprites_ev.size(); i++) {
 			Sprite3D* s = Object::cast_to<Sprite3D>(sprites_ev[i]);
@@ -454,11 +461,12 @@ namespace {
 JENOVA_SCRIPT_BEGIN
 
 // ==========================================
-// CONSTRUCCIÓN DEL MUNDO
+// WORLD CONSTRUCTION
 // ==========================================
 
+// Removes the previous floor's world
 void Limpiar(Caller* instance) {
-	// Los sacamos del árbol YA para que los nodos nuevos puedan reutilizar los mismos nombres
+	// We take them out of the tree RIGHT NOW so the new nodes can reuse the same names
 	Node* nodos[] = { m_mundo, m_props, m_alcance, m_ruta, m_cursor };
 	for (Node* n : nodos) {
 		if (!n) continue;
@@ -478,6 +486,7 @@ void Limpiar(Caller* instance) {
 	if (m_coste) m_coste->set_visible(false);
 }
 
+// Builds the whole 3D floor from the tile types the DungeonManager sends
 void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_size) {
 	self = GetSelf<Node3D>(instance);
 	Limpiar(instance);
@@ -519,7 +528,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	m_props->set_name("Props");
 	self->add_child(m_props);
 
-	// --- SUELOS (incluye la casilla bajo las puertas) ---
+	// --- FLOORS (includes the tile under the doors) ---
 	const Vector2i variantes[] = {
 		Vector2i(6, 0), Vector2i(7, 0), Vector2i(8, 0), Vector2i(9, 0),
 		Vector2i(6, 1), Vector2i(7, 1), Vector2i(8, 1), Vector2i(9, 1),
@@ -530,7 +539,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	for (int x = 0; x < grid; x++) {
 		for (int y = 0; y < grid; y++) {
 			if (!EsMuro(x, y)) { suelos.push_back(Vector2i(x, y)); continue; }
-			// Solo dibujamos los muros que tocan suelo (el resto es vacío negro)
+			// We only draw the walls that touch floor (the rest is black void)
 			bool toca_suelo = false;
 			for (int dx = -1; dx <= 1 && !toca_suelo; dx++)
 				for (int dy = -1; dy <= 1; dy++)
@@ -549,7 +558,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	}
 	m_mundo->add_child(mm_suelo);
 
-	// --- DOS ALTURAS: bajo cada suelo alto o escalón, un pedestal de piedra que llega al suelo ---
+	// --- TWO HEIGHTS: under every high floor or step, a stone pedestal down to the ground ---
 	for (int nivel = alturas::ESCALON; nivel <= alturas::ALTO; nivel++) {
 		std::vector<Vector2i> pedestales;
 		for (const Vector2i& s : suelos)
@@ -571,7 +580,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	}
 	m_mundo->add_child(mm_muro);
 
-	// --- COLUMNAS: pilares más finos que un muro, con su suelo debajo ---
+	// --- COLUMNS: pillars thinner than a wall, with their floor underneath ---
 	std::vector<Vector2i> columnas;
 	for (int x = 0; x < grid; x++)
 		for (int y = 0; y < grid; y++)
@@ -585,14 +594,14 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 		m_mundo->add_child(mm_col);
 	}
 
-	// --- PUERTAS ---
+	// --- DOORS ---
 	Ref<ArrayMesh> bloque = CrearBloque(1.0f);
 	for (int x = 0; x < grid; x++) {
 		for (int y = 0; y < grid; y++) {
 			uint8_t t = tipos[x * grid + y];
 			if (t != T_PUERTA && t != T_PUERTA_ABIERTA) continue;
 			Node3D* prop = CrearProp(NombreProp("Puerta", x, y), x, y, false);
-			// En local la puerta siempre se extiende en X; si el pasillo es horizontal la giramos 90º
+			// Locally the door always extends along X; if the corridor is horizontal we turn it 90º
 			bool corta_en_x = EsMuro(x - 1, y) && EsMuro(x + 1, y);
 			if (!corta_en_x) prop->set_rotation(Vector3(0, (float)Math_PI * 0.5f, 0));
 
@@ -609,7 +618,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 		}
 	}
 
-	// --- OVERLAYS (alcance, ruta y cursor) ---
+	// --- OVERLAYS (reach, path and cursor) ---
 	Ref<ShaderMaterial> mat_alcance;
 	mat_alcance.instantiate();
 	mat_alcance->set_shader(m_shader_overlay);
@@ -628,7 +637,7 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 
 	ColocarAntorchas();
 
-	// --- AMBIENTE: abismo bajo el mapa, motas de polvo que siguen a la cámara y luz lunar ---
+	// --- AMBIENCE: abyss under the map, dust motes following the camera and moonlight ---
 	Ref<PlaneMesh> plano;
 	plano.instantiate();
 	plano->set_size(Vector2(grid * 1.8f, grid * 1.8f));
@@ -664,9 +673,10 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 }
 
 // ==========================================
-// PROPS INTERACTIVOS
+// INTERACTIVE PROPS
 // ==========================================
 
+// Closed chest: box and a lid on a hinge
 void CrearCofre(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node3D* prop = CrearProp(NombreProp("Cofre", x, y), x, y, false);
@@ -680,6 +690,7 @@ void CrearCofre(Caller* instance, int x, int y) {
 	CrearPieza(bisagra, "Tapa", bloque, m_mat_cofre, Vector3(0, 0, 0.22), Vector3(0.64, 0.12, 0.48));
 }
 
+// The lid swings open
 void AbrirCofre(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node3D* bisagra = Object::cast_to<Node3D>(m_props->get_node_or_null(NodePath(NombreProp("Cofre", x, y) + "/Bisagra")));
@@ -688,6 +699,7 @@ void AbrirCofre(Caller* instance, int x, int y) {
 	tw->tween_property(bisagra, "rotation:x", -1.9, 0.35)->set_trans(Tween::TRANS_BACK)->set_ease(Tween::EASE_OUT);
 }
 
+// The door swings open and stops blocking sight in the shader
 void AbrirPuerta(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	if (x >= 0 && y >= 0 && x < grid && y < grid) {
@@ -700,6 +712,7 @@ void AbrirPuerta(Caller* instance, int x, int y) {
 	tw->tween_property(bisagra, "rotation:y", -1.75, 0.55)->set_trans(Tween::TRANS_BACK)->set_ease(Tween::EASE_OUT);
 }
 
+// The exit stairs (a few stone steps)
 void CrearSalida(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node3D* prop = CrearProp("Salida", x, y, false);
@@ -717,7 +730,7 @@ void CrearSalida(Caller* instance, int x, int y) {
 	prop->add_child(luz);
 }
 
-// Brasero de pie: base de piedra, cuenco y llama con luz propia
+// Standing brazier: stone base, bowl and a flame with its own light
 void CrearBrasero(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node3D* prop = CrearProp(NombreProp("Brasero", x, y), x, y, false);
@@ -745,7 +758,7 @@ void CrearBrasero(Caller* instance, int x, int y) {
 	brasas->set_position(Vector3(0, 0.75f, 0));
 }
 
-// Ternas (x, y, tipo): 0 = telaraña de esquina, 1 = huesos, 2 = calavera, 3 = rocas, 4 = piedras
+// Triplets (x, y, type): 0 = corner cobweb, 1 = bones, 2 = skull, 3 = rocks, 4 = stones
 void CrearDecoracion(Caller* instance, PackedInt32Array ternas) {
 	if (!m_props) return;
 	for (int i = 0; i + 2 < ternas.size(); i += 3) {
@@ -756,7 +769,7 @@ void CrearDecoracion(Caller* instance, PackedInt32Array ternas) {
 		float desp_z = (UtilityFunctions::randf() - 0.5f) * 0.3f;
 		switch (tipo) {
 			case 0: {
-				// Telaraña colgando en la esquina formada por los dos muros
+				// Cobweb hanging in the corner made by the two walls
 				float hx = EsMuro(x - 1, y) ? -1.0f : 1.0f;
 				float hz = EsMuro(x, y - 1) ? -1.0f : 1.0f;
 				Rect2 r = UtilityFunctions::randi_range(0, 1) == 0 ? Rect2(64, 96, 16, 16) : Rect2(80, 96, 16, 16);
@@ -786,8 +799,8 @@ void CrearMarcadorEvento(Caller* instance, int x, int y) {
 	m->add_to_group("gemas_evento");
 }
 
-// El evento con su sprite de mapa (EventoData.sprite_mapa: 16x16 o una tira de fotogramas de 16 px
-// de alto, que se anima). Si no tiene, la gema de siempre.
+// The event with its map sprite (EventoData.sprite_mapa: 16x16 or a strip of 16 px tall frames,
+// which gets animated). If it has none, the usual gem.
 void CrearSpriteEvento(Caller* instance, int x, int y, String ruta_evento) {
 	if (!m_props) return;
 	Ref<Resource> evento = ResourceLoader::get_singleton()->load(ruta_evento);
@@ -808,6 +821,7 @@ void CrearSpriteEvento(Caller* instance, int x, int y, String ruta_evento) {
 	prop->add_child(s);
 }
 
+// The event was used: its marker goes away
 void QuitarMarcadorEvento(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node* prop = m_props->get_node_or_null(NodePath(NombreProp("Evento", x, y)));
@@ -815,10 +829,10 @@ void QuitarMarcadorEvento(Caller* instance, int x, int y) {
 }
 
 // ==========================================
-// NIEBLA Y OVERLAYS
+// FOG AND OVERLAYS
 // ==========================================
 
-// estados: 0 = sin explorar, 1 = explorado, 2 = visible
+// estados: 0 = unexplored, 1 = explored, 2 = visible
 void ActualizarNiebla(Caller* instance, PackedByteArray estados, int modo_debug) {
 	if (m_fog_img.is_null() || grid == 0) return;
 	niebla_debug = modo_debug != 0;
@@ -854,12 +868,12 @@ void ActualizarNiebla(Caller* instance, PackedByteArray estados, int modo_debug)
 	}
 }
 
-// Ternas (x, y, tipo): 0 = andar, 1 = interactuable, 2 = enemigo, 3 = alcance de ataque,
-// 4 = alcance de habilidad. Las áreas (0, 3, 4) solo dibujan borde en los lados que dan fuera.
+// Triplets (x, y, type): 0 = walk, 1 = interactable, 2 = enemy, 3 = attack reach, 4 = ability
+// reach. The areas (0, 3, 4) only draw a border on the sides facing out.
 void PintarAlcance(Caller* instance, PackedInt32Array ternas) {
 	if (!m_alcance || grid == 0) return;
 	int count = ternas.size() / 3;
-	std::vector<uint8_t> area(grid * grid, 0); // tipo de área + 1 (0 = nada)
+	std::vector<uint8_t> area(grid * grid, 0); // Area type + 1 (0 = nothing)
 	for (int i = 0; i < count; i++) {
 		int x = ternas[i * 3], y = ternas[i * 3 + 1], tipo = ternas[i * 3 + 2];
 		if (EsArea(tipo) && x >= 0 && y >= 0 && x < grid && y < grid) area[x * grid + y] = (uint8_t)(tipo + 1);
@@ -871,11 +885,11 @@ void PintarAlcance(Caller* instance, PackedInt32Array ternas) {
 	for (int i = 0; i < count; i++) {
 		int x = ternas[i * 3], y = ternas[i * 3 + 1], tipo = ternas[i * 3 + 2];
 		Vector3 pos = GridToWorld(x, y);
-		pos.y += 0.012f; // encima de SU suelo (salas altas y escalones)
+		pos.y += 0.012f; // On top of ITS floor (high rooms and steps)
 		mm->set_instance_transform(i, Transform3D(Basis(), pos));
 
 		int mascara = 15;
-		Color color(0.62, 0.52, 0.36); // caminar: tono de antorcha apagado (el azul molestaba)
+		Color color(0.62, 0.52, 0.36); // Walk: dimmed torch tone (the blue was annoying)
 		if (EsArea(tipo)) {
 			mascara = (mismo(x, y - 1, tipo) ? 0 : 1) | (mismo(x, y + 1, tipo) ? 0 : 2) | (mismo(x - 1, y, tipo) ? 0 : 4) | (mismo(x + 1, y, tipo) ? 0 : 8);
 			if (tipo == O_RANGO_ATAQUE) color = Color(1.0, 0.25, 0.2);
@@ -890,7 +904,7 @@ void PintarAlcance(Caller* instance, PackedInt32Array ternas) {
 	}
 }
 
-// Ruta: las primeras 'alcanzables' casillas en color, el resto (sin PA) en gris
+// Path: the first 'alcanzables' tiles in colour, the rest (no PA left) in grey
 void PintarRuta(Caller* instance, PackedInt32Array celdas, int alcanzables) {
 	if (!m_ruta) return;
 	Ref<MultiMesh> mm = m_ruta->get_multimesh();
@@ -909,6 +923,7 @@ void PintarRuta(Caller* instance, PackedInt32Array celdas, int alcanzables) {
 	}
 }
 
+// Small square under the mouse
 void PintarCursor(Caller* instance, int x, int y) {
 	if (!m_cursor) return;
 	if (x < 0 || y < 0 || x >= grid || y >= grid) { m_cursor->set_visible(false); return; }
@@ -918,6 +933,7 @@ void PintarCursor(Caller* instance, int x, int y) {
 	m_cursor->set_visible(true);
 }
 
+// Clears reach, path, cursor and cost
 void LimpiarOverlay(Caller* instance) {
 	if (m_alcance) m_alcance->get_multimesh()->set_instance_count(0);
 	if (m_ruta) m_ruta->get_multimesh()->set_instance_count(0);
@@ -926,10 +942,10 @@ void LimpiarOverlay(Caller* instance) {
 }
 
 // ==========================================
-// BOCADILLOS Y COSTE (capa 2D anclada al mundo)
+// BUBBLES AND COST (2D layer anchored to the world)
 // ==========================================
 
-// canal 0 = interactuables adyacentes, canal 1 = hover. Solo se recrean los que cambian.
+// Channel 0 = adjacent interactables, channel 1 = hover. Only the ones that change are rebuilt.
 void FijarBocadillos(Caller* instance, int canal, PackedInt32Array celdas, PackedStringArray textos, PackedInt32Array estilos) {
 	if (!m_raiz2d) return;
 	String prefijo = "Bocadillo" + String::num_int64(canal);
@@ -946,7 +962,7 @@ void FijarBocadillos(Caller* instance, int canal, PackedInt32Array celdas, Packe
 
 		Control* b = CrearBocadillo(nombre, textos[i], estilo);
 		b->set_meta("anclaje", GridToWorld(celdas[i * 2], celdas[i * 2 + 1]) + Vector3(0, 0.95f, 0));
-		b->set_visible(false); // se muestra al anclarse en el siguiente frame
+		b->set_visible(false); // It shows up when anchored on the next frame
 		m_raiz2d->add_child(b);
 	}
 
@@ -960,7 +976,7 @@ void FijarBocadillos(Caller* instance, int canal, PackedInt32Array celdas, Packe
 	}
 }
 
-// Texto pequeño junto a la casilla bajo el cursor ("3 PA"). x < 0 lo oculta. estilo 1 = sin PA.
+// Small text next to the tile under the cursor ("3 PA"). x < 0 hides it. estilo 1 = no PA.
 void MostrarCoste(Caller* instance, int x, int y, String texto, int estilo) {
 	if (!m_coste) return;
 	Label* l = Object::cast_to<Label>(m_coste);
@@ -972,7 +988,7 @@ void MostrarCoste(Caller* instance, int x, int y, String texto, int estilo) {
 }
 
 // ==========================================
-// CICLO DE VIDA
+// LIFE CYCLE
 // ==========================================
 
 void OnAwake(Caller* instance) {

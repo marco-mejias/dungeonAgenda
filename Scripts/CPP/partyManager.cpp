@@ -24,6 +24,7 @@ namespace {
 
 	bool MetaBool(Node* n, const char* key) { return n && n->has_meta(key) && (bool)n->get_meta(key); }
 
+	// Our children are the heroes (except the DatosEquipo node)
 	std::vector<Node*> Heroes() {
 		std::vector<Node*> out;
 		if (!self) return out;
@@ -35,11 +36,12 @@ namespace {
 		return out;
 	}
 
+	// Alive, on the map, hasn't ended their turn and has PA left
 	bool PuedeJugar(Node* h) {
 		return h && !MetaBool(h, "esta_muerto") && !MetaBool(h, "ha_escapado") && !MetaBool(h, "ha_movido") && (int)h->get_meta("pa_actual", 0) > 0;
 	}
 
-	// El héroe se desploma de lado y desaparece
+	// The hero collapses sideways and disappears
 	void OcultarFicha(Node* h) {
 		if (!m_dungeon_manager || !h) return;
 		Node3D* ficha = Object::cast_to<Node3D>(m_dungeon_manager->get_node_or_null(NodePath(String(h->get_name()))));
@@ -55,6 +57,7 @@ namespace {
 		if (feel) feel->call("sacudir", 0.35);
 	}
 
+	// A hero dies: no more PA, their card and token go away
 	void Morir(Node* h, const String& causa) {
 		h->set_meta("esta_muerto", true);
 		h->set_meta("pa_actual", 0);
@@ -62,6 +65,7 @@ namespace {
 		OcultarFicha(h);
 	}
 
+	// The first hero that can still play becomes the active one
 	void SeleccionarSiguiente() {
 		act_char = nullptr;
 		for (Node* h : Heroes()) {
@@ -69,11 +73,13 @@ namespace {
 		}
 	}
 
+	// Hero node by name (null for DatosEquipo or a missing name)
 	Node* Heroe(const String& nombre) {
 		if (!self || nombre.is_empty() || nombre == "DatosEquipo") return nullptr;
 		return self->get_node_or_null(NodePath(nombre));
 	}
 
+	// Is the campfire screen open?
 	bool EnFogata() {
 		CanvasLayer* fogata = self ? Object::cast_to<CanvasLayer>(self->get_parent()->get_node_or_null("CanvasLayer3")) : nullptr;
 		return fogata && fogata->is_visible();
@@ -81,6 +87,7 @@ namespace {
 
 	bool EnMapa(Node* h) { return h && !MetaBool(h, "esta_muerto") && !MetaBool(h, "ha_escapado") && h->has_meta("grid_pos"); }
 
+	// Two heroes can trade items when they're next to each other (or anywhere at the campfire)
 	bool PuedenIntercambiarObjetos(Node* a, Node* b) {
 		if (!a || !b || a == b || MetaBool(a, "esta_muerto") || MetaBool(b, "esta_muerto")) return false;
 		if (EnFogata()) return true;
@@ -89,7 +96,7 @@ namespace {
 		return std::abs(pa.x - pb.x) + std::abs(pa.y - pb.y) == 1;
 	}
 
-	// Cambiar el equipo puede cambiar la luz (radio_luz), los PA o la vida: refrescamos todo
+	// Changing equipment can change the light (radio_luz), PA or health: we refresh everything
 	void TrasCambiarEquipo(Node* h) {
 		if (m_ui_manager) {
 			m_ui_manager->call("UpdateWarriorUI");
@@ -101,7 +108,7 @@ namespace {
 		}
 	}
 
-	// CAE LA NOCHE: supervivencia y recarga de PA
+	// NIGHTFALL: survival and PA recharge
 	void Noche() {
 		int turno = (int)self->get_meta("turno_actual", 1) + 1;
 		self->set_meta("turno_actual", turno);
@@ -110,7 +117,7 @@ namespace {
 		for (Node* h : heroes) {
 			if (MetaBool(h, "ha_escapado") || MetaBool(h, "esta_muerto")) continue;
 
-			// HAMBRE: -1 por día. Si queda poca y hay comida en la bolsa, se come sola.
+			// HUNGER: -1 per day. If it's low and there's food in the bag, they eat on their own.
 			int hambre = (int)h->get_meta("hambre_actual", 10) - 1;
 			int comida = h->get_meta("comida_bolsa", 0);
 			if (hambre <= 3 && comida > 0) {
@@ -124,7 +131,7 @@ namespace {
 				continue;
 			}
 
-			// CORDURA: perder al grupo de vista asusta
+			// SANITY: losing sight of the party is scary
 			Vector2i mi_pos = h->get_meta("grid_pos", Vector2i(0, 0));
 			int min_dist = 999;
 			for (Node* c : heroes) {
@@ -138,7 +145,7 @@ namespace {
 				UtilityFunctions::print("[Survival] ", h->get_name(), " loses 15 sanity due to isolation.");
 			}
 
-			inventario::AvanzarDia(h); // los efectos temporales duran X días
+			inventario::AvanzarDia(h); // Temporary effects last X days
 			h->set_meta("ha_movido", false);
 			h->set_meta("pa_actual", h->get_meta("pa_max", 3));
 		}
@@ -150,21 +157,22 @@ namespace {
 		}
 	}
 
+	// Everyone left alive has escaped down the stairs: the floor is over
 	void ComprobarFinDelPiso() {
 		bool alguno_escapo = false;
 		for (Node* h : Heroes()) {
 			if (MetaBool(h, "ha_escapado")) { alguno_escapo = true; continue; }
-			if (!MetaBool(h, "esta_muerto")) return; // queda alguien vivo dentro
+			if (!MetaBool(h, "esta_muerto")) return; // Someone alive is still inside
 		}
 		if (!alguno_escapo) {
-			UtilityFunctions::print("\n[PartyManager] *** TODO EL GRUPO HA CAÍDO ***\n");
+			UtilityFunctions::print(String::utf8("\n[PartyManager] *** TODO EL GRUPO HA CA\xC3\x8D" "DO ***\n"));
 			return;
 		}
 
 		Node* audio = self->get_node_or_null("/root/AudioManager");
 		if (audio) audio->call("play_music", "fireplace");
 		UtilityFunctions::print("\n***********************************");
-		UtilityFunctions::print(" ¡TODOS A SALVO! ENCENDIENDO FOGATA ");
+		UtilityFunctions::print(String::utf8(" \xC2\xA1TODOS A SALVO! ENCENDIENDO FOGATA "));
 		UtilityFunctions::print("***********************************\n");
 
 		CanvasLayer* fogata = Object::cast_to<CanvasLayer>(self->get_parent()->get_node_or_null("CanvasLayer3"));
@@ -178,10 +186,12 @@ JENOVA_SCRIPT_BEGIN
 // ACTIVE CHARACTER MANAGEMENT
 // ==========================================
 
+// The hero whose turn it is (everyone asks this)
 Variant GetActiveCharacter(Caller* instance) {
 	return act_char;
 }
 
+// Selects a hero (only if they haven't ended their turn yet)
 void SetActiveCharacter(Caller* instance, Node* new_char) {
 	if (!new_char) return;
 	if (!MetaBool(new_char, "ha_movido")) {
@@ -192,21 +202,25 @@ void SetActiveCharacter(Caller* instance, Node* new_char) {
 	}
 }
 
+// Picks the first hero that can still play and refreshes the UI
 void SeleccionarPrimerDisponible(Caller* instance) {
 	SeleccionarSiguiente();
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 }
 
+// A meta of the active hero (null if they don't have it)
 Variant GetCurrentStat(Caller* instance, String stat_name) {
 	if (!act_char || !act_char->has_meta(stat_name)) return Variant();
 	return act_char->get_meta(stat_name);
 }
 
+// Grid tile of the active hero
 Vector2i GetActiveGridPos(Caller* instance) {
 	if (!act_char || !act_char->has_meta("grid_pos")) return Vector2i(-1, -1);
 	return act_char->get_meta("grid_pos");
 }
 
+// Moves the active hero in the logic (the token moves on its own)
 void SetActiveGridPos(Caller* instance, int x, int y) {
 	if (!act_char) return;
 	act_char->set_meta("grid_pos", Vector2i(x, y));
@@ -216,6 +230,7 @@ void SetActiveGridPos(Caller* instance, int x, int y) {
 // TURN FLOW MANAGEMENT
 // ==========================================
 
+// The active hero is done: mark them and either pick the next one or end the day
 void TerminarTurnoPersonaje(Caller* instance) {
 	if (!self) return;
 
@@ -224,14 +239,14 @@ void TerminarTurnoPersonaje(Caller* instance) {
 		UtilityFunctions::print("[PartyManager] Action completed for ", act_char->get_meta("nombre_display"));
 	}
 
-	// 1. ¿TERMINA EL DÍA? (nadie vivo y dentro del mapa conserva PA)
+	// 1. DOES THE DAY END? (nobody alive and on the map has PA left)
 	bool dia_terminado = true;
 	for (Node* h : Heroes()) {
 		if (PuedeJugar(h)) { dia_terminado = false; break; }
 	}
 
-	// 2. Si se acaba el día, antes de la noche juegan los enemigos despiertos;
-	//    al terminar, el EnemyManager llama a IniciarNuevoDia
+	// 2. If the day ends, before nightfall the awake enemies play; when they finish, the
+	// EnemyManager calls IniciarNuevoDia
 	if (dia_terminado) {
 		Node* em = m_dungeon_manager ? m_dungeon_manager->get_node_or_null("EnemyManager") : nullptr;
 		if (em && (bool)em->call("HayEnemigosQueActuan")) {
@@ -243,15 +258,15 @@ void TerminarTurnoPersonaje(Caller* instance) {
 		Noche();
 	}
 
-	// 3. SIGUIENTE PERSONAJE DISPONIBLE
+	// 3. NEXT AVAILABLE CHARACTER
 	SeleccionarSiguiente();
 
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
 }
 
-// Explorando (Modo.gd), el día pasa por casillas andadas: hambre, cordura, efectos y PA como cada
-// noche, pero sin turno enemigo y sin cambiar de héroe activo.
+// While exploring (Modo.gd), the day goes by with walked tiles: hunger, sanity, effects and PA like
+// every night, but with no enemy turn and no change of active hero.
 void PasarDiaExplorando(Caller* instance) {
 	if (!self) return;
 	Noche();
@@ -259,7 +274,7 @@ void PasarDiaExplorando(Caller* instance) {
 	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
 }
 
-// Lo llama el EnemyManager al terminar el turno enemigo
+// Called by the EnemyManager when the enemy turn ends
 void IniciarNuevoDia(Caller* instance) {
 	if (!self) return;
 	Noche();
@@ -271,6 +286,7 @@ void IniciarNuevoDia(Caller* instance) {
 	}
 }
 
+// Switches the active hero (clicking another hero or their portrait)
 void CambiarPersonajeActivo(Caller* instance, String new_name) {
 	if (!self) return;
 	Node* child = self->get_node_or_null(NodePath(new_name));
@@ -282,7 +298,7 @@ void CambiarPersonajeActivo(Caller* instance, String new_name) {
 	}
 
 	act_char = child;
-	UtilityFunctions::print("[PartyManager] Selección manual: ", act_char->get_meta("nombre_display"));
+	UtilityFunctions::print(String::utf8("[PartyManager] Selecci\xC3\xB3n manual: "), act_char->get_meta("nombre_display"));
 
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 	if (m_dungeon_manager) m_dungeon_manager->call("UpdateHighlightForWarrior");
@@ -292,6 +308,7 @@ void CambiarPersonajeActivo(Caller* instance, String new_name) {
 // CUSTOM EVENTS
 // ==========================================
 
+// A hero takes damage; at 0 health they die
 void RecibirDano(Caller* instance, int damage_amount, Node* target_hero) {
 	if (!self || !target_hero) return;
 
@@ -307,6 +324,7 @@ void RecibirDano(Caller* instance, int damage_amount, Node* target_hero) {
 	if (m_ui_manager) m_ui_manager->call("ActualizarStatsUI");
 }
 
+// A hero went down the stairs: out of the floor
 void PersonajeEscapa(Caller* instance, Node* hero) {
 	if (!self || !hero) return;
 	hero->set_meta("ha_escapado", true);
@@ -315,11 +333,12 @@ void PersonajeEscapa(Caller* instance, Node* hero) {
 }
 
 // ==========================================
-// INVENTARIO Y EQUIPO (la lógica está en Inventario/Inventario.hpp)
+// INVENTORY AND EQUIPMENT (the logic lives in Inventario/Inventario.hpp)
 // ==========================================
-// Equipar, usar e intercambiar no cuestan PA. Las funciones devuelven "" si todo fue bien
-// o el motivo del fallo (para la interfaz).
+// Equipping, using and swapping cost no PA. The functions return "" if everything went fine or the
+// reason it failed (for the interface).
 
+// Equips item 'indice' from the hero's inventory. "" or the reason it failed
 Variant Equipar(Caller* instance, String heroe, int indice) {
 	Node* h = Heroe(heroe);
 	if (!h) return String::utf8("No existe ese h\xC3\xA9roe");
@@ -328,6 +347,7 @@ Variant Equipar(Caller* instance, String heroe, int indice) {
 	return error;
 }
 
+// Unequips the slot back into the backpack. "" or the reason it failed
 Variant Desequipar(Caller* instance, String heroe, String ranura) {
 	Node* h = Heroe(heroe);
 	if (!h) return String::utf8("No existe ese h\xC3\xA9roe");
@@ -336,7 +356,7 @@ Variant Desequipar(Caller* instance, String heroe, String ranura) {
 	return error;
 }
 
-// Devuelve cuántas unidades han entrado
+// Returns how many units got in
 Variant AnadirObjeto(Caller* instance, String heroe, String id, int cantidad) {
 	Node* h = Heroe(heroe);
 	if (!h) return 0;
@@ -345,11 +365,13 @@ Variant AnadirObjeto(Caller* instance, String heroe, String id, int cantidad) {
 	return n;
 }
 
+// Uses a consumable (special ones go to Especiales.gd). "" or the reason it failed
 Variant UsarObjeto(Caller* instance, String heroe, int indice) {
 	Node* h = Heroe(heroe);
 	if (!h || MetaBool(h, "esta_muerto")) return String("No puede usarlo");
 	String resultado;
-	// Consumibles con efectos raros (poción "¿qué podría malir sal?", botón de pánico): Especiales.gd
+	// Consumables with weird effects ("what could possibly go wrong?" potion, panic button):
+	// Especiales.gd
 	Array inv_especial = inventario::Inventario(h);
 	if (indice >= 0 && indice < inv_especial.size()) {
 		String id = Dictionary(inv_especial[indice])["id"];
@@ -371,11 +393,12 @@ Variant UsarObjeto(Caller* instance, String heroe, int indice) {
 	return error;
 }
 
-// En la fogata se puede dar cualquier cosa; en la mazmorra, solo entre héroes pegados
+// At the campfire you can give anything; in the dungeon, only between adjacent heroes
 Variant PuedenIntercambiar(Caller* instance, String a, String b) {
 	return PuedenIntercambiarObjetos(Heroe(a), Heroe(b));
 }
 
+// Gives 'cantidad' units of an item from one hero to another
 Variant DarObjeto(Caller* instance, String origen, int indice, String destino, int cantidad) {
 	Node* de = Heroe(origen);
 	Node* para = Heroe(destino);
@@ -395,7 +418,7 @@ Variant DarObjeto(Caller* instance, String origen, int indice, String destino, i
 	return entran < n ? String("Solo le caben ") + String::num_int64(entran) : String("");
 }
 
-// Aplica una lista de Efecto.tres a un héroe (eventos): devuelve el resumen ("+20 PV, -10 oro")
+// Applies a list of Efecto.tres to a hero (events): returns the summary ("+20 PV, -10 oro")
 Variant AplicarEfectosA(Caller* instance, String heroe, Array efectos) {
 	Node* h = Heroe(heroe);
 	if (!h) return String("");
@@ -404,6 +427,7 @@ Variant AplicarEfectosA(Caller* instance, String heroe, Array efectos) {
 	return texto;
 }
 
+// The inventory as a list of dictionaries, for the backpack screen
 Variant DescribirInventario(Caller* instance, String heroe) {
 	Node* h = Heroe(heroe);
 	return h ? inventario::DescribirInventario(h) : Array();
@@ -419,15 +443,16 @@ Variant CapacidadInventario(Caller* instance, String heroe) {
 	return h ? inventario::Capacidad(h) : 0.0f;
 }
 
-// Al bajar de piso se acaban los efectos "hasta el final del piso"
+// When going down a floor the "until the end of the floor" effects end
 void FinDePiso(Caller* instance) {
 	for (Node* h : Heroes()) inventario::FinDePiso(h);
 }
 
 // ==========================================
-// DEPURACIÓN (panel F10)
+// DEBUGGING (F10 panel)
 // ==========================================
 
+// Drops units of an item (they're lost)
 Variant QuitarObjeto(Caller* instance, String heroe, int indice, int cantidad) {
 	Node* h = Heroe(heroe);
 	bool ok = h && inventario::Quitar(h, indice, cantidad);
@@ -435,11 +460,11 @@ Variant QuitarObjeto(Caller* instance, String heroe, int indice, int cantidad) {
 	return ok;
 }
 
-// Tira una tabla de botín y se la da al héroe. Devuelve lo que salió (y lo que no cupo).
+// Rolls a loot table and gives it to the hero. Returns what came out (and what didn't fit).
 Variant DarBotinDebug(Caller* instance, String heroe, String tabla) {
 	Node* h = Heroe(heroe);
 	Node* cat = inventario::Catalogo(self);
-	if (!h || !cat) return String("No existe ese héroe");
+	if (!h || !cat) return String(String::utf8("No existe ese h\xC3\xA9roe"));
 	Array botin = cat->call("tirar_botin", tabla, (int)self->get_meta("piso_actual", 1));
 	Vector3 pos(0, 0, 0);
 	if (m_dungeon_manager && h->has_meta("grid_pos")) {
@@ -460,13 +485,13 @@ Variant DarBotinDebug(Caller* instance, String heroe, String tabla) {
 	return texto;
 }
 
-// Tras editar un .tres con el juego en marcha (Catalogo.recargar): stats al día
+// After editing a .tres with the game running (Catalogo.recargar): stats up to date
 void RecalcularTodo(Caller* instance) {
 	for (Node* h : Heroes()) inventario::RecalcularStats(h);
 	TrasCambiarEquipo(nullptr);
 }
 
-// Pasa un día solo para los efectos temporales (para probarlos sin jugar el turno)
+// A day goes by only for the temporary effects (to test them without playing the turn)
 void AvanzarDiaEfectos(Caller* instance, String heroe) {
 	Node* h = Heroe(heroe);
 	if (!h) return;
@@ -474,7 +499,7 @@ void AvanzarDiaEfectos(Caller* instance, String heroe) {
 	TrasCambiarEquipo(h);
 }
 
-// Aplica los efectos al usar de un objeto sin gastarlo (probar consumibles y eventos)
+// Applies an item's use effects without spending it (to test consumables and events)
 Variant ProbarEfectos(Caller* instance, String heroe, String id) {
 	Node* h = Heroe(heroe);
 	Ref<Resource> def = inventario::Definicion(self, id);
@@ -524,9 +549,9 @@ void OnReady(Caller* instance) {
 		soul->set_meta("in_combat", false);
 		soul->set_meta("oro", 0);
 		soul->set_meta("comida_bolsa", 0);
-		self->add_child(soul); // antes de equiparlo: el inventario busca el Catalogo desde el árbol
+		self->add_child(soul); // Before equipping it: the inventory looks for the Catalogo from the tree
 
-		// Stats base + equipo inicial -> stats finales (hp_max, fuerza, radio_luz...)
+		// Base stats + starting equipment -> final stats (hp_max, fuerza, radio_luz...)
 		inventario::Inicializar(soul, res);
 		soul->set_meta("hp_actual", soul->get_meta("hp_max"));
 		soul->set_meta("sanidad_actual", soul->get_meta("sanidad_max"));

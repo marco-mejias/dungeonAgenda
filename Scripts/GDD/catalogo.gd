@@ -1,9 +1,8 @@
 extends Node
 
-# Catálogo (autoload): al arrancar lee todo lo que hay en Data/Objetos, Data/Botin y
-# Data/Enemigos (BaseDatos.cargar_todo). Para añadir algo basta con crear su .tres en una
-# de esas carpetas (o subcarpetas): no hay que tocar código. El resto del juego (también
-# el C++) pide las cosas por id.
+# Catalogo (autoload): at startup it reads everything in Data/Objetos, Data/Botin and Data/Enemigos
+# (BaseDatos.cargar_todo). To add something you just create its .tres in one of those folders (or
+# subfolders): no code to touch. The rest of the game (C++ too) asks for things by id.
 
 var objetos: Dictionary = {}  # id -> ObjetoData
 var tablas: Dictionary = {}   # id -> TablaBotin
@@ -13,7 +12,8 @@ var avisos: PackedStringArray = []
 func _ready() -> void:
 	recargar()
 
-# desde_disco: vuelve a leer los .tres aunque ya estén en memoria (para editarlos con el juego en marcha)
+# desde_disco: reads the .tres again even if they're already in memory (to edit them with the game
+# running)
 func recargar(desde_disco: bool = false) -> void:
 	var datos := BaseDatos.cargar_todo(desde_disco)
 	objetos = datos["objetos"]
@@ -25,17 +25,19 @@ func recargar(desde_disco: bool = false) -> void:
 	print("[Catalogo] %d objetos, %d tablas de botín, %d enemigos" % [objetos.size(), tablas.size(), enemigos.size()])
 
 # ==========================================
-# CONSULTAS (las usa también el C++)
+# QUERIES (C++ uses them too)
 # ==========================================
 
+# The ObjetoData with this id (null if it doesn't exist)
 func obtener(id: String) -> ObjetoData:
 	if objetos.is_empty():
-		recargar() # por si alguien pregunta antes de nuestro _ready
+		recargar() # In case someone asks before our _ready
 	return objetos.get(id)
 
 func existe(id: String) -> bool:
 	return objetos.has(id)
 
+# Every item id of one type (weapon, armour, consumable...)
 func ids_de_tipo(tipo: int) -> PackedStringArray:
 	var out: PackedStringArray = []
 	for id in objetos:
@@ -46,7 +48,7 @@ func ids_de_tipo(tipo: int) -> PackedStringArray:
 func tabla(id: String) -> TablaBotin:
 	return tablas.get(id)
 
-# Lista de {recurso, id, cantidad}; vacía si la tabla no existe
+# List of {recurso, id, cantidad}; empty if the table doesn't exist
 func tirar_botin(id_tabla: String, piso: int) -> Array:
 	var t: TablaBotin = tablas.get(id_tabla)
 	if t == null:
@@ -57,7 +59,7 @@ func tirar_botin(id_tabla: String, piso: int) -> Array:
 func enemigo(id: String) -> EnemigoData:
 	return enemigos.get(id)
 
-# Un tipo de enemigo al azar entre los que valen para este piso (según su peso de aparición)
+# A random enemy type among the valid ones for this floor (by its spawn weight)
 func elegir_enemigo(piso: int) -> EnemigoData:
 	if enemigos.is_empty():
 		recargar()

@@ -3,8 +3,8 @@
 class_name ArmaData
 extends EquipoData
 
-# Arma: va en la mano principal. Alcance 1 = cuerpo a cuerpo (el enemigo contraataca);
-# alcance > 1 = a distancia (sin contraataque si no estás pegado).
+# Weapon: goes in the main hand. Reach 1 = melee (the enemy counterattacks); reach > 1 = ranged (no
+# counterattack if you're not adjacent).
 
 enum Animacion { TAJO, ESTOCADA, GOLPE, DISPARO, CONJURO }
 
@@ -23,7 +23,7 @@ enum Animacion { TAJO, ESTOCADA, GOLPE, DISPARO, CONJURO }
 
 @export_group("Al golpear")
 @export var efectos_al_golpear: Array[Efecto] = []
-## Tipo de animación de ataque (las animaciones por arma llegarán más adelante).
+## Attack animation type (per-weapon animations will come later).
 @export var animacion: Animacion = Animacion.TAJO
 
 func _init() -> void:

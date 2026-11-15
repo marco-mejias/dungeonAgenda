@@ -2,9 +2,9 @@ extends Node
 
 const Iconos := preload("res://Scripts/GDD/iconos_pixel.gd")
 
-# Cursor pixel art que cambia según lo que hay bajo el ratón en el mapa:
-#   flecha (normal), mano (interactuable), espada (enemigo), aspa (no se puede ir)
-# Pregunta al DungeonManager con TipoCursor(x, y). Sobre la interfaz siempre es la flecha.
+# Pixel art cursor that changes with whatever is under the mouse on the map:
+#   arrow (normal), hand (interactable), sword (enemy), cross (can't go)
+# It asks the DungeonManager with TipoCursor(x, y). Over the interface it's always the arrow.
 
 const ESCALA := 3
 const PUNTOS := {"flecha": Vector2(0, 0), "mano": Vector2(4, 0), "espada": Vector2(8, 0), "aspa": Vector2(5, 5)}
@@ -19,7 +19,7 @@ func _ready() -> void:
 	_poner("flecha")
 
 func _exit_tree() -> void:
-	# Al volver al menú, el cursor del sistema
+	# Back to the menu: system cursor
 	Input.set_custom_mouse_cursor(null)
 
 func _process(_delta: float) -> void:
@@ -33,6 +33,7 @@ func _process(_delta: float) -> void:
 		nombre = POR_TIPO[clampi(tipo, 0, POR_TIPO.size() - 1)]
 	_poner(nombre)
 
+# Swaps the system cursor (only when it actually changes)
 func _poner(nombre: String) -> void:
 	if nombre == actual:
 		return

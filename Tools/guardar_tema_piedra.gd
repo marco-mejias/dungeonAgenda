@@ -1,6 +1,6 @@
 extends SceneTree
-# Guarda el tema "piedra tallada" (Scripts/GDD/estilo.gd) como tema del proyecto.
-# Después de Tools/generar_ui_piedra.gd (y de importar los PNG):
+# Saves the "carved stone" theme (Scripts/GDD/estilo.gd) as the project theme.
+# After Tools/generar_ui_piedra.gd (and importing the PNGs):
 #   godot --headless --path . -s res://Tools/guardar_tema_piedra.gd
 
 const RUTA := "res://Assets/UI/Piedra/tema_piedra.tres"

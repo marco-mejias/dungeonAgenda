@@ -1,7 +1,7 @@
 extends Control
 
-# Pantalla de descanso entre pisos: hoguera animada (partículas pixeladas) y el grupo
-# sentado alrededor con su animación idle. Se monta sola al hacerse visible.
+# Rest screen between floors: animated campfire (pixelated particles) and the party sitting around
+# it with their idle animation. It builds itself when it becomes visible.
 
 const CENTRO := Vector2(576, 372)
 
@@ -43,13 +43,13 @@ func _ready() -> void:
 	_crear_resplandor()
 	_crear_hoguera()
 
-	# Botón abajo, con estilo de ventana PS1
+	# Button at the bottom, PS1 window style
 	boton.anchor_top = 1.0
 	boton.anchor_bottom = 1.0
 	boton.offset_top = -96
 	boton.offset_bottom = -52
 	boton.focus_mode = Control.FOCUS_NONE
-	# El botón usa los bloques de piedra del tema; solo le damos algo más de tamaño de letra
+	# The button uses the theme's stone blocks; we only give it a bigger font size
 	boton.add_theme_font_size_override("font_size", 16)
 	move_child(boton, get_child_count() - 1)
 
@@ -57,6 +57,7 @@ func _ready() -> void:
 	if capa:
 		capa.visibility_changed.connect(_al_mostrarse)
 
+# Warm round glow behind the fire
 func _crear_resplandor() -> void:
 	var g := Gradient.new()
 	g.set_color(0, Color(1.0, 0.55, 0.2, 0.55))
@@ -77,8 +78,9 @@ func _crear_resplandor() -> void:
 	resplandor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(resplandor)
 
+# Logs and pixel flame particles
 func _crear_hoguera() -> void:
-	# Troncos cruzados
+	# Crossed logs
 	for ang in [-0.35, 0.35]:
 		var tronco := ColorRect.new()
 		tronco.color = Color(0.32, 0.18, 0.1)
@@ -127,6 +129,7 @@ func _crear_hoguera() -> void:
 	chispas.color = Color(1.0, 0.75, 0.3)
 	add_child(chispas)
 
+# Every time the screen opens: sit the living heroes around the fire
 func _al_mostrarse() -> void:
 	if not get_parent().visible:
 		return
@@ -141,10 +144,10 @@ func _al_mostrarse() -> void:
 	for h in pm.get_children():
 		if h.name != "DatosEquipo" and not h.get_meta("esta_muerto", false):
 			vivos.append(h)
-	# Junto al fuego se recargan todas las habilidades
+	# By the fire every ability recharges
 	Progreso.restaurar_todos()
 
-	# Sentados en semicírculo alrededor del fuego
+	# Sitting in a half circle around the fire
 	for i in vivos.size():
 		var h: Node = vivos[i]
 		var frame: int = Apariencia.fotograma(h)
@@ -152,7 +155,7 @@ func _al_mostrarse() -> void:
 		var pos := CENTRO + Vector2(cos(ang + PI) * 150.0, -sin(ang + PI) * 40.0 + 10.0)
 
 		var r := TextureRect.new()
-		r.texture = Apariencia.textura(h, frame) # el héroe con lo que lleva puesto
+		r.texture = Apariencia.textura(h, frame) # The hero with what they're wearing
 		r.size = Vector2(64, 64)
 		r.position = pos - Vector2(32, 52)
 		r.flip_h = pos.x > CENTRO.x
@@ -171,7 +174,7 @@ func _process(delta: float) -> void:
 		var f := 1.0 + 0.06 * sin(t * 9.0) + 0.04 * sin(t * 23.0)
 		resplandor.scale = Vector2(f, f)
 		resplandor.modulate.a = 0.85 + 0.15 * sin(t * 13.0)
-	# Idle de los sentados: el mismo fotograma que en el mapa (reloj de Apariencia)
+	# Idle of the ones sitting: the same frame as on the map (Apariencia clock)
 	for r in sentados:
 		var h := get_node_or_null(r.get_meta("heroe"))
 		if h:

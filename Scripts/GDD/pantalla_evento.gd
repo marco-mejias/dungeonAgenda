@@ -1,19 +1,19 @@
 extends Panel
 
-# Pantalla de evento (CanvasLayer2/PantallaEvento): la abre el EventManager (vía uiManager) y se
-# resuelve con una tirada d20 como la del combate:
-#   éxito si  d20 + bono de la stat  >=  CD,  con CD = 16 - 5 x multiplicador_dificultad.
-#   20 natural: éxito crítico (efectos_critico además).  1 natural: pifia (efectos_pifia además).
-#   Bono = stat x (1 + suerte x nivel x 3%) / 2 (igual que en combate); con cordura < 20 la stat vale la mitad.
-# Arte (Assets/Eventos/<evento>/): ilustración de la escena, imagen al ganar y al perder (por opción,
-# o la del evento) y sprite del mapa. Lo que falte se ve con un placeholder.
+# Event screen (CanvasLayer2/PantallaEvento): opened by the EventManager (through uiManager) and
+# resolved with a d20 roll like the combat one:
+#   success if  d20 + stat bonus  >=  DC,  with DC = 16 - 5 x multiplicador_dificultad.
+#   Natural 20: critical success (efectos_critico on top).  Natural 1: fumble (efectos_pifia on top).
+#   Bonus = stat x (1 + luck x level x 3%) / 2 (same as combat); with sanity < 20 the stat is halved.
+# Art (Assets/Eventos/<evento>/): scene illustration, win and lose image (per option, or the
+# event's one) and map sprite. Whatever is missing shows a placeholder.
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
 const PH_ESCENA := preload("res://Assets/Eventos/_placeholder/escena.png")
 const PH_EXITO := preload("res://Assets/Eventos/_placeholder/exito.png")
 const PH_FRACASO := preload("res://Assets/Eventos/_placeholder/fracaso.png")
-const LADO_FOTO := 192 # las imágenes son de 96x96: se ven a 2x, píxel nítido
+const LADO_FOTO := 192 # The images are 96x96: shown at 2x, sharp pixels
 const T_GIRO := 1.3
 const NOMBRES_STAT := {"fuerza": "Fuerza", "magia": "Magia", "suerte": "Suerte", "velocidad": "Velocidad",
 	"defensa": "Defensa", "hp_actual": "Vida", "hp_max": "Vida", "sanidad_actual": "Cordura", "ninguna": "Suerte pura"}
@@ -21,7 +21,7 @@ const NOMBRES_STAT := {"fuerza": "Fuerza", "magia": "Magia", "suerte": "Suerte",
 var evento: Resource = null
 var heroe: Node = null
 var resolviendo := false
-var ultima_tirada := {} # para los tests: {d20, bono, cd, exito, critico, pifia, opcion}
+var ultima_tirada := {} # For the tests: {d20, bono, cd, exito, critico, pifia, opcion}
 
 @onready var titulo: Label = $Titulo
 @onready var historia: RichTextLabel = $TextoHistoria
@@ -44,7 +44,7 @@ func _ready() -> void:
 	if not continuar.pressed.is_connected(cerrar):
 		continuar.pressed.connect(cerrar)
 
-# Ilustración grande y centrada; el texto y los botones debajo
+# Big centred illustration; text and buttons below
 func _colocar() -> void:
 	var w := size.x
 	var x := (w - LADO_FOTO) * 0.5
@@ -65,9 +65,9 @@ func _pm() -> Node:
 func _dm() -> Node:
 	return get_node_or_null(RUTA_DM)
 
-# ---------------- La tirada ----------------
+# ---------------- The roll ----------------
 
-## {stat, valor, bono, cd, prob} de una opción para este héroe
+## {stat, valor, bono, cd, prob} of an option for this hero
 func info_tirada(op: Resource, h: Node) -> Dictionary:
 	var stat: String = op.stat_usada
 	var valor := 0 if stat == "ninguna" else int(h.get_meta(stat, 0))
@@ -83,6 +83,7 @@ func info_tirada(op: Resource, h: Node) -> Dictionary:
 			caras += 1
 	return {"stat": stat, "valor": valor, "bono": bono, "cd": cd, "prob": caras * 5}
 
+# Natural 1 fails, natural 20 succeeds, otherwise d20 + bonus vs DC
 static func _exito(d20: int, bono: int, cd: int) -> bool:
 	if d20 == 1:
 		return false
@@ -90,13 +91,15 @@ static func _exito(d20: int, bono: int, cd: int) -> bool:
 		return true
 	return d20 + bono >= cd
 
+# A d20 (or the forced one the test sets)
 func _tirar_d20() -> int:
 	if Engine.has_meta("tirada_forzada"):
 		return clampi(int(Engine.get_meta("tirada_forzada")), 1, 20)
 	return randi_range(1, 20)
 
-# ---------------- Abrir / resolver / cerrar ----------------
+# ---------------- Open / resolve / close ----------------
 
+# Opens the event for hero 'h': illustration, text and one button per option with its odds
 func mostrar(ev: Resource, h: Node) -> void:
 	evento = ev
 	heroe = h
@@ -121,7 +124,7 @@ func mostrar(ev: Resource, h: Node) -> void:
 		b.pressed.connect(resolver.bind(i))
 		botones.add_child(b)
 		botones.move_child(b, botones.get_child_count() - 2)
-	# Entra desde abajo
+	# Comes in from the bottom
 	var alto := get_viewport_rect().size.y
 	modulate = Color.WHITE
 	position.y = alto
@@ -132,6 +135,7 @@ func mostrar(ev: Resource, h: Node) -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "position:y", 0.0, 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
+# The player picked option 'indice': roll the die and show the result
 func resolver(indice: int) -> void:
 	if resolviendo or evento == null or heroe == null or indice >= evento.opciones.size():
 		return
@@ -155,11 +159,12 @@ func resolver(indice: int) -> void:
 	tw.tween_interval(1.1)
 	tw.tween_callback(_aplicar.bind(indice))
 
+# Applies the result of the roll: image, text and effects (normal + critical/fumble)
 func _aplicar(indice: int) -> void:
 	var op: Resource = evento.opciones[indice]
 	var exito: bool = ultima_tirada["exito"]
 	var pm := _pm()
-	# Imagen del resultado: la de la opción, si no la del evento, si no el placeholder
+	# Result image: the option's, otherwise the event's, otherwise the placeholder
 	var img: Texture2D = op.imagen_exito if exito else op.imagen_fracaso
 	if img == null:
 		img = evento.imagen_exito if exito else evento.imagen_fracaso
@@ -168,7 +173,7 @@ func _aplicar(indice: int) -> void:
 	dado.ocultar()
 	foto.texture = img
 	foto.visible = true
-	# Efectos
+	# Effects
 	var efectos: Array = (op.efectos_exito if exito else op.efectos_fracaso).duplicate()
 	if ultima_tirada["critico"]:
 		efectos.append_array(op.efectos_critico)
@@ -201,6 +206,7 @@ func _aplicar(indice: int) -> void:
 	for c in botones.get_children():
 		c.visible = c == continuar
 
+# Slides the screen out and gives control back to the DungeonManager
 func cerrar() -> void:
 	if not visible:
 		return
@@ -214,7 +220,7 @@ func cerrar() -> void:
 	evento = null
 	heroe = null
 
-## Sin animación (cambio de piso, depuración)
+## No animation (floor change, debugging)
 func cerrar_ya() -> void:
 	visible = false
 	resolviendo = false

@@ -1,10 +1,10 @@
 #pragma once
-// Enemigos: configurar un nodo de enemigo a partir de su EnemigoData (Data/Enemigos) y las
-// utilidades de búsqueda que usa la IA (campos de distancia BFS sobre la cuadrícula).
+// Enemies: set up an enemy node from its EnemigoData (Data/Enemigos) and the search utilities the
+// AI uses (BFS distance fields over the grid).
 //
-// Metas de cada enemigo: id_enemigo, nombre_display, frame, hp_max/hp_actual, fuerza, defensa,
-// magia, suerte, movimiento, perfil, radio_deteccion, huir_con_vida, tabla_botin, grid_pos,
-// equipo {mano_principal: id del arma} e in_combat (= despierto, actúa en el turno enemigo).
+// Metas of every enemy: id_enemigo, nombre_display, frame, hp_max/hp_actual, fuerza, defensa,
+// magia, suerte, movimiento, perfil, radio_deteccion, huir_con_vida, tabla_botin, grid_pos, equipo
+// {mano_principal: weapon id} and in_combat (= awake, acts on the enemy turn).
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node3d.hpp>
@@ -20,16 +20,17 @@ using namespace godot;
 
 const int LADO = 40; // = mazmorra::GRID_SIZE
 
-// Mismo orden que EnemigoData.Perfil
+// Same order as EnemigoData.Perfil
 enum Perfil { P_TANQUE, P_CUERPO_A_CUERPO, P_LANZADOR, P_COBARDE };
 
+// Fills an enemy token from its EnemigoData: sprite, stats scaled to the floor, weapon and AI profile
 inline void Configurar(Node3D* e, const Ref<Resource>& def, int piso, Vector2i celda) {
 	e->set_meta("grid_pos", celda);
 	e->set_meta("in_combat", false);
 	Sprite3D* cuerpo = Object::cast_to<Sprite3D>(e->get_node_or_null("Cuerpo"));
 
 	if (def.is_null()) {
-		// Sin fichas en Data/Enemigos: el esqueleto de siempre
+		// No cards in Data/Enemigos: the good old skeleton
 		e->set_meta("nombre_display", "Esqueleto");
 		e->set_meta("frame", 11);
 		e->set_meta("hp_max", 12 + 3 * piso);
@@ -72,7 +73,7 @@ inline void Configurar(Node3D* e, const Ref<Resource>& def, int piso, Vector2i c
 }
 
 // ==========================================
-// CAMPOS DE DISTANCIA (BFS 4 direcciones)
+// DISTANCE FIELDS (4-direction BFS)
 // ==========================================
 
 inline bool Dentro(Vector2i p) { return p.x >= 0 && p.x < LADO && p.y >= 0 && p.y < LADO; }
@@ -87,8 +88,8 @@ struct Campo {
 	int en(Vector2i p) const { return Dentro(p) ? dist[Indice(p)] : INF; }
 };
 
-// Distancias desde 'inicio' pisando solo casillas transitables (el inicio puede estar ocupado:
-// es el propio enemigo o el héroe del que medimos)
+// Distances from 'inicio' stepping only on walkable tiles (the start can be occupied: it's the
+// enemy itself or the hero we measure from)
 inline Campo Bfs(const PackedByteArray& transitable, Vector2i inicio) {
 	Campo c;
 	c.dist.assign(LADO * LADO, INF);
@@ -112,7 +113,7 @@ inline Campo Bfs(const PackedByteArray& transitable, Vector2i inicio) {
 	return c;
 }
 
-// Camino (sin la casilla de salida) desde el inicio del campo hasta 'destino'
+// Path (without the starting tile) from the start of the field to 'destino'
 inline std::vector<Vector2i> Camino(const Campo& c, Vector2i destino) {
 	std::vector<Vector2i> out;
 	if (c.en(destino) >= INF) return out;
@@ -121,7 +122,7 @@ inline std::vector<Vector2i> Camino(const Campo& c, Vector2i destino) {
 	return out;
 }
 
-// Distancia desde un héroe hasta cualquier casilla pegada a él (la del héroe no es transitable)
+// Distance from a hero to any tile next to them (the hero's own tile isn't walkable)
 inline Campo CampoDesdeHeroe(const PackedByteArray& transitable, Vector2i heroe) { return Bfs(transitable, heroe); }
 
 } // namespace enemigos

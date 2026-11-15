@@ -3,13 +3,14 @@
 class_name ObjetoData
 extends Resource
 
-# Definición de un objeto (lo que creas en el Inspector). Los héroes no guardan el
-# recurso: guardan su 'id' y la cantidad. El Catálogo (autoload) los encuentra por id.
+# Item definition (what you create in the Inspector). Heroes don't keep the resource: they keep its
+# 'id' and the amount. The Catalogo (autoload) finds them by id.
 
 enum Tipo { ARMA, ARMADURA, ACCESORIO, LUZ, MOCHILA, CONSUMIBLE, COMIDA, LLAVE, MATERIAL }
 
 @export_group("Identidad")
-## Identificador único. Si lo dejas vacío se usa el nombre del archivo (espada_corta.tres -> "espada_corta").
+## Unique identifier. If you leave it empty the file name is used (espada_corta.tres ->
+## "espada_corta").
 @export var id: String = ""
 @export var nombre: String = "Objeto"
 @export_multiline var descripcion: String = ""
@@ -21,7 +22,7 @@ enum Tipo { ARMA, ARMADURA, ACCESORIO, LUZ, MOCHILA, CONSUMIBLE, COMIDA, LLAVE, 
 @export var valor: int = 1
 @export var apilable: bool = false
 @export var max_pila: int = 1
-## Usos antes de gastarse (0 = no se gasta). Los consumibles suelen tener 1.
+## Uses before it's spent (0 = never spent). Consumables usually have 1.
 @export var usos: int = 0
 
 @export_group("Al usarlo")
@@ -38,6 +39,7 @@ func obtener_id() -> String:
 func es_equipo() -> bool:
 	return false
 
+# Name plus its enchantments ("Espada corta Afilada")
 func nombre_completo() -> String:
 	var n := nombre
 	for e in encantamientos:

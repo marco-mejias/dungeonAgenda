@@ -1,8 +1,7 @@
 /* Jenova C++ Node Base Script (Meteora) - PathManager */
 
-// El "GPS": AStarGrid2D con los muros estáticos cargados UNA sola vez.
-// Las entidades dinámicas (héroes, enemigos, cofres) se inyectan como muros
-// temporales solo mientras se calcula una ruta, y se retiran después.
+// The "GPS": AStarGrid2D with the static walls loaded ONLY once. Dynamic entities (heroes, enemies,
+// chests) are injected as temporary walls only while a path is computed, and removed afterwards.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -28,11 +27,12 @@ namespace {
 
 	Vector3 GridToWorld(Vector2i c) { return Vector3(c.x + 0.5f, alturas::Y(c.x, c.y), c.y + 0.5f); }
 
+	// Is the tile inside the AStar grid?
 	bool EnRegion(Vector2i p) {
 		return astar.is_valid() && astar->is_in_boundsv(p);
 	}
 
-	// Inyecta las entidades dinámicas como sólidos. Devuelve las que hemos marcado nosotros.
+	// Injects the dynamic entities as solids. Returns the ones we marked ourselves.
 	std::vector<Vector2i> InyectarDinamicos(Node* dungeon, Vector2i origen) {
 		std::vector<Vector2i> marcadas;
 		if (!dungeon) return marcadas;
@@ -46,9 +46,9 @@ namespace {
 		return marcadas;
 	}
 
-	// ¿Hay un aliado que no se va a apartar en esa casilla? (una ruta no puede acabar ahí)
-	// Explorando, los de su grupo siguen al líder y dejan sitio: solo cuentan los que se quedan
-	// quietos (Modo.gd). En combate, cualquier aliado.
+	// Is there an ally on that tile who won't step aside? (a path can't end there) While exploring,
+	// the rest of the party follows the leader and makes room: only the ones standing still count
+	// (Modo.gd). In combat, any ally.
 	bool AliadoBloquea(Node* dungeon, Vector2i c) {
 		bool explorando = dungeon->has_meta("modo_exploracion") && (bool)dungeon->get_meta("modo_exploracion");
 		Node* modo = dungeon->get_node_or_null("/root/Modo");
@@ -56,16 +56,18 @@ namespace {
 		return (bool)dungeon->call("HayAliadoEn", c.x, c.y);
 	}
 
+	// Undoes InyectarDinamicos: the marked tiles become walkable again
 	void RetirarDinamicos(const std::vector<Vector2i>& marcadas) {
 		for (const Vector2i& p : marcadas) astar->set_point_solid(p, false);
 	}
 
+	// Plain AStar path (empty if the destination is solid or out of the grid)
 	Array RutaDirecta(Vector2i origen, Vector2i destino) {
 		if (!EnRegion(origen) || !EnRegion(destino) || astar->is_point_solid(destino)) return Array();
 		return astar->get_id_path(origen, destino);
 	}
 
-	// Ruta al destino; si es sólido o inalcanzable, "Modo Enjambre": la mejor casilla adyacente.
+	// Path to the destination; if it is solid or unreachable, "Swarm Mode": the best adjacent tile.
 	Array RutaInteligente(Node* dungeon, Vector2i origen, Vector2i destino) {
 		if (!astar.is_valid()) return Array();
 		std::vector<Vector2i> marcadas = InyectarDinamicos(dungeon, origen);
@@ -76,7 +78,7 @@ namespace {
 			for (const Vector2i& d : vecinos) {
 				Vector2i junto = destino + d;
 				if (junto == origen) { ruta = Array(); ruta.push_back(origen); break; }
-				if (EnRegion(junto) && AliadoBloquea(dungeon, junto)) continue; // ahí no se puede acabar
+				if (EnRegion(junto) && AliadoBloquea(dungeon, junto)) continue; // Can't end there
 				Array candidata = RutaDirecta(origen, junto);
 				if (candidata.size() > 0 && (ruta.size() == 0 || candidata.size() < ruta.size())) ruta = candidata;
 			}
@@ -93,7 +95,7 @@ void OnAwake(Caller* instance) {}
 void OnReady(Caller* instance) {}
 void OnDestroy(Caller* instance) { astar.unref(); }
 
-// 1. INICIALIZAR EL GPS
+// 1. INIT THE GPS
 void ConfigurarAStar(Caller* instance, int grid_size, float cell_size) {
 	astar.instantiate();
 	astar->set_region(Rect2i(0, 0, grid_size, grid_size));
@@ -104,28 +106,28 @@ void ConfigurarAStar(Caller* instance, int grid_size, float cell_size) {
 	astar->update();
 }
 
-// 2. CARGA ESTÁTICA: muros y puertas cerradas, una sola vez por piso (pares x,y)
+// 2. STATIC LOAD: walls and closed doors, only once per floor (x,y pairs)
 void CargarMurosEstaticos(Caller* instance, PackedInt32Array solidos) {
 	if (!astar.is_valid()) return;
 	astar->fill_solid_region(astar->get_region(), false);
 	for (int i = 0; i + 1 < solidos.size(); i += 2) {
 		astar->set_point_solid(Vector2i(solidos[i], solidos[i + 1]), true);
 	}
-	UtilityFunctions::print("[PathManager] Muros estáticos cargados: ", solidos.size() / 2);
+	UtilityFunctions::print(String::utf8("[PathManager] Muros est\xC3\xA1ticos cargados: "), solidos.size() / 2);
 }
 
-// 3. CAMBIOS PUNTUALES (abrir una puerta...)
+// 3. ONE-OFF CHANGES (opening a door...)
 void SetCasillaSolida(Caller* instance, int x, int y, int es_solido) {
 	if (EnRegion(Vector2i(x, y))) astar->set_point_solid(Vector2i(x, y), es_solido != 0);
 }
 
-// 4. RUTA PARA LA LÍNEA DE PREVISUALIZACIÓN (incluye Modo Enjambre)
+// 4. PATH FOR THE PREVIEW LINE (includes Swarm Mode)
 Array CalcularRuta(Caller* instance, int orig_x, int orig_y, int dest_x, int dest_y) {
 	Node* dungeon = GetSelf<Node>(instance)->get_parent();
 	return RutaInteligente(dungeon, Vector2i(orig_x, orig_y), Vector2i(dest_x, dest_y));
 }
 
-// 5. MOVER FÍSICAMENTE AL PERSONAJE CON TWEENS
+// 5. PHYSICALLY MOVE THE CHARACTER WITH TWEENS
 void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -136,7 +138,7 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 
 	Node* act_char = Object::cast_to<Node>(pm->call("GetActiveCharacter"));
 	if (!act_char) {
-		UtilityFunctions::print("[PathManager] Error: No se encontró al personaje activo.");
+		UtilityFunctions::print(String::utf8("[PathManager] Error: No se encontr\xC3\xB3 al personaje activo."));
 		return;
 	}
 
@@ -147,7 +149,7 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 	bool explorando = dungeon->has_meta("modo_exploracion") && (bool)dungeon->get_meta("modo_exploracion");
 	int pa = act_char->has_meta("pa_actual") ? (int)act_char->get_meta("pa_actual") : 0;
 	if (debug || explorando) pa = 999;
-	// Oculto (Sigilo.gd): cada casilla cuesta 2 PA
+	// Hidden (Sigilo.gd): every tile costs 2 PA
 	else if (act_char->has_meta("estados") && Dictionary(act_char->get_meta("estados")).has("oculto")) pa /= 2;
 
 	if (pa <= 0 || path.size() <= 1) {
@@ -157,9 +159,9 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 		return;
 	}
 
-	// Recortar ruta por PA
+	// Cut the path by PA
 	if (path.size() - 1 > pa) path.resize(pa + 1);
-	// Se puede cruzar a un compañero, pero no acabar en su casilla: retrocede a la última libre
+	// You can walk through a teammate, but not end on their tile: step back to the last free one
 	while (path.size() > 1) {
 		Vector2i fin = path[path.size() - 1];
 		if (!AliadoBloquea(dungeon, fin)) break;
@@ -180,7 +182,7 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 	dungeon->set_meta("current_move_tween", tween);
 
 	float y_base = cuerpo ? (float)cuerpo->get_position().y : 0.0f;
-	// Explorando se anda más deprisa (no hay nada que pensar entre paso y paso)
+	// While exploring we walk faster (there's nothing to think about between steps)
 	float paso_t = explorando ? TIEMPO_PASO_EXPLORANDO : TIEMPO_PASO;
 	Vector2i anterior = origen;
 	for (int i = 1; i < path.size(); i++) {
@@ -188,7 +190,7 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 		Vector3 destino = GridToWorld(paso);
 
 		if (cuerpo) {
-			// El sprite mira hacia donde camina (en pantalla)
+			// The sprite faces where it walks (on screen)
 			Vector3 dir((float)(paso.x - anterior.x), 0.0f, (float)(paso.y - anterior.y));
 			bool mira_izq = dir.dot(derecha_cam) < -0.01f;
 			bool mira_der = dir.dot(derecha_cam) > 0.01f;
@@ -207,7 +209,7 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 
 	Vector2i fin = path[path.size() - 1];
 	tween->tween_callback(Callable(dungeon, StringName("AtLast")).bind(fin.x, fin.y, (int)path.size() - 1));
-	// Explorando, el resto del grupo sigue al que anda (Modo.gd)
+	// While exploring, the rest of the party follows whoever walks (Modo.gd)
 	Node* modo = self_node->get_node_or_null("/root/Modo");
 	if (modo && explorando) modo->call("lider_se_mueve", path, (double)paso_t);
 }

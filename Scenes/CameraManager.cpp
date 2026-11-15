@@ -1,13 +1,12 @@
 /* Jenova C++ Node Base Script (Meteora) - CameraManager (3D iso) */
 
-// Cámara "pseudo-isométrica": perspectiva con FOV muy cerrado y lejana, para
-// conservar el temblor de vértices y la deformación de texturas PS1.
-// Va ANCLADA al héroe activo (centrado, también al caminar y al rotar).
-// Q/E rotan 90° alrededor del héroe, rueda = zoom (distancia).
-// Clic derecho mantenido = mirar libremente; al soltar vuelve al héroe deslizándose.
-// El minimapa puede pedir un "vistazo" (meta "vistazo") mientras se mantiene pulsado.
-// El combate pide un "encuadre" (meta "encuadre": PackedVector3Array): la cámara se centra en esos
-// puntos y se acerca todo lo que puede sin que se salgan (con un tope de zoom). Un solo punto = primer plano.
+// "Pseudo-isometric" camera: a far-away perspective with a very narrow FOV, so we keep the PS1
+// vertex jitter and texture warping. It is ANCHORED to the active hero (centred, also while walking
+// and rotating). Q/E rotate 90° around the hero, the wheel is zoom (distance). Holding right click
+// = free look; on release it slides back to the hero. The minimap can ask for a "peek" (meta
+// "vistazo") while it is held. Combat asks for a "framing" (meta "encuadre": PackedVector3Array):
+// the camera centres on those points and gets as close as it can without losing any of them (with a
+// zoom cap). A single point = close-up.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -27,7 +26,7 @@ namespace {
 	const float FOV = 22.0f;
 	const float DIST_MIN = 9.0f;
 	const float DIST_MAX = 34.0f;
-	const float DIST_REF = 18.0f; // distancia de referencia para escalar la UI anclada
+	const float DIST_REF = 18.0f; // Reference distance to scale the anchored UI
 	const float GRID = 40.0f; // = mazmorra::GRID_SIZE
 
 	Vector3 pivote;
@@ -36,30 +35,32 @@ namespace {
 	bool inicializada = false;
 	bool q_prev = false, e_prev = false;
 	bool arrastrando = false;
-	bool volviendo = false; // tras soltar el arrastre/vistazo: regreso suave al héroe
+	bool volviendo = false; // After releasing the drag/peek: smooth return to the hero
 	Vector2 raton_prev;
-	const float VEL_SEGUIR = 14.0f;  // casi pegada al héroe mientras camina
-	const float VEL_VOLVER = 5.0f;   // regreso suave al soltar
-	// Arrastre con clic derecho "pesado": el ratón mueve un punto objetivo (con menos recorrido por
-	// píxel que antes) y la cámara lo persigue con retraso, como si tuviera inercia
-	const float ESCALA_ARRASTRE = 0.0016f; // antes 0.0025: la mazmorra se movía demasiado por cada píxel
-	const float VEL_ARRASTRE = 6.0f;       // cuánto tarda la cámara en alcanzar al ratón
+	const float VEL_SEGUIR = 14.0f;  // Almost glued to the hero while walking
+	const float VEL_VOLVER = 5.0f;   // Smooth return on release
+	// "Heavy" right-click drag: the mouse moves a target point (less travel per pixel than before)
+	// and the camera chases it with some delay, as if it had inertia
+	const float ESCALA_ARRASTRE = 0.0016f; // Used to be 0.0025: the dungeon moved too much per pixel
+	const float VEL_ARRASTRE = 6.0f;       // How long the camera takes to catch up with the mouse
 	Vector3 objetivo_arrastre;
 
-	// Encuadre de combate
-	const float DIST_COMBATE_MIN = 7.5f; // tope de zoom al encuadrar (más cerca que la rueda)
-	const float MARGEN_ENCUADRE = 1.45f; // aire alrededor de los personajes
-	const float ALTO_FICHA = 1.9f;       // cabezas + dado e indicadores encima
+	// Combat framing
+	const float DIST_COMBATE_MIN = 7.5f; // Zoom cap when framing (closer than the wheel)
+	const float MARGEN_ENCUADRE = 1.45f; // Breathing room around the characters
+	const float ALTO_FICHA = 1.9f;       // Heads + die and indicators on top
 	const float VEL_ENCUADRE = 6.0f;
-	float peso_enc = 0.0f;   // 0 = distancia del jugador, 1 = distancia del encuadre
+	float peso_enc = 0.0f;   // 0 = player distance, 1 = framing distance
 	float dist_enc = 18.0f;
 
+	// Unit vector from the pivot to the camera (yaw around the hero + the fixed pitch)
 	Vector3 Direccion() {
 		float p = PITCH_DEG * (float)Math_PI / 180.0f;
 		float y = yaw * (float)Math_PI / 180.0f;
 		return Vector3(std::sin(y) * std::cos(p), std::sin(p), std::cos(y) * std::cos(p));
 	}
 
+	// Token of the active hero on the map (and its name), or null if there's none
 	Node3D* TokenActivo(Camera3D* cam, Node* dungeon, String& nombre) {
 		Node* pm = cam->get_node_or_null("/root/Main/PartyManager");
 		if (!pm) return nullptr;
@@ -69,6 +70,7 @@ namespace {
 		return Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(nombre)));
 	}
 
+	// Mouse position in the map container's pixels
 	Vector2 RatonEnContenedor(Camera3D* cam) {
 		Node* sub = cam->get_viewport();
 		Control* contenedor = sub ? Object::cast_to<Control>(sub->get_parent()) : nullptr;
@@ -78,7 +80,7 @@ namespace {
 
 JENOVA_SCRIPT_BEGIN
 
-// Lo puede llamar el DungeonManager al crear un piso (compatibilidad con la versión 2D)
+// The DungeonManager can call it when building a floor (compatibility with the 2D version)
 void ConfigurarLimitesMapa(Caller* instance, int grid_size) {}
 
 void OnAwake(Caller* instance) {}
@@ -108,7 +110,7 @@ void OnProcess(Caller* instance, double delta) {
 		inicializada = true;
 	}
 
-	// === ROTACIÓN Q / E (pasos de 90°) ===
+	// === Q / E ROTATION (90° steps) ===
 	bool q = input->is_physical_key_pressed(KEY_Q);
 	bool e = input->is_physical_key_pressed(KEY_E);
 	if (q && !q_prev) yaw_obj -= 90.0f;
@@ -116,7 +118,7 @@ void OnProcess(Caller* instance, double delta) {
 	q_prev = q;
 	e_prev = e;
 
-	// === ZOOM (rueda) ===
+	// === ZOOM (wheel) ===
 	if (input->is_action_just_pressed("zoom_in")) dist_obj = UtilityFunctions::clampf(dist_obj - 2.0f, DIST_MIN, DIST_MAX);
 	if (input->is_action_just_pressed("zoom_out")) dist_obj = UtilityFunctions::clampf(dist_obj + 2.0f, DIST_MIN, DIST_MAX);
 
@@ -124,10 +126,10 @@ void OnProcess(Caller* instance, double delta) {
 	yaw += (yaw_obj - yaw) * k;
 	dist += (dist_obj - dist) * k;
 
-	// === CLIC DERECHO MANTENIDO: mirar libremente (arrastre sobre el plano del suelo) ===
+	// === RIGHT CLICK HELD: free look (drag over the floor plane) ===
 	Vector2 raton = RatonEnContenedor(cam);
 	bool derecho = input->is_mouse_button_pressed(MOUSE_BUTTON_RIGHT);
-	if (derecho && !arrastrando) objetivo_arrastre = pivote; // empieza el arrastre
+	if (derecho && !arrastrando) objetivo_arrastre = pivote; // The drag starts
 	if (derecho && arrastrando) {
 		Vector2 d = raton - raton_prev;
 		Basis b = cam->get_global_transform().basis;
@@ -140,11 +142,11 @@ void OnProcess(Caller* instance, double delta) {
 		objetivo_arrastre.z = UtilityFunctions::clampf(objetivo_arrastre.z, 0.0f, GRID);
 		pivote = pivote.lerp(objetivo_arrastre, (float)UtilityFunctions::minf(1.0, VEL_ARRASTRE * delta));
 	}
-	if (!derecho && arrastrando) volviendo = true; // acabamos de soltar
+	if (!derecho && arrastrando) volviendo = true; // We just released
 	arrastrando = derecho;
 	raton_prev = raton;
 
-	// === VISTAZO DESDE EL MINIMAPA (mientras se mantiene pulsado) ===
+	// === PEEK FROM THE MINIMAP (while it is held) ===
 	bool vistazo = cam->has_meta("vistazo");
 	if (vistazo && !derecho && !cam->has_meta("encuadre")) {
 		Vector3 punto = cam->get_meta("vistazo");
@@ -152,7 +154,7 @@ void OnProcess(Caller* instance, double delta) {
 		volviendo = true;
 	}
 
-	// === ENCUADRE DE COMBATE (manda sobre el vistazo y sobre seguir al héroe) ===
+	// === COMBAT FRAMING (wins over the peek and over following the hero) ===
 	bool encuadre = cam->has_meta("encuadre") && !derecho;
 	if (encuadre) {
 		PackedVector3Array puntos = cam->get_meta("encuadre");
@@ -160,7 +162,7 @@ void OnProcess(Caller* instance, double delta) {
 			Vector3 centro;
 			for (int i = 0; i < puntos.size(); i++) centro += puntos[i];
 			centro /= (float)puntos.size();
-			// Ejes de la pantalla con la rotación a la que vamos
+			// Screen axes with the rotation we are heading to
 			float p = PITCH_DEG * (float)Math_PI / 180.0f;
 			float y = yaw_obj * (float)Math_PI / 180.0f;
 			Vector3 haciaCam(std::sin(y) * std::cos(p), std::sin(p), std::cos(y) * std::cos(p));
@@ -179,7 +181,7 @@ void OnProcess(Caller* instance, double delta) {
 				}
 			}
 			float objetivo_d = UtilityFunctions::clampf(necesaria * MARGEN_ENCUADRE, DIST_COMBATE_MIN, DIST_MAX);
-			if (peso_enc < 0.01f) dist_enc = dist; // empieza desde donde está el jugador
+			if (peso_enc < 0.01f) dist_enc = dist; // It starts from where the player is
 			dist_enc += (objetivo_d - dist_enc) * (float)UtilityFunctions::minf(1.0, VEL_ENCUADRE * delta);
 			pivote = pivote.lerp(centro, (float)UtilityFunctions::minf(1.0, VEL_ENCUADRE * delta));
 			volviendo = true;
@@ -187,8 +189,8 @@ void OnProcess(Caller* instance, double delta) {
 	}
 	peso_enc += ((encuadre ? 1.0f : 0.0f) - peso_enc) * (float)UtilityFunctions::minf(1.0, (encuadre ? 8.0 : 4.0) * delta);
 
-	// === ANCLADA AL HÉROE ACTIVO ===
-	if (cam->has_meta("recentrar")) cam->remove_meta("recentrar"); // ya siempre seguimos al héroe
+	// === ANCHORED TO THE ACTIVE HERO ===
+	if (cam->has_meta("recentrar")) cam->remove_meta("recentrar"); // From now on we always follow the hero
 	if (token && token->is_visible() && !derecho && !vistazo && !encuadre) {
 		Vector3 objetivo = token->get_position();
 		float vel = volviendo ? VEL_VOLVER : VEL_SEGUIR;
@@ -200,7 +202,7 @@ void OnProcess(Caller* instance, double delta) {
 	pivote.z = UtilityFunctions::clampf(pivote.z, 0.0f, GRID);
 	pivote.y = 0.0f;
 
-	// Golpe de zoom (críticos) que se recupera solo; lo pone el autoload Feel
+	// Zoom punch (criticals) that recovers on its own; the Feel autoload sets it
 	float punch = cam->has_meta("punch") ? (float)cam->get_meta("punch") : 0.0f;
 	punch = UtilityFunctions::maxf(0.0, punch - 4.0 * delta);
 	cam->set_meta("punch", punch);
@@ -209,12 +211,12 @@ void OnProcess(Caller* instance, double delta) {
 
 	cam->set_position(pivote + Direccion() * dist_visual);
 	cam->look_at(pivote, Vector3(0, 1, 0));
-	// Héroe en el centro exacto: solo aplicamos la sacudida de pantalla que calcula Feel
+	// Hero exactly in the centre: we only apply the screen shake that Feel computes
 	Vector2 sacudida = cam->has_meta("sacudida") ? (Vector2)cam->get_meta("sacudida") : Vector2();
 	cam->set_h_offset(sacudida.x);
 	cam->set_v_offset(sacudida.y);
 
-	// Datos para la UI anclada (menú táctico) y el renderer
+	// Data for the anchored UI and the renderer
 	cam->set_meta("pivote", pivote);
 	cam->set_meta("zoom_factor", 2.0f * DIST_REF / dist_base);
 	cam->set_meta("yaw", yaw);

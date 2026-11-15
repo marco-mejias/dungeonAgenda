@@ -1,11 +1,10 @@
 /* Jenova C++ Node Base Script - CombatManager */
 
-// Combate como secuencia animada:
-//   empujón del atacante (o proyectil si el arma es a distancia) -> impacto (pausa, sacudida,
-//   destello, retroceso, número, efectos del arma) -> muerte (estallido + botín a la ficha) o,
-//   si estaban pegados, contraataque animado -> fin de la acción.
-// Daño, coste, crítico y alcance salen del arma equipada (Combate/Reglas.hpp).
-// Mientras dura, el tablero está bloqueado (is_moving). Los efectos de pantalla los hace el autoload Feel.
+// Combat as an animated sequence: attacker lunge (or a projectile if the weapon is ranged) ->
+// impact (hit stop, shake, flash, knockback, number, weapon effects) -> death (burst + loot flies
+// to the card) or, if they were adjacent, an animated counterattack -> end of the action. Damage,
+// cost, critical and reach come from the equipped weapon (Combate/Reglas.hpp). While it lasts the
+// board is locked (is_moving). Screen effects are done by the Feel autoload.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -33,19 +32,21 @@ using namespace animacion;
 
 namespace {
 	const float T_EMPUJON = 0.11f;
-	// Los enemigos solo pegan en su turno: al atacarles no devuelven el golpe (el código del
-	// contraataque se queda por si algún enemigo o arma lo necesita más adelante)
+	// Enemies only hit on their turn: attacking them doesn't make them hit back (the counterattack
+	// code stays in case some enemy or weapon needs it later)
 	const bool HAY_CONTRAATAQUE = false;
 
 	Node* PartyManager(Node* self) { return self->get_node_or_null("/root/Main/PartyManager"); }
 	Node* Feel(Node* self) { return self->get_node_or_null("/root/Feel"); }
 
+	// 3D token by node name (heroes go by name, enemies by "Enemy_x_y")
 	Node3D* Ficha(Node* dungeon, const String& nombre) {
 		return Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(nombre)));
 	}
 
 	String NombreEnemigo(int x, int y) { return "Enemy_" + String::num_int64(x) + "_" + String::num_int64(y); }
 
+	// The hero whose turn it is (asked to the PartyManager)
 	Node* HeroeActivo(Node* self) {
 		Node* pm = PartyManager(self);
 		return pm ? Object::cast_to<Node>(pm->call("GetActiveCharacter")) : nullptr;
@@ -53,17 +54,18 @@ namespace {
 
 	bool Debug(Node* dungeon) { return dungeon->has_meta("debug_mode") && (bool)dungeon->get_meta("debug_mode"); }
 
-	// Un arquero enemigo no puede contraatacar a quien le pega a bocajarro
+	// An enemy archer can't counterattack whoever hits them point-blank
 	bool PuedeContraatacar(Node* enemigo, Node* heroe) {
 		return reglas::EnAlcance(enemigo, enemigo->get_meta("grid_pos", Vector2i(-99, -99)), heroe->get_meta("grid_pos", Vector2i(99, 99)));
 	}
 
+	// Is the enemy right next to the hero? (melee range)
 	bool CuerpoACuerpo(Node* heroe, int x, int y) {
 		return reglas::Distancia(heroe->get_meta("grid_pos", Vector2i(-99, -99)), Vector2i(x, y)) <= 1;
 	}
 
-	// Un enemigo que ataca queda "desobediente" (la chancleta le tiene ganas) y se le pasan la
-	// distracción y un turno de ceguera
+	// An enemy that attacks becomes "disobedient" (the flip-flop is after them) and loses the
+	// distraction and one turn of blindness
 	void DespuesDeAtacar(Node* e) {
 		if (!e) return;
 		e->set_meta("desobediente", true);
@@ -71,8 +73,8 @@ namespace {
 		if (e->has_meta("cegado")) e->set_meta("cegado", std::max(0, (int)e->get_meta("cegado") - 1));
 	}
 
-	// Muestra la tirada en el dado pequeño sobre quien ataca (autoload DadoCombate): solo el número
-	// y CRÍTICO o FALLO. Devuelve cuánto tarda en verse.
+	// Shows the roll on the small die over the attacker (DadoCombate autoload): just the number and
+	// CRITICAL or MISS. Returns how long it takes to show.
 	float MostrarTirada(Node* self, const reglas::Tirada& t, Node3D* quien) {
 		Node* dado = self->get_node_or_null("/root/DadoCombate");
 		if (!dado) return 0.0f;
@@ -83,7 +85,7 @@ namespace {
 
 	Camera3D* Camara(Node* dungeon) { return dungeon ? Object::cast_to<Camera3D>(dungeon->get_node_or_null("Camera3D")) : nullptr; }
 
-	// La cámara encuadra a estos personajes (CameraManager: meta "encuadre")
+	// The camera frames these characters (CameraManager: meta "encuadre")
 	void Encuadrar(Node* dungeon, Node3D* a, Node3D* b = nullptr) {
 		Camera3D* cam = Camara(dungeon);
 		if (!cam || !a) return;
@@ -93,36 +95,37 @@ namespace {
 		cam->set_meta("encuadre", puntos);
 	}
 
+	// Gives the camera back to the hero once the hit is over
 	void SoltarEncuadre(Node* dungeon) {
 		Camera3D* cam = Camara(dungeon);
 		if (cam && cam->has_meta("encuadre")) cam->remove_meta("encuadre");
 	}
 
-	// Indicadores flotantes: enseña ya lo que ha cambiado (antes de que el nodo desaparezca)
+	// Floating indicators: show what changed right now (before the node goes away)
 	void RevisarIndicadores(Node* self, Node* quien) {
 		Node* ind = self->get_node_or_null("/root/Indicadores");
 		if (ind && quien) ind->call("revisar", quien);
 	}
 
-	// Tactica.gd: tras una tirada de ataque se gasta lo que dura una tirada (la ayuda de un aliado)
+	// Tactica.gd: after an attack roll, whatever lasts one roll is spent (an ally's help)
 	void TrasAtacar(Node* self, Node* atacante) {
 		Node* tac = self->get_node_or_null("/root/Tactica");
 		if (tac && atacante) tac->call("tras_atacar", atacante);
 	}
 
-	// Progreso.gd (XP, niveles y pasivas): avisa de un golpe, crítico, fallo...
+	// Progreso.gd (XP, levels and passives): reports a hit, critical, miss...
 	void Disparar(Node* self, const char* evento, Node* heroe, Node* objetivo, bool puede_matar) {
 		Node* prog = self->get_node_or_null("/root/Progreso");
 		if (prog && heroe) prog->call("disparar", String(evento), heroe, objetivo, puede_matar);
 	}
 
-	// Franja con el nombre de la habilidad (la de los cambios de turno, más breve)
+	// Strip with the ability name (the turn-change one, but shorter)
 	void AnunciarHabilidad(Node* self, const String& nombre) {
 		Node* banner = self->get_node_or_null("/root/Main/CanvasLayer/Banner");
 		if (banner) banner->call("anunciar", nombre);
 	}
 
-	// El enemigo muere: el héroe se lleva lo que salga de su tabla de botín (ficha del enemigo)
+	// The enemy dies: the hero takes whatever comes out of its loot table (enemy card)
 	void BotinEnemigo(Node* self_node, Node* dungeon, Node* heroe, Vector3 pos, const String& tabla) {
 		Node* cat = inventario::Catalogo(self_node);
 		Node* pm = PartyManager(self_node);
@@ -140,7 +143,7 @@ void OnDestroy(Caller* instance) {}
 void OnReady(Caller* instance) {}
 
 // ==========================================
-// PREVISIÓN (tarjeta de ataque del HUD)
+// PREVIEW (HUD attack card)
 // ==========================================
 Dictionary PrevisionAtaque(Caller* instance, int x, int y) {
 	Dictionary d;
@@ -167,15 +170,15 @@ Dictionary PrevisionAtaque(Caller* instance, int x, int y) {
 	d["ca"] = reglas::ClaseArmadura(enemigo);
 	d["hp"] = hp;
 	d["hp_max"] = enemigo->get_meta("hp_max", 1);
-	// Posicionamiento: ventaja/desventaja y por qué (flanqueo, altura, cobertura...)
+	// Positioning: advantage/disadvantage and why (flanking, height, cover...)
 	d["ventaja"] = mods.get("ventaja", 0);
 	d["razones"] = mods.get("razones", PackedStringArray());
 	d["mata"] = dano >= hp;
 	d["mata_critico"] = dano_critico >= hp;
-	// Las stats del objetivo que toca este golpe: la vida y lo que cambien los efectos del arma
+	// The target stats this hit touches: health and whatever the weapon effects change
 	Array stats;
 	int dano_extra = 0;
-	Dictionary cambios; // stat -> suma
+	Dictionary cambios; // stat -> sum
 	Array efectos = reglas::EfectosAlGolpear(heroe);
 	for (int i = 0; i < efectos.size(); i++) {
 		Ref<Resource> ef = efectos[i];
@@ -203,16 +206,16 @@ Dictionary PrevisionAtaque(Caller* instance, int x, int y) {
 		stats.push_back(st);
 	}
 	d["stats"] = stats;
-	d["contra"] = HAY_CONTRAATAQUE && cuerpo && PuedeContraatacar(enemigo, heroe) ? reglas::DanoBase(enemigo, heroe) : 0; // a distancia no hay contraataque
+	d["contra"] = HAY_CONTRAATAQUE && cuerpo && PuedeContraatacar(enemigo, heroe) ? reglas::DanoBase(enemigo, heroe) : 0; // No counterattack at range
 	d["a_distancia"] = !cuerpo;
-	d["en_alcance"] = (bool)dungeon->call("PuedeAtacarA", x, y); // alcance del arma + línea de visión
+	d["en_alcance"] = (bool)dungeon->call("PuedeAtacarA", x, y); // Weapon reach + line of sight
 	d["coste"] = Debug(dungeon) ? 0 : reglas::CosteAtaque(heroe);
 	d["pa"] = heroe->get_meta("pa_actual", 0);
 	return d;
 }
 
 // ==========================================
-// SECUENCIA DE ATAQUE
+// ATTACK SEQUENCE
 // ==========================================
 void FinAtaque(Caller* instance) {
 	Node* self_node = GetSelf<Node>(instance);
@@ -231,6 +234,7 @@ void FinAtaque(Caller* instance) {
 	dungeon->call("RefrescarLuces");
 }
 
+// The enemy's counterattack lands on the hero: damage, flash, knockback and the hero's passives
 void ImpactoContra(Caller* instance, int x, int y, int dano) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -256,7 +260,7 @@ void ImpactoContra(Caller* instance, int x, int y, int dano) {
 	tw->tween_callback(Callable(self_node, StringName("FinAtaque")));
 }
 
-// El contraataque falla su tirada: texto "Fallo" sobre el héroe
+// The counterattack misses its roll: "Miss" text over the hero
 void FalloContra(Caller* instance, int x, int y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -268,6 +272,7 @@ void FalloContra(Caller* instance, int x, int y) {
 	tw->tween_callback(Callable(self_node, StringName("FinAtaque")));
 }
 
+// The enemy hits back (only if they were adjacent and its weapon reaches)
 void Contraataque(Caller* instance, int x, int y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -277,7 +282,7 @@ void Contraataque(Caller* instance, int x, int y) {
 
 	Node3D* ficha_h = Ficha(dungeon, heroe->get_name());
 	Desplazar(ficha_e, Direccion(ficha_e, ficha_h), 0.32f, T_EMPUJON, 0.16f);
-	// El contraataque también tira su d20 (sin dado en pantalla, para no frenar el combate)
+	// The counterattack rolls its own d20 too (no die on screen, so combat doesn't slow down)
 	reglas::Tirada tirada = reglas::TiradaAtaque(ficha_e, heroe);
 	int dano = reglas::DanoBase(ficha_e, heroe);
 	if (tirada.critico) dano = reglas::DanoCritico(ficha_e, dano);
@@ -289,6 +294,7 @@ void Contraataque(Caller* instance, int x, int y) {
 	else tw->tween_callback(Callable(self_node, StringName("FalloContra")).bind(x, y));
 }
 
+// The hero's hit lands: damage (doubled on a critical), weapon effects, passives and maybe death
 void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -297,10 +303,10 @@ void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 	if (!heroe || !enemigo) { FinAtaque(instance); return; }
 
 	if (critico < 0) {
-		// La tirada falló: el golpe no llega (el FALLO ya lo enseña el dado)
+		// The roll missed: the hit doesn't land (the die already shows the MISS)
 		Disparar(self_node, "al_fallar", heroe, enemigo, false);
 		if (inventario::Lleva(heroe, "chancleta_inquisicion")) {
-			// La chancleta rebota y te da a ti
+			// The flip-flop bounces back and hits you
 			Node3D* ficha_r = Ficha(dungeon, heroe->get_name());
 			if (ficha_r) TextoFlotante(dungeon, ficha_r->get_position(), String::utf8("\xC2\xA1" "Rebota!"), Color(1, 0.75, 0.3), 36);
 			Node* pm_r = PartyManager(self_node);
@@ -325,19 +331,19 @@ void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 
 	Node3D* ficha_h = Ficha(dungeon, heroe->get_name());
 	Vector3 dir = Direccion(ficha_h, enemigo);
-	// El número lo enseñan los Indicadores (corazón con el daño sobre la cabeza)
+	// The number is shown by the Indicadores (heart with the damage over the head)
 	Destello(enemigo, Color(4, 4, 4));
 	Desplazar(enemigo, dir, 0.18f, 0.05f, 0.2f);
 
-	// Espada multiusos: te peinas en mitad del combate y el enemigo se distrae
+	// Multi-purpose sword: you comb your hair mid-fight and the enemy gets distracted
 	if (inventario::Lleva(heroe, "espada_multiusos")) {
 		enemigo->set_meta("distraido", 1);
 		TextoFlotante(dungeon, enemigo->get_position() + Vector3(0, 0.6, 0), String::utf8("\xC2\xA1" "Distra\xC3\xAD" "do!"), Color(0.6, 0.85, 1.0), 30);
 	}
 
-	// Efectos del arma al golpear (veneno, robo de vida...)
-	inventario::AplicarEfectos(reglas::EfectosAlGolpear(heroe), enemigo); // sus números: Indicadores
-	// Pasivas del héroe (daño extra, chispas, PA...): la muerte de ESTE enemigo la gestionamos aquí
+	// Weapon effects on hit (poison, life steal...)
+	inventario::AplicarEfectos(reglas::EfectosAlGolpear(heroe), enemigo); // Their numbers: Indicadores
+	// Hero passives (extra damage, sparks, PA...): THIS enemy's death is handled here
 	if (critico) Disparar(self_node, "al_critico", heroe, enemigo, false);
 	Disparar(self_node, "al_golpear", heroe, enemigo, false);
 	hp = enemigo->get_meta("hp_actual", 1);
@@ -353,17 +359,17 @@ void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 
 	Ref<Tween> tw = self_node->create_tween();
 	if (hp <= 0) {
-		// Muerte: estallido de píxeles y el botín vuela a la ficha
-		RevisarIndicadores(self_node, enemigo); // que se vea el último golpe antes de quitarlo
+		// Death: pixel burst and the loot flies to the card
+		RevisarIndicadores(self_node, enemigo); // Let the last hit be seen before removing it
 		Node* prog = self_node->get_node_or_null("/root/Progreso");
-		if (prog) prog->call("enemigo_muerto", enemigo, heroe); // XP y pasivas "al matar"
+		if (prog) prog->call("enemigo_muerto", enemigo, heroe); // XP and "on kill" passives
 		Estallido(dungeon, enemigo->get_position(), Color(0.85, 0.8, 0.7));
 		BotinEnemigo(self_node, dungeon, heroe, enemigo->get_position(), enemigo->get_meta("tabla_botin", "enemigo"));
 		dungeon->call("EliminarEnemigo", x, y);
 		tw->tween_interval(0.45);
 		tw->tween_callback(Callable(self_node, StringName("FinAtaque")));
 	} else if (HAY_CONTRAATAQUE && CuerpoACuerpo(heroe, x, y) && PuedeContraatacar(enemigo, heroe)) {
-		// Pegados: el enemigo devuelve el golpe (si su arma llega)
+		// Adjacent: the enemy hits back (if its weapon reaches)
 		tw->tween_interval(0.32);
 		tw->tween_callback(Callable(self_node, StringName("Contraataque")).bind(x, y));
 	} else {
@@ -373,9 +379,9 @@ void ImpactoAtaque(Caller* instance, int x, int y, int dano, int critico) {
 }
 
 // ==========================================
-// 1. ATAQUE A UN ENEMIGO AL ALCANCE DEL ARMA
+// 1. ATTACK AN ENEMY WITHIN WEAPON REACH
 // ==========================================
-// La línea de visión la comprueba el DungeonManager antes de llamar (es quien tiene el mapa).
+// Line of sight is checked by the DungeonManager before calling (it owns the map).
 void AtacarEnemigo(Caller* instance, int x, int y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -407,7 +413,7 @@ void AtacarEnemigo(Caller* instance, int x, int y) {
 	heroe->set_meta("in_combat", true);
 	enemigo->set_meta("in_combat", true);
 
-	// Tirada de ataque (d20): se ve el dado y, al pararse, sale el golpe
+	// Attack roll (d20): the die shows and, when it stops, the hit comes out
 	reglas::Tirada tirada = reglas::TiradaAtaque(heroe, enemigo);
 	int dano = reglas::DanoBase(heroe, enemigo);
 	if (tirada.critico) dano = reglas::DanoCritico(heroe, dano);
@@ -415,13 +421,14 @@ void AtacarEnemigo(Caller* instance, int x, int y) {
 	TrasAtacar(self_node, heroe);
 	UtilityFunctions::print("[CombatManager] Tirada: d20 ", tirada.d20, " + ", tirada.bono, " = ", tirada.total, " vs CA ", tirada.ca, tirada.acierta ? " -> acierta" : " -> falla");
 
-	// Bloqueamos el tablero mientras dura la secuencia
+	// We lock the board while the sequence lasts
 	dungeon->set_meta("is_moving", true);
 	dungeon->call("ApagarLucesMapa");
 	Node* ui = self_node->get_node_or_null("/root/Main/CanvasLayer");
 	if (ui) ui->call("UpdateWarriorUI");
 
-	// La cámara encuadra al héroe y al enemigo (lo más cerca posible) y el dado sale sobre el héroe
+	// The camera frames the hero and the enemy (as close as possible) and the die shows over the
+	// hero
 	Node3D* ficha_atacante = Ficha(dungeon, heroe->get_name());
 	Encuadrar(dungeon, ficha_atacante, enemigo);
 	float espera_dado = MostrarTirada(self_node, tirada, ficha_atacante);
@@ -430,7 +437,7 @@ void AtacarEnemigo(Caller* instance, int x, int y) {
 	tw_dado->tween_callback(Callable(self_node, StringName("LanzarAtaque")).bind(x, y, dano, critico));
 }
 
-// Tras la tirada: empujón (o proyectil) y el impacto
+// After the roll: lunge (or projectile) and the impact
 void LanzarAtaque(Caller* instance, int x, int y, int dano, int critico) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -445,20 +452,20 @@ void LanzarAtaque(Caller* instance, int x, int y, int dano, int critico) {
 	if (cuerpo) {
 		Desplazar(ficha_h, Direccion(ficha_h, enemigo), 0.34f, T_EMPUJON, 0.16f);
 	} else {
-		// A distancia: pequeño retroceso y el proyectil viaja hasta el enemigo
+		// Ranged: small recoil and the projectile travels to the enemy
 		Desplazar(ficha_h, -Direccion(ficha_h, enemigo), 0.1f, 0.06f, 0.14f);
 		Ref<Resource> arma = inventario::Arma(heroe);
-		bool magia = arma.is_valid() && (int)arma->get("animacion") == 4; // CONJURO
+		bool magia = arma.is_valid() && (int)arma->get("animacion") == 4; // SPELL
 		if (ficha_h) espera = Proyectil(dungeon, ficha_h->get_position(), enemigo->get_position(), magia ? Color(0.5, 0.8, 1.0) : Color(0.95, 0.9, 0.75));
 	}
 
 	Ref<Tween> tw = self_node->create_tween();
 	tw->tween_interval(espera);
-	tw->tween_callback(Callable(self_node, StringName("ImpactoAtaque")).bind(x, y, dano, critico)); // critico: 1 crítico, 0 normal, -1 falla
+	tw->tween_callback(Callable(self_node, StringName("ImpactoAtaque")).bind(x, y, dano, critico)); // critico: 1 critical, 0 normal, -1 miss
 }
 
 // ==========================================
-// 2. RECEPCIÓN DE BOTONES DEL MENÚ TÁCTICO
+// 2. TACTICAL MENU BUTTONS
 // ==========================================
 void OnBotonAtacar(Caller* instance) {
 	Node* self_node = GetSelf<Node>(instance);
@@ -476,7 +483,7 @@ void OnBotonAtacar(Caller* instance) {
 	AtacarEnemigo(instance, objetivo.x, objetivo.y);
 }
 
-// Habilidad: invocar a la gallina lanza-huevos (la lleva el autoload Especiales)
+// Ability: summon the egg-throwing chicken (handled by the Especiales autoload)
 void OnBotonHabilidad(Caller* instance) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -489,7 +496,7 @@ void OnBotonHabilidad(Caller* instance) {
 			UtilityFunctions::print("[CombatManager] ", error);
 			if (audio) audio->call("play_ui", "no");
 		} else if (dungeon) {
-			// Se anuncia la habilidad y la cámara se acerca al que la lanza
+			// The ability is announced and the camera moves close to the caster
 			AnunciarHabilidad(self_node, "Invocar gallina");
 			Encuadrar(dungeon, Ficha(dungeon, heroe->get_name()));
 			Ref<Tween> tw = self_node->create_tween();
@@ -502,7 +509,7 @@ void OnBotonHabilidad(Caller* instance) {
 	if (dungeon) dungeon->call("RefrescarLuces");
 }
 
-// Un enemigo cae por una habilidad o una pasiva (Progreso.gd): estallido, botín para 'heroe' y fuera
+// An enemy falls to an ability or a passive (Progreso.gd): burst, loot for 'heroe' and gone
 void MatarEnemigoPor(Caller* instance, String heroe, int x, int y) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -516,9 +523,9 @@ void MatarEnemigoPor(Caller* instance, String heroe, int x, int y) {
 	dungeon->call("EliminarEnemigo", x, y);
 }
 
-// Un golpe gratis fuera de turno (ataque de oportunidad, y lo que venga): tirada con ventajas,
-// daño del arma, y si cae, XP/botín. 'distancia' = a cuántas casillas está (el arma tiene que llegar).
-// Sirve en los dos sentidos: héroe -> enemigo y enemigo -> héroe. Devuelve si acertó.
+// A free hit out of turn (attack of opportunity, and whatever comes later): roll with advantages,
+// weapon damage, and if it dies, XP/loot. 'distancia' = how many tiles away it is (the weapon has
+// to reach). Works both ways: hero -> enemy and enemy -> hero. Returns whether it hit.
 Variant AtaqueLibre(Caller* instance, Node* atacante, Node* defensor, int distancia) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
@@ -557,20 +564,21 @@ Variant AtaqueLibre(Caller* instance, Node* atacante, Node* defensor, int distan
 	return true;
 }
 
-// Acaba el primer plano de una habilidad (si no ha empezado otra secuencia que encuadre)
+// The ability close-up ends (unless another framing sequence has started)
 void TerminarPrimerPlano(Caller* instance) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
 	if (dungeon && !(dungeon->has_meta("is_moving") && (bool)dungeon->get_meta("is_moving"))) SoltarEncuadre(dungeon);
 }
 
+// "End turn" button: the active hero loses their remaining PA and the turn moves on
 void OnBotonPasar(Caller* instance) {
 	Node* self_node = GetSelf<Node>(instance);
 	Node* dungeon = self_node->get_parent();
 	Node* pm = PartyManager(self_node);
 	if (!dungeon || !pm) return;
 
-	UtilityFunctions::print("[CombatManager] ¡Pasando turno!");
+	UtilityFunctions::print(String::utf8("[CombatManager] \xC2\xA1Pasando turno!"));
 
 	Node* heroe = HeroeActivo(self_node);
 	if (heroe) {
@@ -580,7 +588,7 @@ void OnBotonPasar(Caller* instance) {
 	}
 }
 
-// Árbitro genérico (por si un evento quiere enfrentar a dos nodos)
+// Generic referee (in case an event wants to pit two nodes against each other)
 void EjecutarAtaqueFisico(Caller* instance, Node* atacante, Node* defensor) {
 	if (!atacante || !defensor) return;
 	reglas::Tirada tirada = reglas::TiradaAtaque(atacante, defensor);

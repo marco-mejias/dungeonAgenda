@@ -1,25 +1,25 @@
 extends Node
 
-# Progreso (autoload): experiencia, niveles y habilidades de los héroes.
+# Progreso (autoload): experience, levels and abilities of the heroes.
 #
-#   XP        Matar da XP al que remata (el resto del grupo, un 25%). Al llegar a xp_para(nivel) se
-#             sube de nivel: las stats crecen según la clase, se recargan las habilidades y se abre
-#             el draft (pantalla_nivel.gd): elegir 1 de 3 habilidades de su clase o globales.
-#   Ranuras   3 habilidades (el Mago, 4). Una pasiva repetida se APILA (no gasta ranura): combos.
-#   Activas   usos + enfriamiento en días + coste de PA. Se recargan en la fogata, con el Elixir de
-#             ingenio y al subir de nivel. Se lanzan desde la barra del HUD (teclas Z X C V).
-#   Pasivas   reaccionan solas: al golpear, al hacer crítico, al fallar, al matar, al recibir un
-#             golpe, al empezar el día o al lanzar una habilidad (disparar()).
+#   XP        Killing gives XP to whoever lands the last hit (the rest of the party, 25%). On
+#             reaching xp_para(nivel) they level up: stats grow by class, abilities recharge and
+#             the draft opens (pantalla_nivel.gd): pick 1 of 3 abilities, from their class or global.
+#   Slots     3 abilities (the Mage, 4). A repeated passive STACKS (no new slot): combos.
+#   Actives   uses + cooldown in days + PA cost. They recharge at the campfire, with the Elixir
+#             of wit and when levelling up. Cast from the HUD bar (keys Z X C V).
+#   Passives  react on their own: on hit, on critical, on miss, on kill, on taking a hit, at
+#             the start of the day or on casting an ability (disparar()).
 #
-# Por héroe (metas): "nivel", "xp", "habilidades" = [{id, usos, enfriamiento, pilas}]
-# El C++ llama a: disparar(evento, heroe, objetivo, puede_matar) y enemigo_muerto(enemigo, heroe).
+# Per hero (metas): "nivel", "xp", "habilidades" = [{id, usos, enfriamiento, pilas}]. C++ calls:
+# disparar(evento, heroe, objetivo, puede_matar) and enemigo_muerto(enemigo, heroe).
 
 const CARPETA := "res://Data/Habilidades"
 const CARPETA_ACCIONES := "res://Data/Acciones"
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
 const INICIALES := {"Caballero": "tajo_amplio", "Ladron": "punalada", "Mago": "bola_fuego", "Tanque": "provocar"}
-# Lo que gana cada clase por nivel (sobre sus stats base)
+# What each class gains per level (over its base stats)
 const CRECIMIENTO := {
 	"Caballero": {"hp_max": 8, "fuerza": 2, "defensa": 1},
 	"Ladron": {"hp_max": 5, "fuerza": 1, "suerte": 2},
@@ -27,16 +27,16 @@ const CRECIMIENTO := {
 	"Tanque": {"hp_max": 12, "defensa": 2, "fuerza": 1},
 }
 const CRECIMIENTO_COMUN := {"hp_max": 6, "fuerza": 1}
-const PARTE_GRUPO := 0.25 # XP para los que no rematan
+const PARTE_GRUPO := 0.25 # XP for the ones who don't land the last hit
 
-signal cambio # algo de habilidades/XP ha cambiado (HUD)
+signal cambio # Something about abilities/XP changed (HUD)
 
 var habilidades := {}      # id -> HabilidadData
-var acciones := {}         # acciones básicas que tienen todos (Data/Acciones): ayudar, retirada...
-var pendientes: Array = [] # subidas de nivel esperando su draft: {heroe, nivel, crecimiento}
-var apuntando := {}        # {heroe, indice, celdas} mientras se elige objetivo
+var acciones := {}         # Basic actions everyone has (Data/Acciones): ayudar, retirada...
+var pendientes: Array = [] # Level ups waiting for their draft: {heroe, nivel, crecimiento}
+var apuntando := {}        # {heroe, indice, celdas} while picking a target
 var dia_visto := -1
-var _profundidad := 0      # para que los combos no se llamen a sí mismos sin fin
+var _profundidad := 0      # So combos don't call themselves forever
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -54,6 +54,7 @@ func _dm() -> Node:
 func _pm() -> Node:
 	return get_node_or_null(RUTA_PM)
 
+# Every hero node in the PartyManager
 func heroes() -> Array:
 	var out := []
 	var pm := _pm()
@@ -63,15 +64,18 @@ func heroes() -> Array:
 				out.append(h)
 	return out
 
+# Alive and still on the floor
 func _vivo(h: Node) -> bool:
 	return h != null and is_instance_valid(h) and not h.get_meta("esta_muerto", false) and not h.get_meta("ha_escapado", false)
 
+# The 3D token of a hero or an enemy
 func _ficha(n: Node) -> Node3D:
 	if n is Node3D:
 		return n
 	var dm := _dm()
 	return dm.get_node_or_null(NodePath(str(n.name))) as Node3D if dm and n else null
 
+# Floating text over a character
 func _texto(n: Node, t: String, color: Color, tam: int = 30) -> void:
 	var f := _ficha(n)
 	var esp := get_node_or_null("/root/Especiales")
@@ -81,13 +85,15 @@ func _texto(n: Node, t: String, color: Color, tam: int = 30) -> void:
 func datos(id: String) -> HabilidadData:
 	return habilidades.get(id)
 
+# The Mage gets 4 ability slots, everyone else 3
 func max_ranuras(h: Node) -> int:
 	return 4 if str(h.get_meta("clase", "")) == "Mago" else 3
 
+# The hero's ability list: [{id, usos, enfriamiento, pilas}]
 func lista(h: Node) -> Array:
 	return h.get_meta("habilidades", [])
 
-## ¿Alguna de sus habilidades tiene esta etiqueta? (reglas: escurridizo, guardaespaldas...)
+## Do any of their abilities have this tag? (rules: escurridizo, guardaespaldas...)
 func tiene_etiqueta(n: Node, etiqueta: String) -> bool:
 	if n == null or not is_instance_valid(n) or not n.has_meta("habilidades"):
 		return false
@@ -98,7 +104,7 @@ func tiene_etiqueta(n: Node, etiqueta: String) -> bool:
 	return false
 
 # ==========================================
-# CADA FRAME: héroes nuevos y paso de los días
+# EVERY FRAME: new heroes and passing days
 # ==========================================
 func _process(_delta: float) -> void:
 	var pm := _pm()
@@ -115,6 +121,7 @@ func _process(_delta: float) -> void:
 		dia_visto = dia
 		_nuevo_dia()
 
+# A new hero: level 1, no XP and their class starting ability
 func _iniciar(h: Node) -> void:
 	h.set_meta("nivel", int(h.get_meta("nivel", 1)))
 	h.set_meta("xp", 0)
@@ -125,16 +132,18 @@ func _iniciar(h: Node) -> void:
 	h.set_meta("habilidades", hab)
 	cambio.emit()
 
+# A fresh ability record (full uses, no cooldown, 1 stack)
 func _entrada(d: HabilidadData) -> Dictionary:
 	return {"id": d.obtener_id(), "usos": d.usos, "enfriamiento": 0, "pilas": 1}
 
+# Every day: cooldowns go down, the "start of day" passives trigger and taunts wear off
 func _nuevo_dia() -> void:
 	for h in heroes():
 		for e in lista(h):
 			e["enfriamiento"] = maxi(0, int(e["enfriamiento"]) - 1)
 		if _vivo(h):
 			disparar("al_empezar_dia", h)
-	# La provocación dura hasta que los enemigos han jugado su turno
+	# The taunt lasts until the enemies have played their turn
 	var dm := _dm()
 	if dm:
 		for e in dm.get_children():
@@ -148,17 +157,18 @@ func _nuevo_dia() -> void:
 	cambio.emit()
 
 # ==========================================
-# EXPERIENCIA Y NIVELES
+# EXPERIENCE AND LEVELS
 # ==========================================
 func xp_para(nivel: int) -> int:
 	return 15 * nivel + 5 * (nivel - 1) * (nivel - 1)
 
+# XP an enemy is worth (its own meta, or from its health and strength)
 func xp_de_enemigo(e: Node) -> int:
 	if e.has_meta("xp"):
 		return int(e.get_meta("xp"))
 	return 6 + int(e.get_meta("hp_max", 10)) / 3 + int(e.get_meta("fuerza", 4)) / 2
 
-## Lo llaman el CombatManager, Especiales y las habilidades cuando un enemigo cae
+## Called by the CombatManager, Especiales and the abilities when an enemy falls
 func enemigo_muerto(e: Node, asesino: Node) -> void:
 	if e == null or e.has_meta("xp_repartida"):
 		return
@@ -173,6 +183,7 @@ func enemigo_muerto(e: Node, asesino: Node) -> void:
 		if h != asesino and _vivo(h):
 			ganar_xp(h, maxi(1, ceili(xp * PARTE_GRUPO)))
 
+# Adds XP and queues every level up it reaches
 func ganar_xp(h: Node, cantidad: int) -> void:
 	if cantidad <= 0:
 		return
@@ -185,6 +196,7 @@ func ganar_xp(h: Node, cantidad: int) -> void:
 		subir_nivel(h)
 	cambio.emit()
 
+# One level up: stats grow by class, the health gained is added, abilities recharge and the draft gets queued
 func subir_nivel(h: Node) -> void:
 	var nivel := int(h.get_meta("nivel", 1)) + 1
 	h.set_meta("nivel", nivel)
@@ -209,10 +221,10 @@ func subir_nivel(h: Node) -> void:
 	print("[Progreso] %s sube a nivel %d" % [h.name, nivel])
 
 # ==========================================
-# DRAFT Y APRENDER
+# DRAFT AND LEARNING
 # ==========================================
-## Hasta 3 habilidades distintas que puede sacar (de su clase o globales). Las activas que ya tiene
-## no salen; las pasivas que tiene salen si aún se pueden apilar.
+## Up to 3 different abilities they can get (from their class or global). Actives they already have
+## don't show up; passives they have show up if they can still stack.
 func opciones_draft(h: Node, cuantas: int = 3) -> Array:
 	var clase := str(h.get_meta("clase", ""))
 	var candidatas := []
@@ -238,20 +250,22 @@ func opciones_draft(h: Node, cuantas: int = 3) -> Array:
 				break
 	return elegidas
 
+# The record of ability 'id' on that hero ({} if they don't have it)
 func _buscar(h: Node, id: String) -> Dictionary:
 	for e in lista(h):
 		if e["id"] == id:
 			return e
 	return {}
 
-## ¿Ocupa ranura nueva? (una pasiva que ya tiene solo se apila)
+## Does it take a new slot? (a passive they already have only stacks)
 func necesita_ranura(h: Node, id: String) -> bool:
 	return _buscar(h, id).is_empty()
 
+# No free slot left?
 func ranuras_llenas(h: Node) -> bool:
 	return lista(h).size() >= max_ranuras(h)
 
-## Aprende 'id' (o lo apila); si hay que hacer sitio, olvida 'olvidar'
+## Learns 'id' (or stacks it); if room is needed, forgets 'olvidar'
 func aprender(h: Node, id: String, olvidar: String = "") -> void:
 	var d: HabilidadData = habilidades.get(id)
 	if d == null:
@@ -272,9 +286,9 @@ func aprender(h: Node, id: String, olvidar: String = "") -> void:
 	cambio.emit()
 
 # ==========================================
-# USOS Y RECARGA
+# USES AND RECHARGE
 # ==========================================
-## Recarga usos y enfriamientos (fogata, elixir, subir de nivel)
+## Recharges uses and cooldowns (campfire, elixir, level up)
 func restaurar(h: Node, con_texto: bool = true) -> void:
 	for e in lista(h):
 		var d: HabilidadData = habilidades.get(e["id"])
@@ -285,11 +299,12 @@ func restaurar(h: Node, con_texto: bool = true) -> void:
 		_texto(h, "¡Habilidades listas!", Color(0.55, 0.75, 1.0), 28)
 	cambio.emit()
 
+# Recharges every hero (campfire)
 func restaurar_todos() -> void:
 	for h in heroes():
 		restaurar(h, false)
 
-# ¿Se puede lanzar? "" = sí, si no el motivo
+# Can it be cast? "" = yes, otherwise the reason
 func motivo_no_usar(h: Node, i: int) -> String:
 	var l := lista(h)
 	if i < 0 or i >= l.size():
@@ -299,7 +314,7 @@ func motivo_no_usar(h: Node, i: int) -> String:
 		return "?"
 	return _motivo(h, d, l[i])
 
-# entrada = su ficha de usos/enfriamiento ({} para las acciones básicas: sin límite)
+# entrada = its uses/cooldown record ({} for the basic actions: no limit)
 func _motivo(h: Node, d: HabilidadData, entrada: Dictionary) -> String:
 	if not d.es_activa():
 		return "Es pasiva: funciona sola"
@@ -318,7 +333,7 @@ func _motivo(h: Node, d: HabilidadData, entrada: Dictionary) -> String:
 		return "Nada al alcance"
 	return ""
 
-## Acción básica (rueda del HUD): ayudar, retirada... "" = se puede
+## Basic action (HUD): ayudar, retirada... "" = it can be done
 func motivo_accion(id: String) -> String:
 	var h := _activo()
 	var d: HabilidadData = acciones.get(id)
@@ -326,6 +341,7 @@ func motivo_accion(id: String) -> String:
 		return "?"
 	return _motivo(h, d, {})
 
+# A basic action from the bar (help, retreat...): direct or pick a target
 func lanzar_accion(id: String) -> void:
 	var h := _activo()
 	var d: HabilidadData = acciones.get(id)
@@ -334,13 +350,13 @@ func lanzar_accion(id: String) -> void:
 	_lanzar(h, d, {})
 
 # ==========================================
-# LANZAR: elegir objetivo y ejecutar
+# CAST: pick a target and execute
 # ==========================================
 func _activo() -> Node:
 	var pm := _pm()
 	return pm.call("GetActiveCharacter") if pm else null
 
-## La barra del HUD: pulsar la habilidad 'i' del héroe activo
+## The HUD bar: press ability 'i' of the active hero
 func pulsar(i: int) -> void:
 	var h := _activo()
 	if h == null:
@@ -350,7 +366,7 @@ func pulsar(i: int) -> void:
 		return
 	_lanzar(h, habilidades[l[i]["id"]], l[i])
 
-# Lanza d (habilidad con su 'entrada' de usos, o acción básica con {}): directa o a elegir objetivo
+# Casts d (ability with its uses 'entrada', or basic action with {}): directly or picking a target
 func _lanzar(h: Node, d: HabilidadData, entrada: Dictionary) -> void:
 	var motivo := _motivo(h, d, entrada)
 	var audio := get_node_or_null("/root/AudioManager")
@@ -363,12 +379,13 @@ func _lanzar(h: Node, d: HabilidadData, entrada: Dictionary) -> void:
 		cancelar()
 		_ejecutar(h, d, entrada, h.get_meta("grid_pos"))
 		return
-	# Elegir objetivo: se ve su alcance y los objetivos válidos; clic para lanzar, clic derecho cancela
+	# Pick a target: its reach and the valid targets show; click to cast, right click cancels
 	apuntando = {"heroe": str(h.name), "datos": d, "entrada": entrada, "celdas": celdas_objetivo(h, d)}
 	_pintar(h, d, apuntando["celdas"])
 	if audio:
 		audio.play_ui("open")
 
+# Stops aiming (right click or ESC) and clears the reach from the map
 func cancelar() -> void:
 	if apuntando.is_empty():
 		return
@@ -384,7 +401,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		cancelar()
 		get_viewport().set_input_as_handled()
 
-## main.gd: clic en el mapa mientras se apunta
+## main.gd: click on the map while aiming
 func confirmar(celda: Vector2i) -> void:
 	if apuntando.is_empty():
 		return
@@ -403,6 +420,7 @@ func confirmar(celda: Vector2i) -> void:
 func _dist(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 
+# Enemies visible on the map
 func _enemigos() -> Array:
 	var out := []
 	for e in Tactica.unidades():
@@ -410,6 +428,7 @@ func _enemigos() -> Array:
 			out.append(e)
 	return out
 
+# The visible enemy on that tile, or null
 func _enemigo_en(c: Vector2i) -> Node3D:
 	for e in _enemigos():
 		if e.get_meta("grid_pos") == c:
@@ -418,10 +437,10 @@ func _enemigo_en(c: Vector2i) -> Node3D:
 
 func _ve(desde: Vector2i, hasta: Vector2i) -> bool:
 	var dm := _dm()
-	return dm == null or Tactica.linea_de_vision(desde, hasta) # sin llamar al C++ (mismo algoritmo)
+	return dm == null or Tactica.linea_de_vision(desde, hasta) # Without calling C++ (same algorithm)
 
-## ¿Hay a quién lanzarla? El HUD lo pregunta cada frame y calcular las casillas traza líneas de
-## visión, así que se recuerda un momento (o hasta que el héroe se mueva)
+## Is there anyone to cast it at? The HUD asks every frame and computing the tiles traces lines of
+## sight, so it's remembered for a moment (or until the hero moves)
 const VIDA_CACHE_OBJETIVO := 250 # ms
 var _cache_objetivo := {}
 
@@ -437,7 +456,7 @@ func hay_objetivo(h: Node, d: HabilidadData) -> bool:
 	_cache_objetivo[clave] = [ahora, r]
 	return r
 
-## Casillas donde se puede lanzar
+## Tiles where it can be cast
 func celdas_objetivo(h: Node, d: HabilidadData) -> Array:
 	var pos: Vector2i = h.get_meta("grid_pos")
 	var out := []
@@ -459,13 +478,13 @@ func celdas_objetivo(h: Node, d: HabilidadData) -> Array:
 						out.append(c)
 		HabilidadData.Objetivo.CASILLA:
 			for c in _celdas_en_rango(pos, d):
-				# Teletransportarse: solo a casillas libres
+				# Teleport: only to free tiles
 				if d.movimiento == "teletransporte" and (Tactica.unidad_en(c) != null or Tactica.solido(c)):
 					continue
 				out.append(c)
 	return out
 
-# Carga: en línea recta y sin nada en medio
+# Charge: in a straight line with nothing in the way
 func _linea_libre(desde: Vector2i, hasta: Vector2i) -> bool:
 	if desde.x != hasta.x and desde.y != hasta.y:
 		return false
@@ -477,6 +496,7 @@ func _linea_libre(desde: Vector2i, hasta: Vector2i) -> bool:
 		c += dir
 	return true
 
+# Tiles within the ability's range with line of sight (and its own rules: free tile, straight line...)
 func _celdas_en_rango(pos: Vector2i, d: HabilidadData) -> Array:
 	var dm := _dm()
 	var out := []
@@ -502,7 +522,7 @@ func _celdas_en_rango(pos: Vector2i, d: HabilidadData) -> Array:
 			out.append(c)
 	return out
 
-## Pinta el alcance (azul) y los objetivos (rojo) en el mapa
+## Paints the reach (blue) and the targets (red) on the map
 func _pintar(h: Node, d: HabilidadData, objetivos: Array) -> void:
 	var dm := _dm()
 	var rend := dm.get_node_or_null("DungeonRenderer") if dm else null
@@ -519,12 +539,13 @@ func _pintar(h: Node, d: HabilidadData, objetivos: Array) -> void:
 				_terna(ternas, c, 4)
 	rend.call("PintarAlcance", ternas)
 
+# Appends an (x, y, type) triplet for the renderer
 func _terna(ternas: PackedInt32Array, c: Vector2i, tipo: int) -> void:
 	ternas.append(c.x)
 	ternas.append(c.y)
 	ternas.append(tipo)
 
-## HUD: al pasar el ratón por una habilidad se ve su alcance
+## HUD: hovering an ability shows its reach
 func mostrar_rango(i: int) -> void:
 	var h := _activo()
 	if h == null or not apuntando.is_empty():
@@ -534,6 +555,7 @@ func mostrar_rango(i: int) -> void:
 		return
 	mostrar_rango_de(h, habilidades.get(l[i]["id"]))
 
+# Shows the reach of an ability while its card is hovered (not while aiming another one)
 func mostrar_rango_de(h: Node, d: HabilidadData) -> void:
 	if h == null or d == null or not d.es_activa() or not apuntando.is_empty():
 		return
@@ -541,7 +563,7 @@ func mostrar_rango_de(h: Node, d: HabilidadData) -> void:
 	if dm and (dm.get_meta("is_moving", false) or dm.get_meta("turno_enemigo", false)):
 		return
 	if d.objetivo == HabilidadData.Objetivo.UNO_MISMO:
-		# Lo que alcanza a su alrededor (área) o su propia casilla
+		# Whatever it reaches around it (area) or its own tile
 		var pos: Vector2i = h.get_meta("grid_pos")
 		var celdas := []
 		for x in range(pos.x - d.area, pos.x + d.area + 1):
@@ -556,6 +578,7 @@ func mostrar_rango_de(h: Node, d: HabilidadData) -> void:
 	else:
 		_pintar(h, d, celdas_objetivo(h, d))
 
+# Hides it again when the mouse leaves the card
 func ocultar_rango() -> void:
 	if apuntando.is_empty():
 		var dm := _dm()
@@ -563,12 +586,12 @@ func ocultar_rango() -> void:
 			dm.call("OcultarRangoAccion")
 
 # ------------------------------------------
-# Ejecutar
+# Execute
 # ------------------------------------------
 func _ejecutar(h: Node, d: HabilidadData, e: Dictionary, celda: Vector2i) -> void:
 	var dm := _dm()
 	var debug: bool = dm.get_meta("debug_mode", false)
-	# Coste: PA, un uso (salvo Eco arcano) y su enfriamiento. Las acciones básicas no tienen usos.
+	# Cost: PA, one use (except Arcane echo) and its cooldown. Basic actions have no uses.
 	if not debug:
 		h.set_meta("pa_actual", maxi(0, int(h.get_meta("pa_actual", 0)) - d.coste_pa))
 	if not e.is_empty():
@@ -578,7 +601,7 @@ func _ejecutar(h: Node, d: HabilidadData, e: Dictionary, celda: Vector2i) -> voi
 			e["usos"] = int(e["usos"]) - 1
 		e["enfriamiento"] = d.enfriamiento
 	cambio.emit()
-	# Secuencia: anuncio + cámara encima, el efecto y fin
+	# Sequence: announcement + camera on top, the effect and the end
 	dm.set_meta("is_moving", true)
 	dm.call("ApagarLucesMapa")
 	var banner := get_node_or_null("/root/Main/CanvasLayer/Banner")
@@ -608,10 +631,11 @@ func _ejecutar(h: Node, d: HabilidadData, e: Dictionary, celda: Vector2i) -> voi
 		dm.call("PedirFinDeTurno")
 	cambio.emit()
 
+# What the ability actually does: custom behaviour, movement, targets, damage, states, pushes, hazards
 func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 	var pm := _pm()
 	var pos: Vector2i = h.get_meta("grid_pos")
-	# 1. Comportamientos a medida (los que no encajan en lo genérico)
+	# 1. Custom behaviours (the ones that don't fit the generic stuff)
 	match d.especial:
 		"gallina":
 			var esp := get_node_or_null("/root/Especiales")
@@ -637,7 +661,7 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 		_propios(h, d)
 		return
 
-	# 2. Movimiento del que la lanza (Tactica: reutilizable)
+	# 2. Caster movement (Tactica: reusable)
 	var bono_carga := 0
 	match d.movimiento:
 		"teletransporte":
@@ -657,7 +681,7 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 				await get_tree().create_timer(0.07 * bono_carga + 0.1).timeout
 	pos = h.get_meta("grid_pos")
 
-	# 3. Objetivos
+	# 3. Targets
 	var objetivos := []
 	var centro := celda
 	match d.objetivo:
@@ -665,7 +689,7 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 			var primero := _enemigo_en(celda)
 			if primero:
 				objetivos.append(primero)
-			# Rayo en cadena: salta al enemigo más cercano que no haya tocado
+			# Chain lightning: jumps to the closest enemy it hasn't touched yet
 			var ultimo: Node3D = primero
 			for s in d.saltos:
 				var mejor: Node3D = null
@@ -699,10 +723,10 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 					if d.estado != "":
 						Estados.aplicar(o, d.estado, d.estado_dias, d.estado_potencia, h)
 
-	# 4. Daño (con tirada y ventaja), estados y empujones a los alcanzados
+	# 4. Damage (with roll and advantage), states and pushes on the ones hit
 	if d.objetivo != HabilidadData.Objetivo.ALIADO:
 		if d.objetivo == HabilidadData.Objetivo.CASILLA and d.dano_base > 0 and d.area > 0:
-			# El área no distingue: los héroes de la zona también se llevan lo suyo
+			# The area doesn't discriminate: heroes in the zone get theirs too
 			for o in heroes():
 				if _vivo(o) and o != h and _dist(celda, o.get_meta("grid_pos")) <= d.area:
 					pm.call("RecibirDano", maxi(1, (d.dano_base + int(int(h.get_meta(d.stat_dano, 0)) * d.mult_stat)) / 2), o)
@@ -723,7 +747,7 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 					Tactica.atraer(en, h, -d.empuje, h)
 			if d.movimiento == "atraer":
 				Tactica.atraer(en, h, 99, h)
-		# 5. Peligros en el suelo del área
+		# 5. Hazards on the area floor
 		if d.peligro != "":
 			for x in range(centro.x - d.area, centro.x + d.area + 1):
 				for y in range(centro.y - d.area, centro.y + d.area + 1):
@@ -732,14 +756,15 @@ func _efecto(h: Node, d: HabilidadData, celda: Vector2i) -> void:
 						Tactica.crear_peligro(c, d.peligro, d.peligro_dias, h)
 	_propios(h, d)
 
+# Effects and state on the caster
 func _propios(h: Node, d: HabilidadData) -> void:
 	if not d.efectos_propios.is_empty():
 		_pm().call("AplicarEfectosA", str(h.name), d.efectos_propios)
 	if d.estado_propio != "":
 		Estados.aplicar(h, d.estado_propio, d.estado_propio_dias, 1, h)
 
-## Una tirada (d20 sobre el que lanza, con ventaja/desventaja) y el daño a cada objetivo.
-## Devuelve los enemigos alcanzados (para estados y empujones). Sin daño ni tirada: todos.
+## One roll (d20 over the caster, with advantage/disadvantage) and the damage to every target.
+## Returns the enemies hit (for states and pushes). No damage and no roll: all of them.
 func _danar_varios(h: Node, d: HabilidadData, objetivos: Array, bono_extra: int = 0) -> Array:
 	if objetivos.is_empty():
 		if d.objetivo != HabilidadData.Objetivo.UNO_MISMO or d.area > 0:
@@ -758,7 +783,7 @@ func _danar_varios(h: Node, d: HabilidadData, objetivos: Array, bono_extra: int 
 		Tactica.tras_atacar(h)
 		var bono := int(floor(stat * (1.0 + int(h.get_meta("suerte", 0)) * int(h.get_meta("nivel", 1)) * 0.03) / 2.0)) + int(mods["bono"])
 		critico = d20 >= umbral
-		# Acierta si supera la CA del primero (el resto, con la misma tirada)
+		# Hits if it beats the first one's AC (the rest, with the same roll)
 		var ca := 8 + int(objetivos[0].get_meta("defensa", 0))
 		var acierta := d20 != 1 and (critico or d20 + bono >= ca)
 		var dado := get_node_or_null("/root/DadoCombate")
@@ -787,11 +812,12 @@ func _danar_varios(h: Node, d: HabilidadData, objetivos: Array, bono_extra: int 
 		disparar("al_golpear", h, objetivos[0])
 	return objetivos
 
+# A d20 (or the forced one the test sets)
 func _d20() -> int:
 	var tf: int = int(Engine.get_meta("tirada_forzada")) if Engine.has_meta("tirada_forzada") else 0
 	return clampi(tf, 1, 20) if tf > 0 else randi_range(1, 20)
 
-## Quita vida a un enemigo; si cae, botín y XP para 'h'
+## Takes health from an enemy; if it falls, loot and XP for 'h'
 func golpear_enemigo(h: Node, en: Node, dano: int, puede_matar: bool = true) -> void:
 	if en == null or not is_instance_valid(en) or str(en.name).ends_with("_muerto"):
 		return
@@ -801,6 +827,7 @@ func golpear_enemigo(h: Node, en: Node, dano: int, puede_matar: bool = true) -> 
 	if hp <= 0 and puede_matar:
 		matar(en, h)
 
+# An enemy dies by an ability: last indicator, burst, loot and XP
 func matar(en: Node, h: Node) -> void:
 	if en == null or not is_instance_valid(en) or str(en.name).ends_with("_muerto"):
 		return
@@ -813,7 +840,7 @@ func matar(en: Node, h: Node) -> void:
 		combate.call("MatarEnemigoPor", str(h.name) if h else "", c.x, c.y)
 
 # ==========================================
-# PASIVAS: los combos
+# PASSIVES: the combos
 # ==========================================
 func _evento_a_disparador(evento: String) -> int:
 	return {"al_golpear": HabilidadData.Disparador.AL_GOLPEAR, "al_critico": HabilidadData.Disparador.AL_CRITICO,
@@ -821,6 +848,7 @@ func _evento_a_disparador(evento: String) -> int:
 		"al_recibir_golpe": HabilidadData.Disparador.AL_RECIBIR_GOLPE, "al_empezar_dia": HabilidadData.Disparador.AL_EMPEZAR_DIA,
 		"al_usar_habilidad": HabilidadData.Disparador.AL_USAR_HABILIDAD}.get(evento, -1)
 
+# Does any passive with this trigger fire? (chance x stacks, capped at 100%)
 func _proba_pasiva(h: Node, reaccion: int) -> bool:
 	for e in lista(h):
 		var d: HabilidadData = habilidades.get(e["id"])
@@ -828,8 +856,8 @@ func _proba_pasiva(h: Node, reaccion: int) -> bool:
 			return true
 	return false
 
-## Lo llaman el C++ (golpes, críticos, fallos, recibir golpes) y este script (matar, días, habilidades).
-## puede_matar = false cuando el que llama ya se encarga de la muerte del objetivo (CombatManager).
+## Called by C++ (hits, criticals, misses, taking hits) and by this script (kills, days, abilities).
+## puede_matar = false when the caller already handles the target's death (CombatManager).
 func disparar(evento: String, h: Node, objetivo: Node = null, puede_matar: bool = true) -> void:
 	if h == null or not is_instance_valid(h) or not h.has_meta("habilidades") or _profundidad > 2:
 		return
@@ -849,6 +877,7 @@ func disparar(evento: String, h: Node, objetivo: Node = null, puede_matar: bool 
 		_reaccionar(h, d, pilas, objetivo, puede_matar)
 	_profundidad -= 1
 
+# One passive firing: what it does depends on its trigger
 func _reaccionar(h: Node, d: HabilidadData, pilas: int, objetivo: Node, puede_matar: bool) -> void:
 	var pm := _pm()
 	var v := d.valor * pilas
@@ -909,6 +938,7 @@ func _reaccionar(h: Node, d: HabilidadData, pilas: int, objetivo: Node, puede_ma
 			_texto(h, "+%d oro" % v, Color(1.0, 0.85, 0.3), 24)
 	cambio.emit()
 
+# Builds an Efecto on the fly (to reuse the C++ effect engine)
 func _ef(tipo: int, valor: int) -> Efecto:
 	var ef := Efecto.new()
 	ef.tipo = tipo
@@ -917,7 +947,7 @@ func _ef(tipo: int, valor: int) -> Efecto:
 	return ef
 
 # ==========================================
-# TEXTOS (HUD, draft)
+# TEXTS (HUD, draft)
 # ==========================================
 func describir(h: Node, i: int) -> String:
 	var l := lista(h)

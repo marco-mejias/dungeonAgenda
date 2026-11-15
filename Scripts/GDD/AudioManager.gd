@@ -1,87 +1,96 @@
 extends Node
 
-# Creamos dos altavoces: uno para efectos y otro para música
+# AudioManager (autoload): music, effects and interface sounds. The sounds (Assets/Audio) are NOT in
+# the repository: they are third-party packs, several with a licence that doesn't allow
+# redistribution. That's why they're loaded at startup ONLY if the file exists: without the folder
+# the game works the same, just silent.
+
+# Three speakers: effects, interface and music
 var sfx_player: AudioStreamPlayer
 var ui_player: AudioStreamPlayer
 var bgm_player: AudioStreamPlayer
 
-# Diccionario con todos los sonidos cargados en memoria y su configuración
+# Dictionary with every sound loaded in memory and its settings
 var sonidos = {
 	
 	# --- MUSIC ---
 	"dungeon": {
-		"stream": preload("res://Assets/Audio/kaden_cook-epic-dungeon-beat-259883.mp3"),
-		"volumen": -25.0, # Bajita, para dar ambiente sin estorbar
+		"ruta": "res://Assets/Audio/kaden_cook-epic-dungeon-beat-259883.mp3",
+		"volumen": -25.0, # Low, to set the mood without getting in the way
 		"pitch": 1.3
 	},
 	"fireplace": {
-		"stream": preload("res://Assets/Audio/poopie pack/regrowth wip.wav"),
+		"ruta": "res://Assets/Audio/poopie pack/regrowth wip.wav",
 		"volumen": -12.0,
 		"pitch": 1.0
 	},
 	
 	# --- UI ---
 	"hover": {
-		"stream": preload("res://Assets/Audio/10_UI_Menu_SFX/001_Hover_01.wav"),
-		"volumen": -15.0, # Muy sutil para no volver loco al jugador
+		"ruta": "res://Assets/Audio/10_UI_Menu_SFX/001_Hover_01.wav",
+		"volumen": -15.0, # Very subtle so the player doesn't go crazy
 		"pitch": 1.0
 	},
 	"clic": {
-		"stream": preload("res://Assets/Audio/10_UI_Menu_SFX/013_Confirm_03.wav"),
+		"ruta": "res://Assets/Audio/10_UI_Menu_SFX/013_Confirm_03.wav",
 		"volumen": -30.0,
 		"pitch": 1.0
 	},
 	"no": {
-		"stream": preload("res://Assets/Audio/10_UI_Menu_SFX/033_Denied_03.wav"),
+		"ruta": "res://Assets/Audio/10_UI_Menu_SFX/033_Denied_03.wav",
 		"volumen": -20.0,
-		"pitch": 0.9 # Le bajo el tono un 10% para que suene más grave (error)
+		"pitch": 0.9 # Pitch lowered 10% so it sounds deeper (error)
 	},
 	"open": {
-		"stream": preload("res://Assets/Audio/UI Soundpack/WAV/Coffee1.wav"),
+		"ruta": "res://Assets/Audio/UI Soundpack/WAV/Coffee1.wav",
 		"volumen": -20.0,
 		"pitch": 1.0
 	},
 	
 	# --- EXPLORE ---
 	"walk": {
-		"stream": preload("res://Assets/Audio/12_Player_Movement_SFX/12_Step_wood_03.wav"),
+		"ruta": "res://Assets/Audio/12_Player_Movement_SFX/12_Step_wood_03.wav",
 		"volumen": -8.0, 
 		"pitch": 1.0
 	},
 	"stairs": {
-		"stream": preload("res://Assets/Audio/12_Player_Movement_SFX/42_Cling_climb_03.wav"),
+		"ruta": "res://Assets/Audio/12_Player_Movement_SFX/42_Cling_climb_03.wav",
 		"volumen": -2.0,
 		"pitch": 1.0
 	},
 	
 	# --- EVENTS ---
 	"fail": {
-		"stream": preload("res://Assets/Audio/Announcer Pack/failure.wav"),
+		"ruta": "res://Assets/Audio/Announcer Pack/failure.wav",
 		"volumen": -20.0,
 		"pitch": 1.0
 	},
 	"event": {
-		"stream": preload("res://Assets/Audio/47313572-experimental-8-bit-sound-270302.mp3"),
+		"ruta": "res://Assets/Audio/47313572-experimental-8-bit-sound-270302.mp3",
 		"volumen": -20.0,
 		"pitch": 1.0
 	},
 	"dice": {
-		"stream": preload("res://Assets/Audio/558119__abdrtar__dice.mp3"),
-		"volumen": 0.0, # A volumen real, que se escuche bien el bote
+		"ruta": "res://Assets/Audio/558119__abdrtar__dice.mp3",
+		"volumen": 0.0, # Full volume, so the bounce is heard well
 		"pitch": 1.0
 	},
 	"success": {
-		"stream": preload("res://Assets/Audio/Announcer Pack/amazing.wav"),
+		"ruta": "res://Assets/Audio/Announcer Pack/amazing.wav",
 		"volumen": -20.0,
 		"pitch": 1.0
 	}
 	
-	# MECÁNICS (Puedes seguir añadiendo aquí)
+	# MECHANICS (keep adding here)
 }
 
 func _ready():
-	# Esta línea le dice al AudioManager y a todos sus altavoces: "¡Vosotros nunca os pauséis!"
+	# This line tells the AudioManager and all its speakers: "never pause!"
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Loads the ones on disk; the missing ones stay silent
+	for nombre in sonidos.keys():
+		var ruta: String = sonidos[nombre]["ruta"]
+		sonidos[nombre]["stream"] = load(ruta) if ResourceLoader.exists(ruta) else null
 	
 	sfx_player = AudioStreamPlayer.new()
 	add_child(sfx_player)
@@ -92,21 +101,22 @@ func _ready():
 	bgm_player = AudioStreamPlayer.new()
 	add_child(bgm_player)
 	
-	# Conectamos a bus de musica
+	# We connect to the music bus
 	bgm_player.bus = "Musica"
 	sfx_player.bus = "SFX"
-	ui_player.bus = "SFX" # La UI también se considera un efecto de sonido
+	ui_player.bus = "SFX" # The UI counts as a sound effect too
 	
-	# Arrancar la música de la mazmorra por defecto
+	# Start the dungeon music by default
 	play_music("dungeon")
 
+# Plays a sound effect by name (silent if it isn't loaded)
 func play_sfx(nombre: String):
-	if sonidos.has(nombre):
+	if sonidos.has(nombre) and sonidos[nombre].get("stream") != null:
 		var config = sonidos[nombre]
 		sfx_player.stream = config["stream"]
 		sfx_player.volume_db = config["volumen"]
 		
-		# Variación de pitch aleatoria para los pasos (rompe la monotonía)
+		# Random pitch variation for the footsteps (breaks the monotony)
 		if nombre == "walk":
 			sfx_player.pitch_scale = config["pitch"] + randf_range(-0.15, 0.15)
 		else:
@@ -114,16 +124,18 @@ func play_sfx(nombre: String):
 			
 		sfx_player.play()
 
+# Plays an interface sound
 func play_ui(nombre: String):
-	if sonidos.has(nombre):
+	if sonidos.has(nombre) and sonidos[nombre].get("stream") != null:
 		var config = sonidos[nombre]
 		ui_player.stream = config["stream"]
 		ui_player.volume_db = config["volumen"]
 		ui_player.pitch_scale = config["pitch"]
 		ui_player.play()
 
+# Changes the background music
 func play_music(nombre: String):
-	if sonidos.has(nombre):
+	if sonidos.has(nombre) and sonidos[nombre].get("stream") != null:
 		var config = sonidos[nombre]
 		bgm_player.stream = config["stream"]
 		bgm_player.volume_db = config["volumen"]

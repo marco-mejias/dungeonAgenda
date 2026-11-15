@@ -1,10 +1,9 @@
 extends CanvasLayer
 
-# Panel de depuración de inventario y equipo (F10).
-# Muestra stats base -> finales, el arma, la carga y los efectos temporales del héroe elegido,
-# y deja equipar, quitar, usar, dar y tirar objetos, añadir cualquier objeto del catálogo,
-# tirar tablas de botín y recargar los .tres editados sin cerrar el juego.
-# Todo pasa por las mismas funciones del PartyManager que usará la interfaz de verdad.
+# Inventory and equipment debug panel (F10). Shows base -> final stats, the weapon, the load and the
+# temporary effects of the chosen hero, and lets you equip, unequip, use, give and drop items, add
+# any item from the catalogue, roll loot tables and reload edited .tres without closing the game.
+# Everything goes through the same PartyManager functions the real interface uses.
 
 const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
 const ANCHO := 500.0
@@ -49,6 +48,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F10:
 		alternar()
 
+# F10: opens or closes the panel (on the active hero by default)
 func alternar() -> void:
 	visible = not visible
 	if visible:
@@ -67,9 +67,10 @@ func _process(delta: float) -> void:
 		_refrescar(false)
 
 # ==========================================
-# CONSTRUCCIÓN DEL PANEL
+# PANEL CONSTRUCTION
 # ==========================================
 
+# Builds the whole panel by code
 func _construir() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "PanelDebug"
@@ -125,7 +126,7 @@ func _construir() -> void:
 	opt_objeto = OptionButton.new()
 	opt_objeto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	opt_objeto.add_theme_font_size_override("font_size", 11)
-	opt_objeto.fit_to_longest_item = false # si no, el desplegable ensancha el panel
+	opt_objeto.fit_to_longest_item = false # Otherwise the dropdown widens the panel
 	opt_objeto.clip_text = true
 	fila_add.add_child(opt_objeto)
 	spin_cantidad = SpinBox.new()
@@ -195,15 +196,17 @@ func _icono(tex: Texture2D) -> TextureRect:
 	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return t
 
+# Shows the result of the last action and refreshes
 func _log(texto: String) -> void:
 	lbl_log.text = texto
 	print("[DebugInventario] ", texto)
 	_refrescar(true)
 
 # ==========================================
-# DATOS
+# DATA
 # ==========================================
 
+# Every hero node in the PartyManager
 func _heroes() -> Array:
 	var out: Array = []
 	if pm:
@@ -215,6 +218,7 @@ func _heroes() -> Array:
 func _nodo_heroe() -> Node:
 	return pm.get_node_or_null(NodePath(heroe)) if pm and heroe != "" else null
 
+# Fills the item and loot table dropdowns from the Catalogo
 func _rellenar_desplegables() -> void:
 	opt_objeto.clear()
 	if cat:
@@ -228,6 +232,7 @@ func _rellenar_desplegables() -> void:
 		for id in cat.tablas:
 			opt_tabla.add_item(id)
 
+# Repaints stats, equipment and inventory of the chosen hero
 func _refrescar(forzar: bool) -> void:
 	var h := _nodo_heroe()
 	if not h:
@@ -240,6 +245,7 @@ func _refrescar(forzar: bool) -> void:
 		_pintar_equipo(h)
 		_pintar_inventario(h)
 
+# One button per hero to pick whose inventory to look at
 func _pintar_heroes() -> void:
 	for c in caja_heroes.get_children():
 		c.queue_free()
@@ -257,6 +263,7 @@ func _pintar_heroes() -> void:
 func _color_hex(c: Color) -> String:
 	return c.to_html(false)
 
+# Base -> final stats, weapon, load and temporary effects
 func _pintar_stats(h: Node) -> void:
 	var base: Dictionary = h.get_meta("stats_base", {})
 	var t := "[b]%s[/b]  ·  clase %s  ·  oro %d  ·  comida %d\n" % [h.get_meta("nombre_display", h.name), h.get_meta("clase", "?"), h.get_meta("oro", 0), h.get_meta("comida_bolsa", 0)]
@@ -273,7 +280,7 @@ func _pintar_stats(h: Node) -> void:
 	for i in range(0, columnas.size(), 2):
 		t += "   ".join(columnas.slice(i, i + 2)) + "\n"
 
-	# Arma: lo que usará el combate
+	# Weapon: what combat will use
 	var arma = cat.obtener(h.get_meta("equipo", {}).get("mano_principal", "")) if cat else null
 	var suerte := int(h.get_meta("suerte", 0))
 	if arma is ArmaData:
@@ -298,6 +305,7 @@ func _pintar_stats(h: Node) -> void:
 	barra_peso.max_value = maxf(cap, 0.1)
 	barra_peso.value = peso
 
+# One row per slot with its unequip button
 func _pintar_equipo(h: Node) -> void:
 	for c in caja_equipo.get_children():
 		c.queue_free()
@@ -323,6 +331,7 @@ func _pintar_equipo(h: Node) -> void:
 func _describir(o) -> String:
 	return Textos.resumen(o)
 
+# One row per inventory entry with its equip/use/give/drop buttons
 func _pintar_inventario(h: Node) -> void:
 	for c in caja_inv.get_children():
 		c.queue_free()
@@ -368,9 +377,10 @@ func _pintar_inventario(h: Node) -> void:
 		caja_inv.add_child(fila)
 
 # ==========================================
-# ACCIONES
+# ACTIONS
 # ==========================================
 
+# Adds the chosen catalogue item to the hero (ignoring the weight)
 func _on_anadir() -> void:
 	if opt_objeto.selected < 0:
 		return
@@ -379,24 +389,28 @@ func _on_anadir() -> void:
 	var entran: int = pm.call("AnadirObjeto", heroe, id, pedidas)
 	_log("Añadir %d x %s: entran %d%s" % [pedidas, id, entran, "" if entran == pedidas else " (no cabe más en la mochila)"])
 
+# Applies the item's effects without spending it
 func _on_probar() -> void:
 	if opt_objeto.selected < 0:
 		return
 	var id: String = opt_objeto.get_item_metadata(opt_objeto.selected)
 	_log("Efectos de %s: %s" % [id, pm.call("ProbarEfectos", heroe, id)])
 
+# Rolls the chosen loot table for the hero
 func _on_botin() -> void:
 	if opt_tabla.selected < 0:
 		return
 	var tabla := opt_tabla.get_item_text(opt_tabla.selected)
 	_log("Tabla '%s': %s" % [tabla, pm.call("DarBotinDebug", heroe, tabla)])
 
+# Reloads every .tres from disk (edit data while the game runs)
 func _on_recargar() -> void:
 	cat.recargar(true)
 	pm.call("RecalcularTodo")
 	_rellenar_desplegables()
 	_log("Catálogo recargado del disco: %d objetos, %d tablas%s" % [cat.objetos.size(), cat.tablas.size(), "" if cat.avisos.is_empty() else " · avisos: " + ", ".join(cat.avisos)])
 
+# +/- buttons for health, PA, sanity and hunger
 func _sumar_meta(meta: String, delta: int, minimo: int, meta_max: String) -> void:
 	var h := _nodo_heroe()
 	if not h:

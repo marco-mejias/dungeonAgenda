@@ -1,7 +1,6 @@
 #pragma once
-// Animaciones de combate compartidas por el CombatManager (ataques de los héroes) y el
-// EnemyManager (turno de los enemigos): números flotantes, destellos, empujones,
-// estallidos y proyectiles.
+// Combat animations shared by the CombatManager (hero attacks) and the EnemyManager (enemy turn):
+// floating numbers, flashes, lunges, bursts and projectiles.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -22,7 +21,7 @@ namespace animacion {
 
 using namespace godot;
 
-// Número flotante sobre una ficha (daño, "¡CRÍTICO!", etc.) con un pequeño rebote
+// Floating number over a token (damage, "CRITICAL!", etc.) with a small bounce
 inline void TextoFlotante(Node* dungeon, Vector3 pos, const String& texto, Color color, int tamano = 48) {
 	Label3D* label = memnew(Label3D);
 	label->set_text(texto);
@@ -46,7 +45,7 @@ inline void TextoFlotante(Node* dungeon, Vector3 pos, const String& texto, Color
 	tw->tween_callback(Callable(label, StringName("queue_free")));
 }
 
-// Destello blanco (o del color dado) del sprite
+// White (or given colour) flash on the sprite
 inline void Destello(Node3D* ficha, Color color) {
 	if (!ficha) return;
 	Sprite3D* cuerpo = Object::cast_to<Sprite3D>(ficha->get_node_or_null("Cuerpo"));
@@ -58,7 +57,7 @@ inline void Destello(Node3D* ficha, Color color) {
 	tw->tween_property(cuerpo, "modulate", base, 0.22);
 }
 
-// El cuerpo se desplaza hacia 'dir' y vuelve (empujón del atacante o retroceso del golpeado)
+// The body moves towards 'dir' and comes back (attacker lunge or knockback of the one hit)
 inline void Desplazar(Node3D* ficha, Vector3 dir, float distancia, float t_ida, float t_vuelta) {
 	if (!ficha) return;
 	Node3D* cuerpo = Object::cast_to<Node3D>(ficha->get_node_or_null("Cuerpo"));
@@ -70,6 +69,7 @@ inline void Desplazar(Node3D* ficha, Vector3 dir, float distancia, float t_ida, 
 	tw->tween_property(cuerpo, "position", reposo, t_vuelta)->set_trans(Tween::TRANS_QUAD)->set_ease(Tween::EASE_IN_OUT);
 }
 
+// Flat direction (no height) from one token to another
 inline Vector3 Direccion(Node3D* desde, Node3D* hacia) {
 	if (!desde || !hacia) return Vector3();
 	Vector3 d = hacia->get_position() - desde->get_position();
@@ -77,7 +77,7 @@ inline Vector3 Direccion(Node3D* desde, Node3D* hacia) {
 	return d.length() > 0.001f ? d.normalized() : Vector3();
 }
 
-// Estallido de píxeles al morir un enemigo
+// Pixel burst when an enemy dies
 inline void Estallido(Node* dungeon, Vector3 pos, Color color) {
 	CPUParticles3D* p = memnew(CPUParticles3D);
 	Ref<QuadMesh> quad;
@@ -114,7 +114,8 @@ inline void Estallido(Node* dungeon, Vector3 pos, Color color) {
 	tw->tween_callback(Callable(p, StringName("queue_free")));
 }
 
-// Flecha o chispa que viaja de un atacante a su objetivo (armas a distancia). Devuelve la duración.
+// Arrow or spark that travels from an attacker to its target (ranged weapons). Returns the
+// duration.
 inline float Proyectil(Node* dungeon, Vector3 desde, Vector3 hasta, Color color) {
 	MeshInstance3D* bala = memnew(MeshInstance3D);
 	Ref<QuadMesh> quad;

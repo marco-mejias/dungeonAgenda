@@ -1,8 +1,8 @@
 #pragma once
-// Mazmorra: la cuadrícula lógica de un piso (lo que antes eran las globales del DungeonManager).
-// Sabe generarse (salas, pasillos, puertas, eventos, cofres, braseros, enemigos y decoración),
-// calcular la visión/niebla y responder consultas de la cuadrícula. No conoce nodos de Godot:
-// el DungeonManager le pasa lo que necesita (p.ej. los focos de luz de los héroes).
+// Mazmorra: the logic grid of a floor (what used to be the DungeonManager globals). It knows how to
+// generate itself (rooms, corridors, doors, events, chests, braziers, enemies and decoration),
+// compute vision/fog and answer grid queries. It doesn't know any Godot nodes: the DungeonManager
+// passes it what it needs (e.g. the heroes' light sources).
 
 #include "Scripts/CPP/Mazmorra/Alturas.hpp"
 #include <Godot/godot.hpp>
@@ -20,13 +20,14 @@ namespace mazmorra {
 
 using namespace godot;
 
-const int GRID_SIZE = 40; // mazmorra con zonas: entrada, campamentos y sala del jefe
+const int GRID_SIZE = 40; // Dungeon with zones: entrance, camps and boss room
 const int RADIO_BRASERO = 3;
-// Lo que ve un héroe = su luz (radio_luz) + VISION_EXTRA casillas. Sin antorcha, ANTORCHA_APAGADA.
-// Los enemigos ven siempre menos que él (Sigilo.gd: su vista menos 2): los ves tú antes.
+// What a hero sees = their light (radio_luz) + VISION_EXTRA tiles. Without a torch,
+// ANTORCHA_APAGADA. Enemies always see less than them (Sigilo.gd: their sight minus 2): you see
+// them first.
 const int VISION_EXTRA = 3;
 const int ANTORCHA_APAGADA = 2;
-// Radio de visión de un héroe (niebla, sombras y la luz que pinta el shader)
+// Vision radius of a hero (fog, shadows and the light the shader paints)
 inline int RadioVision(godot::Node* h) {
 	int radio = (h && h->has_meta("radio_luz") ? (int)h->get_meta("radio_luz") : 4) + VISION_EXTRA;
 	if (h && h->has_meta("antorcha_apagada") && (bool)h->get_meta("antorcha_apagada")) radio = std::min(radio, ANTORCHA_APAGADA);
@@ -34,7 +35,7 @@ inline int RadioVision(godot::Node* h) {
 }
 const Vector2i DIRS4[4] = { Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0) };
 
-// Centro de la casilla, a la altura de su suelo (salas altas y escalones)
+// Centre of the tile, at the height of its floor (high rooms and steps)
 inline Vector3 GridToWorld(Vector2i c) { return Vector3(c.x + 0.5f, alturas::Y(c.x, c.y), c.y + 0.5f); }
 
 struct Cell {
@@ -49,40 +50,41 @@ struct Cell {
 	bool chest_opened = false;
 	bool has_event = false;
 	bool has_enemy = false;
-	bool is_brasero = false; // obstáculo estático que ilumina su sala
-	bool is_pillar = false;  // columna dentro de una sala: es muro (no se pasa ni se ve a través), pero se dibuja fina
-	bool is_locked = false;  // puerta de la sala del jefe: solo se abre con la llave
-	int peloton = -1;        // sala (campamento/jefe) a la que pertenece el enemigo que aparece aquí
-	int nivel = 0;           // 0 suelo de abajo, 1 escalón (une las dos alturas), 2 sala alta
+	bool is_brasero = false; // Static obstacle that lights its room
+	bool is_pillar = false;  // Column inside a room: it's a wall (you can't walk or see through it), but it's drawn thin
+	bool is_locked = false;  // Boss room door: only opens with the key
+	int peloton = -1;        // Room (camp/boss) the enemy spawning here belongs to
+	int nivel = 0;           // 0 lower floor, 1 step (joins the two heights), 2 high room
 	int event_idx = -1;
 };
 
-// Estructura para definir y manipular habitaciones
+// Struct to define and handle rooms
 struct Room {
 	int x, y, w, h;
-	// Ala opcional (salas en L o en T): otro rectángulo pegado a un lado. aw = 0 -> no tiene
+	// Optional wing (L or T rooms): another rectangle stuck to one side. aw = 0 -> none
 	int ax = 0, ay = 0, aw = 0, ah = 0;
-	bool elevada = false; // sala alta (nivel 2): se sube por escalones
+	bool elevada = false; // High room (level 2): you go up by steps
 	int tipo = 0;         // SALA_NORMAL, SALA_ENTRADA, SALA_CAMPAMENTO, SALA_JEFE
-	int zona = -1;        // campamentos: 0 el más cercano a la entrada, 1 el siguiente...
-	int dist = 0;         // casillas andando desde la entrada
+	int zona = -1;        // Camps: 0 the closest to the entrance, 1 the next one...
+	int dist = 0;         // Walking tiles from the entrance
 	Vector2i cofre = Vector2i(-1, -1);
 
 	Vector2i get_center() const { return Vector2i(x + w / 2, y + h / 2); }
 
+	// Is the point inside the room or its wing?
 	bool contains(int px, int py) const {
 		return (px >= x && px < x + w && py >= y && py < y + h) ||
 			   (aw > 0 && px >= ax && px < ax + aw && py >= ay && py < ay + ah);
 	}
 
-	// Rectángulo que lo contiene todo (sala + ala)
+	// Rectangle that contains everything (room + wing)
 	Rect2i caja() const {
 		Rect2i r(x, y, w, h);
 		if (aw > 0) r = r.merge(Rect2i(ax, ay, aw, ah));
 		return r;
 	}
 
-	// Se tocan (con 1 casilla de margen: siempre queda pared entre dos salas)
+	// They touch (with 1 tile of margin: there's always a wall between two rooms)
 	bool intersects(const Room& other) const {
 		Rect2i a = caja().grow(1), b = other.caja();
 		return a.intersects(b);
@@ -90,11 +92,12 @@ struct Room {
 };
 
 enum TipoSala { SALA_NORMAL = 0, SALA_ENTRADA = 1, SALA_CAMPAMENTO = 2, SALA_JEFE = 3 };
+// Room type name for the scripts (Zonas.gd)
 inline const char* NombreTipoSala(int t) {
 	return t == SALA_ENTRADA ? "entrada" : (t == SALA_CAMPAMENTO ? "campamento" : (t == SALA_JEFE ? "jefe" : "sala"));
 }
 
-// Datos de un evento, leídos del .tres UNA vez al generar el piso
+// Event data, read from the .tres ONCE when generating the floor
 struct EventInfo {
 	Vector2i pos;
 	String path;
@@ -105,7 +108,7 @@ struct EventInfo {
 	bool activo = true;
 };
 
-// Un punto que ilumina a su alrededor (un héroe en el mapa)
+// A point that lights around it (a hero on the map)
 struct Foco {
 	Vector2i pos;
 	int radio = 4;
@@ -119,9 +122,10 @@ struct Mazmorra {
 	std::vector<Vector2i> m_braseros;
 	Vector2i m_inicio = Vector2i(1, 1);
 	Vector2i m_salida = Vector2i(2, 2);
-	int m_piso = 1; // lo pone el DungeonManager antes de generar: más salas en los pisos de abajo
-	// La estructura del piso (como una cueva de Elden Ring): entrada con hoguera, campamentos con su
-	// pelotón y su cofre, y al fondo la sala del jefe, cerrada con llave, con la escalera detrás
+	int m_piso = 1; // The DungeonManager sets it before generating: more rooms on the lower floors
+	// The floor structure (like an Elden Ring cave): entrance with a campfire, camps with their
+	// squad and their chest, and at the back the boss room, locked with a key, with the stairs
+	// behind
 	Vector2i m_hoguera = Vector2i(-1, -1);
 	Vector2i m_jefe = Vector2i(-1, -1);
 	Vector2i m_cofre_llave = Vector2i(-1, -1);
@@ -129,7 +133,7 @@ struct Mazmorra {
 	int m_sala_jefe = -1;
 	std::vector<Vector2i> m_puertas_jefe;
 
-	// Las alturas de todas las casillas, para el resto de scripts (alturas::Nivel / alturas::Y)
+	// The heights of every tile, for the rest of the scripts (alturas::Nivel / alturas::Y)
 	void PublicarAlturas() {
 		PackedByteArray niveles;
 		niveles.resize(GRID_SIZE * GRID_SIZE);
@@ -140,7 +144,7 @@ struct Mazmorra {
 
 	bool vacia() const { return map_data.empty(); }
 
-	// Genera un piso completo desde cero
+	// Generates a whole floor from scratch
 	void GenerarPiso() {
 		GenerarMapa();
 		PublicarAlturas();
@@ -154,16 +158,18 @@ struct Mazmorra {
 	}
 
 	// ==========================================
-	// CONSULTAS DE LA CUADRÍCULA
+	// GRID QUERIES
 	// ==========================================
 
 		static bool InBounds(int x, int y) { return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE; }
 
+		// Walls, columns and closed doors block sight
 		bool BloqueaVision(int x, int y) {
 			const Cell& c = map_data[x][y];
 			return c.is_wall || (c.is_door && !c.door_open);
 		}
 
+		// Bresenham between two tiles; the GDScript copy in Tactica.linea_de_vision must match it exactly
 		bool CheckLineOfSight(Vector2i start, Vector2i end) {
 			int x0 = start.x, y0 = start.y, x1 = end.x, y1 = end.y;
 			int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
@@ -173,7 +179,7 @@ struct Mazmorra {
 			while (true) {
 				if (!InBounds(x0, y0)) return false;
 
-				// Si golpeamos un obstáculo, podemos verlo, pero la visión se detiene ahí
+				// If we hit an obstacle we can see it, but vision stops there
 				if (BloqueaVision(x0, y0) && !(x0 == start.x && y0 == start.y)) {
 					return (x0 == x1 && y0 == y1);
 				}
@@ -184,7 +190,7 @@ struct Mazmorra {
 				if (e2 >= dy) { err += dy; x0 += sx; }
 				if (e2 <= dx) { err += dx; y0 += sy; }
 
-				// Control estricto de esquinas (paso diagonal)
+				// Strict corner check (diagonal step)
 				if (x0 != prev_x && y0 != prev_y) {
 					bool wall1 = InBounds(x0, prev_y) && BloqueaVision(x0, prev_y);
 					bool wall2 = InBounds(prev_x, y0) && BloqueaVision(prev_x, y0);
@@ -194,11 +200,11 @@ struct Mazmorra {
 			return true;
 		}
 
-		// LA regla de visión del juego, idéntica al shader de las sombras (ps1_world.gdshader, rayo()):
-		// un rayo de 'o' (el que mira) a 'p' (lo mirado), en coordenadas de mundo, que recorre
-		// exactamente las casillas que cruza (DDA). Las paredes, columnas y puertas cerradas lo cortan;
-		// la casilla mirada y la del que mira no cuentan. Así, una casilla está "a la vista" si y solo
-		// si su centro sale iluminado en pantalla.
+		// THE game's vision rule, identical to the shadow shader (ps1_world.gdshader, rayo()): a
+		// ray from 'o' (the viewer) to 'p' (the viewed), in world coordinates, that walks exactly
+		// the tiles it crosses (DDA). Walls, columns and closed doors cut it; the viewed tile and
+		// the viewer's tile don't count. So a tile is "in view" if and only if its centre comes out
+		// lit on screen.
 		bool TapaVista(Vector2i c) {
 			return !InBounds(c.x, c.y) || BloqueaVision(c.x, c.y);
 		}
@@ -227,23 +233,25 @@ struct Mazmorra {
 			return true;
 		}
 
-		// ¿Ve el foco (centro de su casilla, radio en casillas) el centro de esta casilla?
+		// Does the light source (centre of its tile, radius in tiles) see the centre of this tile?
 		bool VeCasilla(Vector2i foco, float radio, Vector2i c) {
 			Vector2 o(foco.x + 0.5f, foco.y + 0.5f), p(c.x + 0.5f, c.y + 0.5f);
 			return (o - p).length() <= radio && RayoLibre(o, p);
 		}
 
-		// ¿Puede alguien estar de pie aquí? (sin mirar a los héroes)
+		// Can someone stand here? (ignoring the heroes)
 		bool EsSueloLibre(int x, int y) {
 			if (!InBounds(x, y)) return false;
 			const Cell& c = map_data[x][y];
 			return !c.is_wall && !(c.is_door && !c.door_open) && !c.is_chest && !c.has_enemy && !c.is_brasero;
 		}
 
+		// A manual event that's still there (investigated by clicking)
 		bool EventoManualActivo(const Cell& c) {
 			return c.has_event && c.event_idx >= 0 && m_eventos[c.event_idx].activo && m_eventos[c.event_idx].gatillo == 0;
 		}
 
+		// Tiles of every living enemy (the DungeonManager publishes it as a meta)
 		Array ListaEnemigos() {
 			Array out;
 			for (int x = 0; x < GRID_SIZE; x++)
@@ -253,10 +261,10 @@ struct Mazmorra {
 		}
 
 	// ==========================================
-	// VISIÓN Y NIEBLA DE GUERRA
+	// VISION AND FOG OF WAR
 	// ==========================================
 
-	// Recalcula qué casillas se ven (y marca las exploradas) a partir de los focos de luz
+	// Recomputes which tiles are seen (and marks the explored ones) from the light sources
 	void CalcularVision(const std::vector<Foco>& focos) {
 		if (map_data.empty()) return;
 			for (int x = 0; x < GRID_SIZE; x++)
@@ -265,13 +273,13 @@ struct Mazmorra {
 					map_data[x][y].is_lit = false;
 				}
 
-			// Cada foco (héroe en el mapa) ilumina su radio de luz (con línea de visión)
+			// Every light source (hero on the map) lights its light radius (with line of sight)
 			for (const Foco& f : focos) {
 				Vector2i pos = f.pos;
 				int r = f.radio;
 				for (int x = std::max(0, pos.x - r); x <= std::min(GRID_SIZE - 1, pos.x + r); x++) {
 					for (int y = std::max(0, pos.y - r); y <= std::min(GRID_SIZE - 1, pos.y + r); y++) {
-						if (!VeCasilla(pos, r + 0.5f, Vector2i(x, y))) continue; // = el shader
+						if (!VeCasilla(pos, r + 0.5f, Vector2i(x, y))) continue; // = the shader
 						map_data[x][y].is_visible = true;
 						map_data[x][y].is_lit = true;
 						map_data[x][y].is_explored = true;
@@ -279,19 +287,19 @@ struct Mazmorra {
 				}
 			}
 
-			// Si se ve un brasero, se ve también lo que ilumina
+			// If a brazier is seen, whatever it lights is seen too
 			for (const Vector2i& b : m_braseros) {
 				if (!map_data[b.x][b.y].is_visible) continue;
 				for (int x = std::max(0, b.x - RADIO_BRASERO); x <= std::min(GRID_SIZE - 1, b.x + RADIO_BRASERO); x++)
 					for (int y = std::max(0, b.y - RADIO_BRASERO); y <= std::min(GRID_SIZE - 1, b.y + RADIO_BRASERO); y++) {
-						if (!VeCasilla(b, RADIO_BRASERO + 0.5f, Vector2i(x, y))) continue; // = el shader
+						if (!VeCasilla(b, RADIO_BRASERO + 0.5f, Vector2i(x, y))) continue; // = the shader
 						map_data[x][y].is_visible = true;
 						map_data[x][y].is_lit = true;
 						map_data[x][y].is_explored = true;
 					}
 			}
 
-			// Los muros que rodean al suelo visible también se ven
+			// The walls around the visible floor are seen too
 			std::vector<Vector2i> muros;
 			for (int x = 0; x < GRID_SIZE; x++)
 				for (int y = 0; y < GRID_SIZE; y++) {
@@ -306,7 +314,7 @@ struct Mazmorra {
 			}
 	}
 
-	// Estado de niebla por casilla para el renderer: 0 = sin explorar, 1 = explorada, 2 = visible
+	// Fog state per tile for the renderer: 0 = unexplored, 1 = explored, 2 = visible
 	PackedByteArray EstadosNiebla(bool revelar_todo) const {
 		PackedByteArray estados;
 		estados.resize(GRID_SIZE * GRID_SIZE);
@@ -318,7 +326,7 @@ struct Mazmorra {
 		return estados;
 	}
 
-		// Ternas (x, y, tipo): 0 = telaraña (esquina), 1 = huesos, 2 = calavera, 3 = rocas, 4 = piedras
+		// Triplets (x, y, type): 0 = cobweb (corner), 1 = bones, 2 = skull, 3 = rocks, 4 = stones
 		PackedInt32Array GenerarDecoracion() {
 			PackedInt32Array ternas;
 			for (const Room& r : m_rooms)
@@ -331,7 +339,7 @@ struct Mazmorra {
 
 						bool muro_x = map_data[x - 1][y].is_wall || map_data[x + 1][y].is_wall;
 						bool muro_y = map_data[x][y - 1].is_wall || map_data[x][y + 1].is_wall;
-						if (!muro_x && !muro_y) continue; // solo pegado a la pared
+						if (!muro_x && !muro_y) continue; // Only against the wall
 
 						int tirada = UtilityFunctions::randi_range(0, 99);
 						int tipo = -1;
@@ -345,26 +353,28 @@ struct Mazmorra {
 
 private:
 		// ==========================================
-		// GENERACIÓN PROCEDURAL
+		// PROCEDURAL GENERATION
 		// ==========================================
 
 		// ==========================================
-		// GENERADOR DE SALAS Y PASILLOS
+		// ROOM AND CORRIDOR GENERATOR
 		// ==========================================
-		// Salas grandes (5-9 de lado), algunas en L o en T y con esquinas recortadas; pasillos de 1 a 3
-		// casillas de ancho con algún quiebro; un árbol que las une todas más algún bucle (dos caminos
-		// a la misma sala); y columnas en las salas grandes, que nunca dejan nada incomunicado.
+		// Big rooms (5-9 per side), some in L or T shape and with cut corners; corridors 1 to 3
+		// tiles wide with the odd bend; a tree that joins them all plus some loop (two ways to the
+		// same room); and columns in the big rooms, which never cut anything off.
 
+		// Turns a tile into floor (never the outer border)
 		void Excavar(int x, int y) {
 			if (x >= 1 && y >= 1 && x < GRID_SIZE - 1 && y < GRID_SIZE - 1) map_data[x][y].is_wall = false;
 		}
 
+		// Digs a whole rectangle
 		void ExcavarRect(const Rect2i& r) {
 			for (int x = r.position.x; x < r.position.x + r.size.x; x++)
 				for (int y = r.position.y; y < r.position.y + r.size.y; y++) Excavar(x, y);
 		}
 
-		// Un tramo recto de pasillo de 'ancho' casillas
+		// A straight stretch of corridor 'ancho' tiles wide
 		void ExcavarTramo(Vector2i a, Vector2i b, int ancho) {
 			int x0 = std::min(a.x, b.x), x1 = std::max(a.x, b.x);
 			int y0 = std::min(a.y, b.y), y1 = std::max(a.y, b.y);
@@ -372,7 +382,7 @@ private:
 				for (int y = y0; y <= y1 + ancho - 1; y++) Excavar(x, y);
 		}
 
-		// Pasillo en L (con un quiebro opcional a mitad) entre dos puntos
+		// L corridor (with an optional bend halfway) between two points
 		void ExcavarPasillo(Vector2i a, Vector2i b, int ancho) {
 			Vector2i medio = a;
 			if (UtilityFunctions::randi_range(0, 99) < 45) {
@@ -388,11 +398,13 @@ private:
 			en_l(medio, b);
 		}
 
+		// Random corridor width: 40% narrow, 45% medium, 15% wide
 		int AnchoDePasillo() {
 			int r = UtilityFunctions::randi_range(0, 99);
-			return r < 40 ? 1 : (r < 85 ? 2 : 3); // los de 1 son los que pueden tener puerta
+			return r < 40 ? 1 : (r < 85 ? 2 : 3); // The 1-wide ones are the ones that can have a door
 		}
 
+		// Can every floor tile be reached from any other? (flood fill)
 		bool TodoConectado() {
 			Vector2i inicio(-1, -1);
 			int suelos = 0;
@@ -416,17 +428,19 @@ private:
 			return alcanzados == suelos;
 		}
 
+		// Rooms, corridors, heights and columns (the floor layout)
 		void GenerarMapa() {
-			// Lienzo en negro: reiniciamos TODA la matriz (antes quedaban puertas y enemigos del piso anterior)
+			// Black canvas: we reset the WHOLE matrix (doors and enemies from the previous floor
+			// used to stay)
 			map_data.assign(GRID_SIZE, std::vector<Cell>(GRID_SIZE));
 			m_rooms.clear();
 
-			// Piso 1: 9 salas; una más cada dos pisos, hasta 12. Grandes: los campamentos necesitan sitio
+			// Floor 1: 9 rooms; one more every two floors, up to 12. Big ones: the camps need space
 			const int MAX_ROOMS = std::clamp(9 + (m_piso - 1) / 2, 9, 12), MIN_SIZE = 5, MAX_SIZE = 10, MAX_ATTEMPTS = 900;
 
-			// 1) Salas (algunas con ala: en L o en T)
+			// 1) Rooms (some with a wing: L or T shape)
 			for (int i = 0; i < MAX_ATTEMPTS && (int)m_rooms.size() < MAX_ROOMS; i++) {
-				int tope = i > 450 ? MAX_SIZE - 3 : MAX_SIZE; // si cuesta encajarlas, más pequeñas
+				int tope = i > 450 ? MAX_SIZE - 3 : MAX_SIZE; // If they're hard to fit, smaller
 				int w = UtilityFunctions::randi_range(MIN_SIZE + 1, tope);
 				int h = UtilityFunctions::randi_range(MIN_SIZE, tope);
 				Room nueva = { UtilityFunctions::randi_range(2, GRID_SIZE - w - 3), UtilityFunctions::randi_range(2, GRID_SIZE - h - 3), w, h };
@@ -441,7 +455,7 @@ private:
 					nueva.aw = aw; nueva.ah = ah;
 					Rect2i caja = nueva.caja();
 					if (caja.position.x < 2 || caja.position.y < 2 || caja.get_end().x > GRID_SIZE - 2 || caja.get_end().y > GRID_SIZE - 2)
-						nueva.aw = nueva.ah = 0; // el ala se sale del mapa: sala normal
+						nueva.aw = nueva.ah = 0; // The wing goes off the map: normal room
 				}
 				bool choca = false;
 				for (const Room& otra : m_rooms)
@@ -450,7 +464,7 @@ private:
 
 				ExcavarRect(Rect2i(nueva.x, nueva.y, nueva.w, nueva.h));
 				if (nueva.aw > 0) ExcavarRect(Rect2i(nueva.ax, nueva.ay, nueva.aw, nueva.ah));
-				// Esquinas recortadas en las salas grandes (que no parezcan cajas)
+				// Cut corners in the big rooms (so they don't look like boxes)
 				if (w >= 6 && h >= 6) {
 					const Vector2i esquinas[4] = { Vector2i(nueva.x, nueva.y), Vector2i(nueva.x + w - 1, nueva.y),
 												   Vector2i(nueva.x, nueva.y + h - 1), Vector2i(nueva.x + w - 1, nueva.y + h - 1) };
@@ -460,7 +474,8 @@ private:
 				m_rooms.push_back(nueva);
 			}
 
-			// 2) Pasillos: árbol de unión mínimo (cada sala con la más cercana ya unida)...
+			// 2) Corridors: minimum spanning tree (every room with the closest one already
+			// joined)...
 			int n = (int)m_rooms.size();
 			auto dist = [&](int a, int b) {
 				Vector2i ca = m_rooms[a].get_center(), cb = m_rooms[b].get_center();
@@ -480,7 +495,7 @@ private:
 				unida[mejor_b] = true;
 				uniones.push_back({ mejor_a, mejor_b });
 			}
-			// ...y algún bucle: 1 o 2 uniones extra entre salas que no estaban unidas
+			// ...and some loop: 1 or 2 extra links between rooms that weren't joined
 			int extras = n >= 6 ? UtilityFunctions::randi_range(1, 2) : 1;
 			for (int intento = 0; intento < 40 && extras > 0 && n > 2; intento++) {
 				int a = UtilityFunctions::randi_range(0, n - 1), b = UtilityFunctions::randi_range(0, n - 1);
@@ -493,9 +508,9 @@ private:
 			}
 			for (auto& u : uniones) ExcavarPasillo(m_rooms[u.first].get_center(), m_rooms[u.second].get_center(), AnchoDePasillo());
 
-			// 3) Dos alturas: alguna sala entera está arriba (nunca la del inicio). Se sube por escalones:
-			//    cada suelo de abajo pegado a uno de arriba es un escalón, así que solo se cambia de
-			//    altura por ellos (el pathfinding no necesita saber nada más)
+			// 3) Two heights: some whole room is up high (never the starting one). You go up by
+			// steps: every lower floor next to a higher one is a step, so you only change height
+			// through them (the pathfinding doesn't need to know anything else)
 			int altas = 0;
 			if (n >= 3) {
 				int quiero = std::max(1, n / 3);
@@ -522,8 +537,8 @@ private:
 					}
 			}
 
-			// 4) Columnas en las salas grandes: en rejilla, lejos de las paredes y del centro,
-			//    y solo si no dejan nada incomunicado
+			// 4) Columns in the big rooms: on a grid, away from the walls and the centre, and only
+			// if they don't cut anything off
 			int columnas = 0;
 			for (const Room& r : m_rooms) {
 				if (r.w < 7 || r.h < 6 || UtilityFunctions::randi_range(0, 99) >= 75) continue;
@@ -540,11 +555,13 @@ private:
 			UtilityFunctions::print("[DungeonManager] Mapa generado: ", (int)m_rooms.size(), " salas (", altas, " altas), ", (int)uniones.size(), " pasillos, ", columnas, " columnas.");
 		}
 
+		// Is the tile inside any room?
 		bool EnAlgunaSala(int x, int y) {
 			for (const Room& r : m_rooms) if (r.contains(x, y)) return true;
 			return false;
 		}
 
+		// Doors on narrow corridor mouths, spread out so they don't pile up
 		void GenerarPuertas() {
 			const int DISTANCIA_MINIMA = 6;
 			const int PROBABILIDAD_PUERTA = 40;
@@ -570,6 +587,7 @@ private:
 			}
 		}
 
+		// Spawn in the first room; exit in one of the furthest rooms (random among the top 35%)
 		void DefinirInicioYSalida() {
 			m_inicio = Vector2i(1, 1);
 			m_salida = Vector2i(2, 2);
@@ -594,13 +612,13 @@ private:
 				m_salida = m_inicio + Vector2i(1, 0);
 			}
 
-			// Sin puertas pegadas al spawn ni en la salida
+			// No doors next to the spawn or at the exit
 			for (int dx = -2; dx <= 2; dx++)
 				for (int dy = -2; dy <= 2; dy++)
 					if (InBounds(m_inicio.x + dx, m_inicio.y + dy)) map_data[m_inicio.x + dx][m_inicio.y + dy].is_door = false;
 			map_data[m_salida.x][m_salida.y].is_door = false;
 
-			// Casillas de aparición: las 4 más cercanas al centro de la sala inicial
+			// Spawn tiles: the 4 closest to the centre of the starting room
 			m_spawn_cells.clear();
 			std::vector<std::vector<bool>> visto(GRID_SIZE, std::vector<bool>(GRID_SIZE, false));
 			std::queue<Vector2i> cola;
@@ -619,17 +637,19 @@ private:
 			}
 		}
 
+		// Within 'radio' tiles of the spawn?
 		bool CercaDelInicio(Vector2i p, int radio) {
 			return std::abs(p.x - m_inicio.x) + std::abs(p.y - m_inicio.y) <= radio;
 		}
 
+		// Is there a door next to this tile?
 		bool PegadoAPuerta(int x, int y) {
 			for (const Vector2i& d : DIRS4)
 				if (InBounds(x + d.x, y + d.y) && map_data[x + d.x][y + d.y].is_door) return true;
 			return false;
 		}
 
-		// Casilla vacía, lejos del spawn y de la salida, sin taponar puertas
+		// Empty tile, far from the spawn and the exit, without blocking doors
 		bool CasillaDeSalaValida(int x, int y) {
 			const Cell& c = map_data[x][y];
 			if (c.is_wall || c.is_door || c.is_chest || c.has_event || c.has_enemy || c.is_brasero || c.nivel == alturas::ESCALON) return false;
@@ -638,11 +658,11 @@ private:
 		}
 
 		// ==========================================
-		// ZONAS: entrada, campamentos y sala del jefe
+		// ZONES: entrance, camps and boss room
 		// ==========================================
 
-		// Casillas andando desde 'origen' (-1 = no se llega). Las puertas cerradas se pasan
-		// (se pueden abrir) salvo las de la llave si 'llave_bloquea'; 'sala_vetada' no se pisa.
+		// Walking tiles from 'origen' (-1 = unreachable). Closed doors can be crossed (they can be
+		// opened) except the key ones if 'llave_bloquea'; 'sala_vetada' is never stepped on.
 		std::vector<std::vector<int>> DistanciasDesde(Vector2i origen, bool llave_bloquea, int sala_vetada = -1) {
 			std::vector<std::vector<int>> d(GRID_SIZE, std::vector<int>(GRID_SIZE, -1));
 			if (!InBounds(origen.x, origen.y) || map_data[origen.x][origen.y].is_wall) return d;
@@ -664,7 +684,7 @@ private:
 			return d;
 		}
 
-		// Lo más cerca que se llega a una sala (-1 = a ninguna de sus casillas)
+		// The closest you can get to a room (-1 = none of its tiles)
 		int DistanciaASala(const std::vector<std::vector<int>>& d, int i) {
 			const Room& r = m_rooms[i];
 			Rect2i c = r.caja();
@@ -675,7 +695,7 @@ private:
 			return mejor;
 		}
 
-		// Las casillas de la sala por las que se entra (pegadas a un suelo de fuera)
+		// The room tiles you come in through (next to a floor outside)
 		std::vector<Vector2i> EntradasDeSala(int i) {
 			const Room& r = m_rooms[i];
 			Rect2i c = r.caja();
@@ -691,8 +711,9 @@ private:
 			return out;
 		}
 
-		// Cierra la sala del jefe: cada boca se tapia salvo una casilla, que pasa a ser puerta con llave.
-		// Si algo se queda incomunicado, se deshace todo (el piso queda sin llave, pero se puede jugar).
+		// Closes the boss room: every opening gets walled off except one tile, which becomes a
+		// locked door. If something ends up cut off, everything is undone (the floor has no key,
+		// but it's still playable).
 		bool SellarSalaJefe(int i) {
 			std::vector<Vector2i> entradas = EntradasDeSala(i);
 			if (entradas.empty()) return false;
@@ -700,7 +721,7 @@ private:
 			std::vector<bool> usado(entradas.size(), false);
 			for (size_t k = 0; k < entradas.size(); k++) {
 				if (usado[k]) continue;
-				// Grupo de entradas pegadas (una boca de pasillo ancho)
+				// Group of adjacent entrances (the mouth of a wide corridor)
 				std::vector<Vector2i> grupo;
 				std::vector<size_t> pila = { k };
 				usado[k] = true;
@@ -719,13 +740,14 @@ private:
 					else { c.is_wall = true; c.is_door = false; }
 				}
 			}
-			// Comprobación: sin llave se llega a todas las demás salas y no a la del jefe; con llave, también a ella
+			// Check: without the key you reach every other room but not the boss one; with the key,
+			// that one too
 			auto sin_llave = DistanciasDesde(m_inicio, true);
 			auto con_llave = DistanciasDesde(m_inicio, false);
 			bool ok = DistanciaASala(sin_llave, i) < 0 && DistanciaASala(con_llave, i) >= 0;
 			for (size_t k = 0; k < m_rooms.size() && ok; k++)
 				if ((int)k != i && DistanciaASala(sin_llave, (int)k) < 0) ok = false;
-			// Y dentro de la sala, todo su suelo sigue unido a la puerta
+			// And inside the room, all its floor is still connected to the door
 			if (ok) {
 				const Room& r = m_rooms[i];
 				Rect2i c = r.caja();
@@ -740,6 +762,7 @@ private:
 			return ok;
 		}
 
+		// Gives every room its role: entrance, camps and the boss room
 		void AsignarZonas() {
 			m_hoguera = m_jefe = m_cofre_llave = m_cofre_jefe = Vector2i(-1, -1);
 			m_sala_jefe = -1;
@@ -752,7 +775,8 @@ private:
 			for (int i = 0; i < n; i++) m_rooms[i].dist = std::max(0, DistanciaASala(d, i));
 			if (n < 3) return;
 
-			// 1) La sala del jefe: la más lejana que, quitándola, no deje a nadie aislado (mejor grande)
+			// 1) The boss room: the furthest one that, if removed, doesn't leave anyone isolated
+			// (big is better)
 			std::vector<int> orden;
 			for (int i = 1; i < n; i++) orden.push_back(i);
 			std::sort(orden.begin(), orden.end(), [&](int a, int b) { return m_rooms[a].dist > m_rooms[b].dist; });
@@ -772,7 +796,7 @@ private:
 			jefe.tipo = SALA_JEFE;
 			SellarSalaJefe(m_sala_jefe);
 
-			// La escalera, en el fondo de la sala del jefe (lo más lejos de la puerta)
+			// The stairs, at the back of the boss room (as far as possible from the door)
 			auto dj = DistanciasDesde(m_inicio, false);
 			Rect2i cj = jefe.caja();
 			int mejor = -1;
@@ -784,8 +808,8 @@ private:
 				}
 			map_data[m_salida.x][m_salida.y].is_door = false;
 
-			// 2) Campamentos: las salas más grandes que quedan (dejando un par para eventos),
-			//    numerados de la entrada hacia el fondo
+			// 2) Camps: the biggest rooms left (keeping a couple for events), numbered from the
+			// entrance to the back
 			std::vector<int> libres;
 			for (int i = 1; i < n; i++) if (m_rooms[i].tipo == SALA_NORMAL) libres.push_back(i);
 			std::sort(libres.begin(), libres.end(), [&](int a, int b) { return m_rooms[a].w * m_rooms[a].h > m_rooms[b].w * m_rooms[b].h; });
@@ -799,7 +823,7 @@ private:
 			UtilityFunctions::print("[Mazmorra] Zonas: jefe en la sala ", m_sala_jefe, (m_puertas_jefe.empty() ? " (sin sellar)" : " (sellada)"), ", ", (int)campamentos.size(), " campamentos.");
 		}
 
-		// La casilla libre de la sala más cerca de 'centro' que cumpla 'vale'
+		// The free tile of the room closest to 'centro' that passes 'vale'
 		template <typename F>
 		Vector2i CasillaCercana(const Room& r, Vector2i centro, F vale) {
 			Rect2i c = r.caja();
@@ -814,13 +838,14 @@ private:
 			return mejor;
 		}
 
+		// Is there a chest next to this tile?
 		bool PegadoACofre(int x, int y) {
 			for (const Vector2i& d : DIRS4)
 				if (InBounds(x + d.x, y + d.y) && map_data[x + d.x][y + d.y].is_chest) return true;
 			return false;
 		}
 
-		// Interior de la sala (sin el borde, por donde entran los pasillos)
+		// Room interior (without the edge, where the corridors come in)
 		bool Interior(const Room& r, int x, int y) {
 			for (int dx = -1; dx <= 1; dx++)
 				for (int dy = -1; dy <= 1; dy++)
@@ -828,8 +853,9 @@ private:
 			return true;
 		}
 
+		// Camp chests, the key, the boss prize and a few hidden ones
 		void GenerarCofres() {
-			// Cada campamento guarda su cofre, a la vista, en el centro del campamento
+			// Every camp keeps its chest, in plain sight, in the centre of the camp
 			int ultimo = -1;
 			for (size_t i = 0; i < m_rooms.size(); i++) {
 				Room& r = m_rooms[i];
@@ -840,17 +866,17 @@ private:
 				r.cofre = p;
 				if (ultimo < 0 || r.zona > m_rooms[ultimo].zona) ultimo = (int)i;
 			}
-			// La llave del jefe, en el cofre del campamento más profundo
+			// The boss key, in the chest of the deepest camp
 			if (ultimo >= 0 && !m_puertas_jefe.empty()) m_cofre_llave = m_rooms[ultimo].cofre;
 
-			// El premio del jefe, junto a la escalera
+			// The boss prize, next to the stairs
 			if (m_sala_jefe >= 0) {
 				Room& j = m_rooms[m_sala_jefe];
 				Vector2i p = CasillaCercana(j, m_salida, [&](int x, int y) { return Vector2i(x, y) != m_salida && CasillaDeSalaValida(x, y); });
 				if (p.x >= 0) { map_data[p.x][p.y].is_chest = true; m_cofre_jefe = p; j.cofre = p; }
 			}
 
-			// Y uno o dos escondidos en las salas sin vigilar
+			// And one or two hidden in the unguarded rooms
 			std::vector<Vector2i> candidatas;
 			for (const Room& r : m_rooms)
 				if (r.tipo == SALA_NORMAL)
@@ -868,17 +894,18 @@ private:
 			}
 		}
 
+		// A brazier on that tile (it lights its room)
 		void PonerBrasero(Vector2i p) {
 			if (p.x < 0) return;
 			map_data[p.x][p.y].is_brasero = true;
 			m_braseros.push_back(p);
 		}
 
-		// Hoguera en la entrada, una lumbre en cada campamento (se ven de lejos: hay algo que
-		// guardar) y otra en la sala del jefe. Las demás salas, a oscuras.
+		// Campfire at the entrance, a fire in every camp (seen from far away: there's something to
+		// guard) and another one in the boss room. The other rooms, dark.
 		void GenerarBraseros() {
 			m_braseros.clear();
-			// Nunca en la fila/columna central de la sala, que es por donde entran los pasillos
+			// Never on the central row/column of the room, which is where the corridors come in
 			auto fuera_del_paso = [&](const Room& r, int x, int y) {
 				Vector2i c = r.get_center();
 				return x != c.x && y != c.y && Interior(r, x, y) && !PegadoACofre(x, y);
@@ -904,17 +931,20 @@ private:
 			}
 		}
 
+		// An enemy on that tile, belonging to squad 'peloton' (-1 = loose)
 		void PonerEnemigo(Vector2i p, int peloton) {
 			if (p.x < 0) return;
 			map_data[p.x][p.y].has_enemy = true;
 			map_data[p.x][p.y].peloton = peloton;
 		}
 
+		// Camp squads, the boss with its escort and a few loose prowlers
 		void GenerarEnemigos() {
 			for (size_t i = 0; i < m_rooms.size(); i++) {
 				Room& r = m_rooms[i];
 				if (r.tipo == SALA_CAMPAMENTO) {
-					// El pelotón, alrededor de su cofre: más gente en los del fondo y en los pisos de abajo
+					// The squad, around its chest: more people in the deeper ones and on the lower
+					// floors
 					int num = 3 + (r.zona >= 2 ? 1 : 0) + (m_piso >= 3 ? 1 : 0);
 					Vector2i centro = r.cofre.x >= 0 ? r.cofre : r.get_center();
 					for (int e = 0; e < num; e++) {
@@ -928,7 +958,7 @@ private:
 					Vector2i c = r.get_center();
 					m_jefe = CasillaCercana(r, c, [&](int x, int y) { return CasillaDeSalaValida(x, y) && !PegadoACofre(x, y); });
 					PonerEnemigo(m_jefe, (int)i);
-					// Escolta desde el piso 2
+					// Escort from floor 2
 					for (int e = 0; e < (m_piso >= 2 ? 1 : 0) + (m_piso >= 4 ? 1 : 0); e++) {
 						Vector2i p = CasillaCercana(r, m_jefe, [&](int x, int y) {
 							int d = std::abs(x - m_jefe.x) + std::abs(y - m_jefe.y);
@@ -937,7 +967,7 @@ private:
 						PonerEnemigo(p, (int)i);
 					}
 				} else if (r.tipo == SALA_NORMAL && UtilityFunctions::randi_range(0, 99) < 35) {
-					// Algún merodeador suelto
+					// Some loose prowler
 					std::vector<Vector2i> validas;
 					for (int x = r.x + 1; x < r.x + r.w - 1; x++)
 						for (int y = r.y + 1; y < r.y + r.h - 1; y++)
@@ -947,7 +977,8 @@ private:
 			}
 		}
 
-		// Los eventos van en las salas sin campamento (uno o dos por sala); si faltan, en los pasillos
+		// Events go in rooms without a camp (one or two per room); if they don't fit, in the
+		// corridors
 		void GenerarEventos() {
 			m_eventos.clear();
 
@@ -958,7 +989,7 @@ private:
 				dir->list_dir_begin();
 				for (String f = dir->get_next(); !f.is_empty(); f = dir->get_next()) {
 					if (dir->current_is_dir()) continue;
-					// En exportaciones los .tres pueden aparecer como .tres.remap
+					// In exported builds the .tres can show up as .tres.remap
 					if (f.ends_with(".tres.remap")) f = f.trim_suffix(".remap");
 					if (f.ends_with(".tres")) disponibles.push_back(carpeta + f);
 				}
@@ -999,7 +1030,7 @@ private:
 					if (crear(pos)) aqui--;
 				}
 			}
-			// Pasillos (fuera de toda sala)
+			// Corridors (outside every room)
 			std::vector<Vector2i> pasillos;
 			for (int x = 0; x < GRID_SIZE; x++)
 				for (int y = 0; y < GRID_SIZE; y++)
@@ -1013,7 +1044,7 @@ private:
 		}
 
 public:
-		// Para el resto de scripts (Zonas.gd): [{tipo, zona, caja, centro, cofre}]
+		// For the rest of the scripts (Zonas.gd): [{tipo, zona, caja, centro, cofre}]
 		Array ListaZonas() {
 			Array out;
 			for (size_t i = 0; i < m_rooms.size(); i++) {

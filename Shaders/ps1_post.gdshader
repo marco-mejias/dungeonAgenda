@@ -4,7 +4,7 @@ shader_type canvas_item;
 uniform float levels = 32.0;
 uniform float dither_strength = 0.85;
 uniform float darken = 1.0;
-uniform bool crt = false; // scanlines + viñeta (opción del menú de pausa)
+uniform bool crt = false; // Scanlines + vignette (pause menu option)
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 

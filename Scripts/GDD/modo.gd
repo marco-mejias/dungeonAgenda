@@ -1,51 +1,51 @@
 extends Node
 
-# Modo (autoload): exploración, sigilo o combate.
-#   (SIGILO lo lleva Sigilo.gd: hay turnos como en combate pero los enemigos solo vigilan.
-#    con_turnos() = combate o sigilo: PA, fin del turno, sin fila india.)
+# Modo (autoload): exploring, stealth or combat.
+#   (STEALTH is handled by Sigilo.gd: there are turns like in combat but the enemies only keep
+#    watch. con_turnos() = combat or stealth: PA, end of turn, no single file.)
 #
-#   EXPLORACIÓN  (ningún pelotón despierto) Andar no gasta PA y no hay turnos: se va a cualquier
-#                casilla explorada, más deprisa. El resto va detrás en FILA INDIA por el rastro del
-#                líder: en cada paso suyo, cada seguidor avanza una casilla (a donde estaba el de
-#                delante). El día pasa cada PASOS_POR_DIA casillas andadas, sin turno enemigo.
-#   LA FILA      Quién sigue al líder es fijo (no se recalcula en cada clic): un héroe entra en la
-#                fila al quedar a DIST_GRUPO casillas o menos del líder o de alguien de la fila, y ya
-#                no se cae aunque se retrase. Solo sale si lo apartas tú (Ctrl+clic mueve al líder
-#                solo); vuelve a unirse cuando el líder se haya ido y vuelva a pasar cerca.
-#                Los que están lejos no se unen solos.
-#   COMBATE      Los enemigos van en PELOTONES (los que aparecen juntos). Si uno despierta, despierta
-#                todo su pelotón: animación de sorpresa (la cámara los enfoca, saltan con un "!") y
-#                el combate sigue hasta que caiga el último. Todo el grupo juega por turnos con PA,
-#                esté cerca o lejos. pasar_lejanos() acaba el turno de los que están a más de
-#                DIST_LEJOS casillas.
-#   AL ACABAR    Los que estaban luchando (a DIST_LEJOS o menos de un enemigo despierto) se reúnen
-#                en fila detrás del líder; los que estaban lejos se quedan donde están.
+#   EXPLORING    (no squad awake) Walking costs no PA and there are no turns: you can go to any
+#                explored tile, faster. The rest walk behind in SINGLE FILE along the leader's
+#                trail: on every step of theirs, each follower moves one tile (to where the one
+#                ahead was). The day goes by every PASOS_POR_DIA walked tiles, with no enemy turn.
+#   THE LINE     Who follows the leader is fixed (it isn't recomputed on every click): a hero joins
+#                the line when they're DIST_GRUPO tiles or less from the leader or from someone in
+#                the line, and they don't drop out even if they fall behind. They only leave if you
+#                move them away (Ctrl+click moves the leader alone); they join again once the leader
+#                has left and comes back close. The ones far away don't join on their own.
+#   COMBAT       Enemies come in SQUADS (the ones that spawn together). If one wakes up, its whole
+#                squad wakes up: surprise animation (the camera focuses on them, they jump with a
+#                "!") and combat goes on until the last one falls. The whole party plays in turns
+#                with PA, near or far. pasar_lejanos() ends the turn of the ones more than
+#                DIST_LEJOS tiles away.
+#   WHEN IT ENDS The ones who were fighting (DIST_LEJOS or less from an awake enemy) regroup in
+#                line behind the leader; the ones far away stay where they are.
 #
-# Lo publica en la meta "modo_exploracion" del DungeonManager (la leen el C++ y el HUD).
+# It publishes it in the DungeonManager meta "modo_exploracion" (read by C++ and the HUD).
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
 const PASOS_POR_DIA := 30
 const DIST_LEJOS := 8
-const DIST_PELOTON := 4 # enemigos a esta distancia (encadenada) al aparecer = mismo pelotón
-const DIST_GRUPO := 3   # para entrar en la fila
-const T_REUNION := 0.14 # segundos por paso al reunirse tras un combate
+const DIST_PELOTON := 4 # Enemies within this (chained) distance when spawning = same squad
+const DIST_GRUPO := 3   # To join the line
+const T_REUNION := 0.14 # Seconds per step when regrouping after a fight
 
 signal cambio_de_modo(combate: bool)
 
 var en_combate := false
 var pasos := 0
-var xp_al_entrar := {}       # héroe -> XP total al empezar el combate (para el resumen)
-var pelotones_activos := {}  # id de pelotón -> true (despierto hasta que caiga el último)
+var xp_al_entrar := {}       # hero -> total XP when combat started (for the summary)
+var pelotones_activos := {}  # Squad id -> true (awake until the last one falls)
 var siguiente_peloton := 0
 var piso_visto := -1
-# Fila india
-var fila: Array = []         # nombres de los que siguen al líder, en orden
+# Single file
+var fila: Array = []         # Names of the ones following the leader, in order
 var lider_visto := ""
-var apartados := {}          # nombre -> ya se ha alejado del líder (puede volver a unirse)
+var apartados := {}          # name -> has already moved away from the leader (can join again)
 var paso_t := 0.15
-var rastro: Array = []       # últimas casillas del líder (la más reciente primero)
-var luchadores := {}         # nombres de los que han estado en la pelea (se reúnen al acabar)
+var rastro: Array = []       # Leader's last tiles (most recent first)
+var luchadores := {}         # Names of the ones who were in the fight (they regroup at the end)
 
 func _dm() -> Node:
 	return get_node_or_null(RUTA_DM)
@@ -66,7 +66,7 @@ func _process(_delta: float) -> void:
 		piso_visto = piso
 		pelotones_activos.clear()
 		apartados.clear()
-		lider_visto = "" # en el piso nuevo la fila se rehace
+		lider_visto = "" # On the new floor the line is rebuilt
 	_actualizar_pelotones()
 	var combate := hay_combate()
 	var explorar := not (combate or Sigilo.en_sigilo)
@@ -87,22 +87,23 @@ func _process(_delta: float) -> void:
 			lider_visto = str(lider.name)
 			_rehacer_fila(lider)
 
-## ¿Algún pelotón despierto con alguien vivo (o es el turno enemigo)?
+## Is any squad awake with someone alive (or is it the enemy turn)?
 func hay_combate() -> bool:
 	var dm := _dm()
 	if dm and dm.get_meta("turno_enemigo", false):
 		return true
 	return not pelotones_activos.is_empty()
 
+# No turns: free movement
 func explorando() -> bool:
 	return not con_turnos()
 
-## Combate o sigilo: se juega por turnos con PA
+## Combat or stealth: you play in turns with PA
 func con_turnos() -> bool:
 	return en_combate or Sigilo.en_sigilo
 
 # ==========================================
-# PELOTONES
+# SQUADS
 # ==========================================
 func _enemigos() -> Array:
 	var out := []
@@ -111,8 +112,8 @@ func _enemigos() -> Array:
 			out.append(u)
 	return out
 
-# Los que aparecen juntos forman un pelotón; si uno despierta, despiertan todos y el pelotón sigue
-# en pie hasta que muera el último
+# The ones spawning together form a squad; if one wakes up, they all wake up and the squad stays up
+# until the last one dies
 func _actualizar_pelotones() -> void:
 	var enemigos := _enemigos()
 	var sin_peloton := []
@@ -140,13 +141,13 @@ func _actualizar_pelotones() -> void:
 			pelotones_activos[id] = true
 	for id in pelotones_activos.keys():
 		if not miembros.has(id):
-			pelotones_activos.erase(id) # cayó el último
+			pelotones_activos.erase(id) # The last one fell
 			continue
 		for e in miembros[id]:
 			if not e.get_meta("in_combat", false):
-				e.set_meta("in_combat", true) # despierta con los suyos
+				e.set_meta("in_combat", true) # Wakes up with its mates
 
-## Enemigos despiertos (de pelotones activos)
+## Awake enemies (from active squads)
 func despiertos() -> Array:
 	var out := []
 	for e in _enemigos():
@@ -155,7 +156,7 @@ func despiertos() -> Array:
 	return out
 
 # ==========================================
-# INICIO DEL COMBATE: sorpresa
+# COMBAT START: surprise
 # ==========================================
 func _empezar_combate() -> void:
 	pasos = 0
@@ -167,7 +168,7 @@ func _empezar_combate() -> void:
 	_marcar_luchadores()
 	var dm := _dm()
 	var banner := get_node_or_null("/root/Main/CanvasLayer/Banner")
-	# Si el combate lo ha empezado un ataque (ya hay secuencia en marcha), solo el cartel
+	# If combat was started by an attack (a sequence is already running), only the banner
 	if dm.get_meta("is_moving", false):
 		if banner:
 			banner.mostrar("¡Combate!")
@@ -175,7 +176,7 @@ func _empezar_combate() -> void:
 		return
 	_animacion_sorpresa()
 
-# La cámara enfoca al pelotón, cada uno da un salto con un "!" mirando a los héroes, y el cartel
+# The camera focuses on the squad, each one jumps with a "!" facing the heroes, and the banner
 func _animacion_sorpresa() -> void:
 	var dm := _dm()
 	var cam := dm.get_node_or_null("Camera3D")
@@ -183,7 +184,7 @@ func _animacion_sorpresa() -> void:
 	for e in despiertos():
 		if e.visible:
 			vistos.append(e)
-	dm.set_meta("is_moving", true) # nadie se mueve mientras tanto
+	dm.set_meta("is_moving", true) # Nobody moves meanwhile
 	var puntos := PackedVector3Array()
 	for e in vistos:
 		puntos.append(e.position)
@@ -200,7 +201,7 @@ func _animacion_sorpresa() -> void:
 			continue
 		var cuerpo := e.get_node_or_null("Cuerpo") as Sprite3D
 		if cuerpo:
-			# Se gira hacia el héroe que le ha sorprendido
+			# It turns to face the hero that surprised it
 			var fl := Tactica.ficha(lider) if lider else null
 			if fl and cam:
 				var derecha: Vector3 = cam.global_transform.basis.x
@@ -220,6 +221,7 @@ func _animacion_sorpresa() -> void:
 	dm.set_meta("is_moving", false)
 	_refrescar()
 
+# Remembers who was fighting (close to an awake enemy), to regroup them at the end
 func _marcar_luchadores() -> void:
 	var en_pie := despiertos()
 	for h in _heroes():
@@ -229,7 +231,7 @@ func _marcar_luchadores() -> void:
 				break
 
 # ==========================================
-# FIN DEL COMBATE: los que luchaban se reúnen
+# COMBAT END: the ones fighting regroup
 # ==========================================
 func _acabar_combate() -> void:
 	var ganado := 0
@@ -241,6 +243,7 @@ func _acabar_combate() -> void:
 		banner.mostrar("Fin del combate" + ("  ·  +%d XP" % ganado if ganado > 0 else ""), 0.85, false)
 	_reunir()
 
+# After combat the fighters walk back into line behind the leader
 func _reunir() -> void:
 	var dm := _dm()
 	var lider = _pm().call("GetActiveCharacter")
@@ -260,7 +263,7 @@ func _reunir() -> void:
 	if reunir.is_empty():
 		_refrescar()
 		return
-	# Sitios libres alrededor del líder, del más cercano al más lejano (por donde se puede andar)
+	# Free spots around the leader, from closest to furthest (where you can walk)
 	var sitios := _casillas_cerca(lp, reunir.size(), reunir)
 	var path_mgr := dm.get_node_or_null("PathManager")
 	var mas_larga := 0
@@ -278,10 +281,10 @@ func _reunir() -> void:
 		_andar(h, ruta.slice(1), T_REUNION)
 	await get_tree().create_timer(mas_larga * T_REUNION + 0.15).timeout
 	dm.set_meta("is_moving", false)
-	dm.call("ColocarHeroe", str(lider.name), lp.x, lp.y, 1) # visión recalculada con todos ya juntos
+	dm.call("ColocarHeroe", str(lider.name), lp.x, lp.y, 1) # Vision recomputed with everyone together
 	_refrescar()
 
-# BFS desde el líder por suelo libre: las 'n' casillas más cercanas donde ponerse
+# BFS from the leader over free floor: the 'n' closest tiles to stand on
 func _casillas_cerca(desde: Vector2i, n: int, que_se_mueven: Array) -> Array:
 	var dm := _dm()
 	var libres: PackedByteArray = dm.call("ObtenerTransitables")
@@ -300,7 +303,7 @@ func _casillas_cerca(desde: Vector2i, n: int, que_se_mueven: Array) -> Array:
 			if visto.has(s) or s.x < 0 or s.y < 0 or s.x >= lado or s.y >= lado:
 				continue
 			visto[s] = true
-			# Libre o con uno de los que se van a mover (se apartará)
+			# Free or with one of the ones about to move (they'll step aside)
 			var ocupada_por_quien_se_mueve := false
 			for h in que_se_mueven:
 				if h.get_meta("grid_pos") == s:
@@ -311,14 +314,14 @@ func _casillas_cerca(desde: Vector2i, n: int, que_se_mueven: Array) -> Array:
 	return out
 
 # ==========================================
-# LA FILA INDIA
+# THE SINGLE FILE
 # ==========================================
 func _heroe(nombre: String) -> Node:
 	var pm := _pm()
 	var h = pm.get_node_or_null(NodePath(nombre)) if pm else null
 	return h if h and Tactica.vivo(h) else null
 
-# Al cambiar de líder: la fila son los que están cerca de él (encadenados), del más cercano al más lejano
+# When the leader changes: the line is the ones close to them (chained), from closest to furthest
 func _rehacer_fila(lider: Node) -> void:
 	fila.clear()
 	rastro.clear()
@@ -340,25 +343,26 @@ func _rehacer_fila(lider: Node) -> void:
 	for h in dentro:
 		fila.append(str(h.name))
 
-## PathManager: el líder empieza a andar (explorando). Con Ctrl, se va solo: la fila se queda apartada.
+## PathManager: the leader starts walking (exploring). With Ctrl, they go alone: the line stays
+## apart.
 func lider_se_mueve(_ruta: Array, t: float) -> void:
 	paso_t = t
 	if con_turnos():
 		return
 	if Input.is_key_pressed(KEY_CTRL):
 		for n in fila:
-			apartados[n] = false # todavía no se ha alejado del líder
+			apartados[n] = false # Hasn't moved away from the leader yet
 		fila.clear()
 		rastro.clear()
 
-## Tactica.al_mover: el héroe 'h' da un paso de 'desde' a 'hasta'. Si es el líder explorando, la
-## fila avanza una casilla: cada uno a donde estaba el de delante.
+## Tactica.al_mover: hero 'h' takes a step from 'desde' to 'hasta'. If it's the leader while
+## exploring, the line moves one tile: each one to where the one ahead was.
 func paso_lider(h: Node, desde: Vector2i, hasta: Vector2i) -> void:
 	if con_turnos() or _pm() == null or h != _pm().call("GetActiveCharacter"):
 		return
 	_unirse_a_la_fila(h, hasta)
-	# El rastro del líder: las últimas casillas que ha pisado (la más reciente, la primera).
-	# El seguidor i va a rastro[i]: casillas contiguas, así que quedan pegados uno tras otro.
+	# The leader's trail: the last tiles they stepped on (the most recent first). Follower i goes to
+	# rastro[i]: contiguous tiles, so they stay glued one behind the other.
 	rastro.push_front(desde)
 	while rastro.size() > fila.size() + 1:
 		rastro.pop_back()
@@ -380,11 +384,11 @@ func paso_lider(h: Node, desde: Vector2i, hasta: Vector2i) -> void:
 		elif Tactica.dist(antes, objetivo) == 1:
 			pasos_f = [objetivo]
 		elif path_mgr:
-			# Se ha quedado atrás (acaba de unirse, o algo le cortó): hasta dos pasos, más deprisa
+			# It fell behind (just joined, or something cut it off): up to two steps, faster
 			var ruta: Array = path_mgr.call("CalcularRuta", antes.x, antes.y, objetivo.x, objetivo.y)
 			for k in range(1, mini(3, ruta.size())):
 				pasos_f.append(ruta[k])
-		# No acabar donde ya va el líder u otro de la fila en este paso
+		# Don't end where the leader or someone else in the line is going on this step
 		while not pasos_f.is_empty() and ocupadas.has(pasos_f[pasos_f.size() - 1]):
 			pasos_f.pop_back()
 		if pasos_f.is_empty():
@@ -393,8 +397,8 @@ func paso_lider(h: Node, desde: Vector2i, hasta: Vector2i) -> void:
 			_andar(f, pasos_f, paso_t / float(pasos_f.size()))
 			ocupadas[pasos_f[pasos_f.size() - 1]] = true
 
-# Entran en la fila los que están cerca del líder o de alguien de la fila (los apartados con Ctrl,
-# solo después de que el líder se haya alejado de ellos y vuelva)
+# The ones close to the leader or to someone in the line join it (the ones set apart with Ctrl, only
+# after the leader has moved away from them and comes back)
 func _unirse_a_la_fila(lider: Node, lider_en: Vector2i) -> void:
 	for h in _heroes():
 		var n := str(h.name)
@@ -411,7 +415,7 @@ func _unirse_a_la_fila(lider: Node, lider_en: Vector2i) -> void:
 		if apartados.has(n):
 			if not apartados[n]:
 				if Tactica.dist(hp, lider_en) > DIST_GRUPO:
-					apartados[n] = true # ya se ha alejado: la próxima vez que pase cerca, se une
+					apartados[n] = true # Already moved away: the next time it passes close, it joins
 				continue
 			if not cerca:
 				continue
@@ -419,7 +423,7 @@ func _unirse_a_la_fila(lider: Node, lider_en: Vector2i) -> void:
 		if cerca:
 			fila.append(n)
 
-# Anda casilla a casilla por 'pasos' (con saltito y mirando hacia donde va)
+# Walks tile by tile along 'pasos' (with a little hop and facing where it goes)
 func _andar(h: Node, pasos_ruta: Array, t: float) -> void:
 	var ficha := Tactica.ficha(h)
 	var dm := _dm()
@@ -443,14 +447,14 @@ func _andar(h: Node, pasos_ruta: Array, t: float) -> void:
 		if cuerpo:
 			tw.parallel().tween_property(cuerpo, "position:y", y0 + 0.12, t * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 			tw.parallel().tween_property(cuerpo, "position:y", y0, t * 0.5).set_delay(t * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		# La casilla se apunta al llegar; la visión (cara) solo en el último paso
+		# The tile is stored on arrival; vision (expensive) only on the last step
 		tw.tween_callback(func(): dm.call("ColocarHeroe", nombre, c.x, c.y, 1 if ultimo else 0))
 		previa = c
-	# La casilla de destino se reserva ya (para que nadie más la elija en este mismo paso)
+	# The destination tile is reserved right away (so nobody else picks it on this same step)
 	h.set_meta("grid_pos", pasos_ruta[pasos_ruta.size() - 1])
 
-## PathManager (explorando): ¿hay en esa casilla un aliado que NO va a apartarse? (los de la fila
-## se apartan al seguir al líder; con Ctrl pulsado no se aparta nadie)
+## PathManager (exploring): is there an ally on that tile who WON'T step aside? (the ones in the
+## line step aside when following the leader; with Ctrl held nobody does)
 func aliado_quieto_en(x: int, y: int) -> bool:
 	var pm := _pm()
 	var lider = pm.call("GetActiveCharacter") if pm else null
@@ -461,7 +465,7 @@ func aliado_quieto_en(x: int, y: int) -> bool:
 			return true
 	return false
 
-## Grupos para la barra del HUD: el líder con su fila, y el resto juntando a los que están cerca
+## Groups for the HUD bar: the leader with their line, and the rest grouping the ones close together
 func grupos_heroes() -> Array:
 	var pm := _pm()
 	var lider = pm.call("GetActiveCharacter") if pm else null
@@ -488,6 +492,7 @@ func grupos_heroes() -> Array:
 		grupos.append(grupo)
 	return grupos
 
+# The group of a hero (the leader's line or the ones close to them)
 func grupo_de(h: Node) -> Array:
 	for g in grupos_heroes():
 		if h in g:
@@ -495,9 +500,9 @@ func grupo_de(h: Node) -> Array:
 	return [h]
 
 # ==========================================
-# EL TIEMPO EXPLORANDO
+# TIME WHILE EXPLORING
 # ==========================================
-## Tactica.al_mover lo llama en cada paso de un héroe; solo cuentan los del que va delante
+## Tactica.al_mover calls it on every hero step; only the leader's count
 func contar_paso(h: Node) -> void:
 	if con_turnos() or _pm() == null or h != _pm().call("GetActiveCharacter"):
 		return
@@ -506,7 +511,7 @@ func contar_paso(h: Node) -> void:
 		pasos = 0
 		_pm().call("PasarDiaExplorando")
 
-## Descansar (botón del sol explorando): pasa el día sin andar
+## Rest (sun button while exploring): the day goes by without walking
 func descansar() -> void:
 	if con_turnos():
 		return
@@ -514,14 +519,14 @@ func descansar() -> void:
 	_pm().call("PasarDiaExplorando")
 
 # ==========================================
-# COMBATE: los que están lejos
+# COMBAT: the far ones
 # ==========================================
-## Héroes con PA a más de DIST_LEJOS casillas de cualquier enemigo despierto
+## Heroes with PA more than DIST_LEJOS tiles away from any awake enemy
 func lejanos() -> Array:
 	var out := []
 	if not con_turnos():
 		return out
-	# En combate, lejos de los despiertos; en sigilo, lejos de los que vigilan
+	# In combat, far from the awake ones; in stealth, far from the ones on watch
 	var en_pie := despiertos() if en_combate else Sigilo.acechados()
 	for h in _heroes():
 		if int(h.get_meta("pa_actual", 0)) <= 0:
@@ -533,7 +538,7 @@ func lejanos() -> Array:
 			out.append(h)
 	return out
 
-## Acaba el turno de todos los lejanos (botón del HUD, tecla L)
+## Ends the turn of all the far ones (HUD button, L key)
 func pasar_lejanos() -> void:
 	var lista := lejanos()
 	if lista.is_empty():
@@ -554,6 +559,7 @@ func _refrescar() -> void:
 	if ui:
 		ui.call("UpdateWarriorUI")
 
+# Heroes on the map
 func _heroes() -> Array:
 	var out := []
 	for u in Tactica.unidades():
@@ -561,6 +567,7 @@ func _heroes() -> Array:
 			out.append(u)
 	return out
 
+# Total XP of a hero across all their levels (for the combat summary)
 func _xp_total(h: Node) -> int:
 	var total := int(h.get_meta("xp", 0))
 	for n in range(1, int(h.get_meta("nivel", 1))):

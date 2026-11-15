@@ -1,6 +1,6 @@
 #pragma once
-// Piezas de construcción del mundo 3D del DungeonRenderer: bloques con UV por cara,
-// materiales de overlay, MultiMesh, partículas y sprites del tileset. Sin estado propio.
+// Building blocks of the DungeonRenderer 3D world: blocks with per-face UVs, overlay materials,
+// MultiMesh, particles and tileset sprites. No state of their own.
 
 #include "Scripts/CPP/Mazmorra/Alturas.hpp"
 #include <Godot/godot.hpp>
@@ -23,22 +23,22 @@ namespace render {
 
 using namespace godot;
 
-// Tipos de casilla que nos manda el DungeonManager
+// Tile types the DungeonManager sends us
 const uint8_t T_MURO = 0;
 const uint8_t T_SUELO = 1;
 const uint8_t T_PUERTA = 2;
 const uint8_t T_PUERTA_ABIERTA = 3;
-const uint8_t T_COLUMNA = 4; // columna dentro de una sala (suelo debajo y un pilar fino encima)
+const uint8_t T_COLUMNA = 4; // Column inside a room (floor underneath and a thin pillar on top)
 
 const float WALL_H = 1.0f;
-const float TILE = 0.1f; // 16px de 160px en el atlas
+const float TILE = 0.1f; // 16px out of 160px in the atlas
 
 inline Vector4 Tile(int col, int fila) { return Vector4(col * TILE, fila * TILE, TILE, TILE); }
 
-// Centro de la casilla, a la altura de su suelo (Mazmorra/Alturas.hpp)
+// Centre of the tile, at the height of its floor (Mazmorra/Alturas.hpp)
 inline Vector3 GridToWorld(int x, int y) { return Vector3(x + 0.5f, alturas::Y(x, y), y + 0.5f); }
 
-// Bloque de base 1x1 centrado en el origen, desde y=0 hasta y=h. UV2.x = 1 en la tapa superior.
+// 1x1 base block centred on the origin, from y=0 to y=h. UV2.x = 1 on the top face.
 inline Ref<ArrayMesh> CrearBloque(float h, bool con_lados = true) {
 	PackedVector3Array v, n;
 	PackedVector2Array uv, uv2;
@@ -76,6 +76,7 @@ inline Ref<ArrayMesh> CrearBloque(float h, bool con_lados = true) {
 	return mesh;
 }
 
+// Unshaded transparent material for the overlays (reach, path, cursor)
 inline Ref<StandardMaterial3D> CrearMaterialOverlay(Color color, bool color_instancia = false) {
 	Ref<StandardMaterial3D> mat;
 	mat.instantiate();
@@ -88,6 +89,7 @@ inline Ref<StandardMaterial3D> CrearMaterialOverlay(Color color, bool color_inst
 	return mat;
 }
 
+// One MultiMesh for many copies of the same piece (floors, walls, overlay tiles): one draw call
 inline MultiMeshInstance3D* CrearMultiMesh(const String& nombre, Ref<Mesh> mesh, Ref<Material> mat, bool custom_data, bool colores = false) {
 	Ref<MultiMesh> mm;
 	mm.instantiate();
@@ -102,10 +104,12 @@ inline MultiMeshInstance3D* CrearMultiMesh(const String& nombre, Ref<Mesh> mesh,
 	return inst;
 }
 
+// Unique node name for a prop on a tile ("Cofre_4_7")
 inline String NombreProp(const String& tipo, int x, int y) {
 	return tipo + String("_") + String::num_int64(x) + String("_") + String::num_int64(y);
 }
 
+// A mesh child with its material, position and scale
 inline MeshInstance3D* CrearPieza(Node* padre, const String& nombre, Ref<Mesh> mesh, Ref<Material> mat, Vector3 pos, Vector3 escala) {
 	MeshInstance3D* m = memnew(MeshInstance3D);
 	m->set_name(nombre);
@@ -117,6 +121,7 @@ inline MeshInstance3D* CrearPieza(Node* padre, const String& nombre, Ref<Mesh> m
 	return m;
 }
 
+// Square pixel particles (dust, fire, sparks)
 inline CPUParticles3D* CrearParticulas(Node* padre, const String& nombre, int cantidad, float vida, float tam, Color color, Vector3 caja, Vector3 gravedad, float vel_min, float vel_max, float dispersion) {
 	CPUParticles3D* p = memnew(CPUParticles3D);
 	p->set_name(nombre);
@@ -155,6 +160,7 @@ inline CPUParticles3D* CrearParticulas(Node* padre, const String& nombre, int ca
 	return p;
 }
 
+// A billboard sprite cut from the tileset atlas
 inline Sprite3D* CrearSpriteTile(Ref<Texture2D> atlas, Node* padre, const String& nombre, Rect2 region, float pixel, Vector3 pos, bool sombreado) {
 	Sprite3D* sp = memnew(Sprite3D);
 	sp->set_name(nombre);

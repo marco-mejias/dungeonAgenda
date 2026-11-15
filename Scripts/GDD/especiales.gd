@@ -1,12 +1,12 @@
 extends Node
 
-# Especiales (autoload): los objetos de broma que no caben en los efectos normales y la gallina.
-#   - Poción "¿Qué podría malir sal?": d6 -> pollo / vida al máximo y +3 fuerza / explosión.
-#   - Botón de "¡PÁNICO!": teletransporte a una casilla lejana; los demás pierden cordura.
-#   - Gallina lanza-huevos (habilidad, 3 PA): aliada que al empezar el turno enemigo lanza un huevo
-#     (3 de daño y ciega: -3 a su próxima tirada). Cada 5 disparos quiere grano de oro; sin él, a
-#     veces el huevo es para quien la invocó.
-# El resto (chancleta, cartón, navaja, cubo, máscara) está en C++ (Reglas.hpp, EnemyManager...).
+# Especiales (autoload): the joke items that don't fit in the normal effects, and the chicken.
+#   - "What could possibly go wrong?" potion: d6 -> chicken / full health and +3 strength / boom.
+#   - "PANIC!" button: teleport to a far tile; the others lose sanity.
+#   - Egg-throwing chicken (ability, 3 PA): an ally that throws an egg when the enemy turn starts
+#     (3 damage and blinds: -3 to their next roll). Every 5 shots it wants a golden grain; without
+#     it, sometimes the egg is for whoever summoned it.
+# The rest (flip-flop, cardboard, knife, bucket, mask) lives in C++ (Reglas.hpp, EnemyManager...).
 
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
 const RUTA_PM := "/root/Main/PartyManager"
@@ -26,16 +26,18 @@ func _dm() -> Node:
 func _pm() -> Node:
 	return get_node_or_null(RUTA_PM)
 
+# Consumables whose effect lives here instead of in their Efecto list
 func es_especial(id: String) -> bool:
 	return id in ["pocion_malir_sal", "boton_panico", "elixir_ingenio"]
 
-# ---------------- Utilidades ----------------
+# ---------------- Utilities ----------------
 
 func _manhattan(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 
+# World position of a tile's centre
 func _mundo(c: Vector2i) -> Vector3:
-	# A la altura del suelo de la casilla (salas altas y escalones: Mazmorra/Alturas.hpp)
+	# At the height of the tile's floor (high rooms and steps: Mazmorra/Alturas.hpp)
 	var y := 0.0
 	if Engine.has_meta("alturas"):
 		var lado := int(Engine.get_meta("alturas_lado", 0))
@@ -44,7 +46,7 @@ func _mundo(c: Vector2i) -> Vector3:
 			y = a[c.x * lado + c.y] * 0.2
 	return Vector3(c.x + 0.5, y, c.y + 0.5)
 
-## Texto que sube y se desvanece sobre una casilla del mapa
+## Text that rises and fades over a map tile
 func texto(pos: Vector3, t: String, color: Color, tam: int = 40) -> void:
 	var dm := _dm()
 	if not dm:
@@ -65,6 +67,7 @@ func texto(pos: Vector3, t: String, color: Color, tam: int = 40) -> void:
 	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.4)
 	tw.tween_callback(l.queue_free)
 
+# Heroes alive and on the map
 func _heroes_en_mapa() -> Array:
 	var out := []
 	var pm := _pm()
@@ -76,6 +79,7 @@ func _heroes_en_mapa() -> Array:
 		out.append(h)
 	return out
 
+# Living enemies on the map
 func _enemigos() -> Array:
 	var out := []
 	var dm := _dm()
@@ -87,27 +91,29 @@ func _enemigos() -> Array:
 			out.append(e)
 	return out
 
+# Damage to an enemy from a joke item or the chicken (wakes it up; if it dies, loot and XP)
 func _danar_enemigo(e: Node, dano: int) -> void:
 	var hp := int(e.get_meta("hp_actual", 1)) - dano
 	e.set_meta("hp_actual", hp)
 	e.set_meta("in_combat", true)
-	# El número lo enseñan los Indicadores (corazón sobre la cabeza)
+	# The number is shown by the Indicadores (heart over the head)
 	if hp <= 0:
-		Indicadores.revisar(e) # antes de que desaparezca
-		# XP para quien invocó a la gallina
+		Indicadores.revisar(e) # Before it disappears
+		# XP for whoever summoned the chicken
 		var inv: Node = _pm().get_node_or_null(str(gallina.get_meta("invocador", ""))) if is_instance_valid(gallina) else null
 		Progreso.enemigo_muerto(e, inv)
 		var p: Vector2i = e.get_meta("grid_pos")
 		_dm().call("EliminarEnemigo", p.x, p.y)
 
+# Shows a roll on the combat die
 func _dado(numero: int, bueno: bool, sello: String, detalle: String) -> void:
 	var d := get_node_or_null("/root/DadoCombate")
 	if d:
 		d.tirar(numero, 1 if bueno else 0, sello, detalle)
 
-# ---------------- Consumibles ----------------
+# ---------------- Consumables ----------------
 
-## Devuelve "" si se ha usado (el PartyManager quita el objeto) o el motivo por el que no.
+## Returns "" if it was used (the PartyManager removes the item) or the reason it wasn't.
 func usar(h: Node, id: String) -> String:
 	match id:
 		"pocion_malir_sal": return _pocion(h)
@@ -117,12 +123,13 @@ func usar(h: Node, id: String) -> String:
 			return ""
 	return "No se puede usar"
 
+# "What could possibly go wrong?" potion: roll a d6 and pray
 func _pocion(h: Node) -> String:
 	var d6 := randi_range(1, 6)
 	var pos: Vector3 = _mundo(h.get_meta("grid_pos")) if h.has_meta("grid_pos") else Vector3.ZERO
 	var nombre := str(h.get_meta("nombre_display", h.name))
 	if d6 <= 2:
-		# Pollo: pierde lo que le queda del turno (vuelve a ser persona al empezar el día)
+		# Chicken: loses whatever is left of the turn (turns back into a person when the day starts)
 		h.set_meta("es_pollo", true)
 		h.set_meta("pa_actual", 0)
 		_dado(d6, false, "¡POLLO!", "%s: d6 %d -> te conviertes en pollo" % [nombre, d6])
@@ -144,6 +151,7 @@ func _pocion(h: Node) -> String:
 		_explosion(h)
 	return ""
 
+# The potion's worst outcome: damage to everyone around the hero
 func _explosion(h: Node) -> void:
 	if not h.has_meta("grid_pos"):
 		return
@@ -161,6 +169,7 @@ func _explosion(h: Node) -> void:
 		if _manhattan(o.get_meta("grid_pos"), centro) <= RADIO_EXPLOSION:
 			pm.call("RecibirDano", DANO_EXPLOSION, o)
 
+# Panic button: teleport far away; the rest of the party loses sanity
 func _boton(h: Node) -> String:
 	var dm := _dm()
 	var pm := _pm()
@@ -184,7 +193,7 @@ func _boton(h: Node) -> String:
 		return "El botón no responde"
 	dm.call("CalcularMapaDeLuces")
 	texto(_mundo(destino), "¡PÁNICO!", Color(1, 0.35, 0.3), 52)
-	# El odio eterno del grupo
+	# The eternal hatred of the party
 	for o in _heroes_en_mapa():
 		if o != h:
 			o.set_meta("sanidad_actual", maxi(0, int(o.get_meta("sanidad_actual", 0)) - 5))
@@ -194,9 +203,9 @@ func _boton(h: Node) -> String:
 		feel.destello_pantalla(Color(1, 0.2, 0.2, 0.5), 0.3)
 	return ""
 
-# ---------------- La gallina ----------------
+# ---------------- The chicken ----------------
 
-## Habilidad: invoca a la gallina junto al héroe (3 PA; solo una a la vez)
+## Ability: summons the chicken next to the hero (3 PA; only one at a time)
 func invocar_gallina(h: Node) -> String:
 	var dm := _dm()
 	var pm := _pm()
@@ -226,7 +235,7 @@ func invocar_gallina(h: Node) -> String:
 	gallina.set_meta("invocador", str(h.name))
 	gallina.set_meta("disparos", 0)
 	var cuerpo := Sprite3D.new()
-	cuerpo.name = "CuerpoGallina" # no "Cuerpo": así el renderer no la toma por una ficha
+	cuerpo.name = "CuerpoGallina" # Not "Cuerpo": that way the renderer doesn't take it for a token
 	cuerpo.texture = HOJA_GALLINA
 	cuerpo.hframes = 4
 	cuerpo.pixel_size = 0.055
@@ -240,7 +249,7 @@ func invocar_gallina(h: Node) -> String:
 	texto(gallina.position, "¡Cloc cloc!", Color(1, 0.85, 0.4))
 	return ""
 
-## Al empezar el turno enemigo: un huevo al enemigo más cercano a la vista. Devuelve cuánto dura.
+## When the enemy turn starts: an egg at the closest enemy in view. Returns how long it takes.
 func turno_gallina() -> float:
 	if not is_instance_valid(gallina):
 		return 0.0
@@ -260,7 +269,7 @@ func turno_gallina() -> float:
 	var disparos := int(gallina.get_meta("disparos", 0)) + 1
 	gallina.set_meta("disparos", disparos)
 	if disparos % 5 == 0:
-		# Quiere su grano de oro
+		# It wants its golden grain
 		var invocador: Node = pm.get_node_or_null(str(gallina.get_meta("invocador")))
 		if invocador:
 			var inv: Array = pm.call("DescribirInventario", str(invocador.name))
@@ -274,6 +283,7 @@ func turno_gallina() -> float:
 				return _lanzar_huevo(invocador, true)
 	return _lanzar_huevo(objetivo)
 
+# An egg flies in an arc to 'objetivo': 3 damage and blinded. Returns how long the flight takes
 func _lanzar_huevo(objetivo: Node, a_un_heroe: bool = false) -> float:
 	var dm := _dm()
 	var huevo := MeshInstance3D.new()
@@ -287,7 +297,7 @@ func _lanzar_huevo(objetivo: Node, a_un_heroe: bool = false) -> float:
 	huevo.material_override = mat
 	huevo.position = gallina.position + Vector3(0, 0.6, 0)
 	dm.add_child(huevo)
-	# La cámara encuadra a la gallina y a su víctima (el EnemyManager lo suelta al seguir)
+	# The camera frames the chicken and its victim (the EnemyManager releases it when carrying on)
 	var cam := dm.get_node_or_null("Camera3D")
 	if cam and objetivo is Node:
 		var ficha_obj: Node = objetivo if objetivo is Node3D else dm.get_node_or_null(NodePath(str(objetivo.name)))
@@ -311,7 +321,7 @@ func _process(_dt: float) -> void:
 		gallina = null
 		return
 	var pm := _pm()
-	# Al bajar de piso la gallina se queda atrás
+	# When going down a floor the chicken stays behind
 	if pm and int(pm.get_meta("piso_actual", 1)) != piso_gallina:
 		gallina.queue_free()
 		gallina = null

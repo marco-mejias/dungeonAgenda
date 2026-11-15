@@ -2,15 +2,15 @@
 class_name BaseDatos
 extends RefCounted
 
-# Lectura y validación de los datos del juego (Data/...). Lo usan el Catalogo (en partida)
-# y el panel "Base de datos" del editor, así los dos avisan de los mismos errores.
+# Reading and validating the game data (Data/...). Used by the Catalogo (in game) and the editor
+# "Base de datos" panel, so both warn about the same errors.
 
 const CARPETA_OBJETOS := "res://Data/Objetos"
 const CARPETA_BOTIN := "res://Data/Botin"
 const CARPETA_ENEMIGOS := "res://Data/Enemigos"
 
-# Todos los .tres de una carpeta y sus subcarpetas.
-# desde_disco: vuelve a leerlos aunque ya estén en memoria (para editarlos con el juego en marcha)
+# Every .tres in a folder and its subfolders. desde_disco: reads them again even if they're already
+# in memory (to edit them with the game running)
 static func cargar_carpeta(ruta: String, desde_disco: bool = false) -> Array:
 	var salida: Array = []
 	var dir := DirAccess.open(ruta)
@@ -19,7 +19,7 @@ static func cargar_carpeta(ruta: String, desde_disco: bool = false) -> Array:
 	for sub in dir.get_directories():
 		salida.append_array(cargar_carpeta(ruta.path_join(sub), desde_disco))
 	for f in dir.get_files():
-		# En un juego exportado los .tres aparecen como .tres.remap
+		# In an exported game the .tres show up as .tres.remap
 		var nombre := f.trim_suffix(".remap")
 		if nombre.get_extension() in ["tres", "res"]:
 			var modo := ResourceLoader.CACHE_MODE_REPLACE_DEEP if desde_disco else ResourceLoader.CACHE_MODE_REUSE
@@ -28,7 +28,8 @@ static func cargar_carpeta(ruta: String, desde_disco: bool = false) -> Array:
 				salida.append(r)
 	return salida
 
-# Lee las tres carpetas: {objetos: id -> ObjetoData, tablas: id -> TablaBotin, enemigos: id -> EnemigoData, avisos}
+# Reads the three folders: {objetos: id -> ObjetoData, tablas: id -> TablaBotin, enemigos: id ->
+# EnemigoData, avisos}
 static func cargar_todo(desde_disco: bool = false) -> Dictionary:
 	var objetos := {}
 	var tablas := {}
@@ -54,6 +55,7 @@ static func cargar_todo(desde_disco: bool = false) -> Dictionary:
 	avisos.append_array(validar(objetos, tablas, enemigos))
 	return {"objetos": objetos, "tablas": tablas, "enemigos": enemigos, "avisos": avisos}
 
+# Checks the data for mistakes (missing icons, broken ids, empty tables...) and returns the warnings
 static func validar(objetos: Dictionary, tablas: Dictionary, enemigos: Dictionary) -> PackedStringArray:
 	var avisos: PackedStringArray = []
 	for id in objetos:

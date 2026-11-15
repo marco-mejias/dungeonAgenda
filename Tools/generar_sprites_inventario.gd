@@ -1,12 +1,12 @@
 extends SceneTree
-# Sprites de la mochila (pixel art dibujado con rejillas de caracteres):
-#   - Assets/Sprites/Puesto/<id>.png: cómo se ve cada objeto PUESTO sobre el héroe. Son capas de
-#     16x16 alineadas con el sprite del héroe (los cuatro comparten silueta: cabeza arriba, mano
-#     derecha en la columna 13, mano izquierda en la 2).
-#   - Assets/UI/Iconos/<stat>.png: iconos de la barra de stats (vida, PA, cordura...).
-#   godot --headless --path . -s res://Tools/generar_sprites_inventario.gd            (dibuja)
-#   godot --headless --path . -s res://Tools/generar_sprites_inventario.gd -- asignar (tras importar:
-#     pone cada sprite en el campo 'sprite_puesto' de su .tres)
+# Backpack sprites (pixel art drawn with character grids):
+#   - Assets/Sprites/Puesto/<id>.png: how each item looks WORN on the hero. They're 16x16
+#     layers aligned with the hero sprite (all four share a silhouette: head up, right hand on
+#     column 13, left hand on column 2).
+#   - Assets/UI/Iconos/<stat>.png: stats bar icons (health, PA, sanity...).
+#   godot --headless --path . -s res://Tools/generar_sprites_inventario.gd            (draws)
+#   godot --headless --path . -s res://Tools/generar_sprites_inventario.gd -- asignar (after
+#     importing: puts every sprite in the 'sprite_puesto' field of its .tres)
 
 const PALETA := {
 	"#": Color(0.08, 0.06, 0.1), "w": Color(0.92, 0.93, 0.95), "s": Color(0.62, 0.66, 0.74),
@@ -17,7 +17,7 @@ const PALETA := {
 	"y": Color(1.0, 0.86, 0.3), "e": Color(0.44, 0.60, 0.27), "k": Color(0.85, 0.84, 0.80),
 }
 
-# Fila -> texto. Las filas que faltan quedan transparentes.
+# Row -> text. Missing rows stay transparent.
 const PUESTOS := {
 	"espada_corta": {1: ".............#..", 2: "............#w#.", 3: "............#w#.", 4: "............#w#.",
 		5: "............#w#.", 6: "............#s#.", 7: "............#s#.", 8: "............#s#.",
@@ -50,7 +50,7 @@ const PUESTOS := {
 		10: "#bn#............", 11: "#bn#............", 12: "#bb#............", 13: "###............."},
 }
 
-# Iconos de 12x12 de la barra de stats
+# 12x12 icons for the stats bar
 const ICONOS := {
 	"vida": ["............", "..##....##..", ".#rr#..#rr#.", "#rrrr##rrrr#", "#rrrrrrrrrr#", "#rrrrrrrrrr#",
 		".#rrrrrrrr#.", "..#rrrrrr#..", "...#rrrr#...", "....#rr#....", ".....##.....", "............"],

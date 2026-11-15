@@ -1,18 +1,17 @@
 extends PanelContainer
 
-# Bocadillo de un personaje (nodo "Prevision" del HUD). Sale al pasar el ratón:
-#   - sobre un héroe o un enemigo del mapa (encima de su cabeza)
-#   - sobre su retrato en la barra de arriba (debajo del retrato)
-# Corto por defecto: nombre, vida y lo justo (héroe: sus PA; enemigo: fuerza y defensa).
-# Manteniendo Mayús salen todas sus stats.
-# Si es un enemigo al que el héroe activo puede atacar, en vez de eso: solo las stats que toca el
-# golpe ("Vida 10 → 5") y la probabilidad de acertar.
+# A character's bubble (the HUD "Prevision" node). It shows on hover:
+#   - over a hero or an enemy on the map (above their head)
+#   - over their portrait in the top bar (under the portrait)
+# Short by default: name, health and the bare minimum (hero: their PA; enemy: strength and
+# defense). Holding Shift shows all their stats. If it's an enemy the active hero can attack,
+# instead: only the stats the hit touches ("Vida 10 → 5") and the chance to hit.
 
 const STATS := ["fuerza", "defensa", "magia", "velocidad", "suerte", "radio_luz"]
 const STATS_ENEMIGO_CORTO := ["fuerza", "defensa"]
 const RUTA_DM := "/root/Main/ContenedorMapa/SubViewport/DungeonManager"
-# Aspecto de grimorio (como el HUD): placa de cuero con filete dorado, texto hueso, títulos en IM Fell.
-# Grande a propósito: los números de los iconos tienen que leerse de un vistazo
+# Grimoire look (like the HUD): leather plate with a golden trim, bone text, titles in IM Fell. Big
+# on purpose: the icon numbers have to read at a glance
 const FUENTE_TITULO := preload("res://Assets/Fonts/imfell/grimorio_titulo.tres")
 const FUENTE_FUERTE := preload("res://Assets/Fonts/alegreya/alegreya_fuerte.tres")
 const C_HUESO := Color(0.93, 0.87, 0.70)
@@ -25,8 +24,8 @@ const TAM_ICONO := 26.0
 const SOMBRA := 4
 
 var titulo: Label
-var filas: VBoxContainer   # modo ataque: stats tocadas
-var rejilla: GridContainer # modo stats
+var filas: VBoxContainer   # Attack mode: stats touched
+var rejilla: GridContainer # Stats mode
 var acierto: Label
 var aviso: Label
 var pista: Label
@@ -68,6 +67,7 @@ func _ready() -> void:
 	pista = _label(v, 12, C_SUAVE)
 	pista.text = "Mayús: todas sus stats"
 
+# Outlined label inside the card
 func _label(padre: Control, tam: int, color: Color) -> Label:
 	var l := Label.new()
 	l.add_theme_font_size_override("font_size", tam)
@@ -78,6 +78,7 @@ func _label(padre: Control, tam: int, color: Color) -> Label:
 	padre.add_child(l)
 	return l
 
+# Pixel-sharp icon
 func _icono(tex: Texture2D, tam: float) -> TextureRect:
 	var ic := TextureRect.new()
 	ic.texture = tex
@@ -88,7 +89,7 @@ func _icono(tex: Texture2D, tam: float) -> TextureRect:
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return ic
 
-# ¿A quién señala el ratón? [nodo con las stats, ficha 3D o null, slot de la barra o null]
+# Who is the mouse pointing at? [node with the stats, 3D token or null, bar slot or null]
 func _objetivo(dm: Node) -> Array:
 	var hud := get_parent().get_node_or_null("HUD")
 	var slot = hud.get_meta("slot_hover") if hud and hud.has_meta("slot_hover") else null
@@ -109,6 +110,7 @@ func _objetivo(dm: Node) -> Array:
 				return [h, _ficha(dm, h), null]
 	return [null, null, null]
 
+# The 3D token of a character (enemies already are one)
 func _ficha(dm: Node, p: Node) -> Node3D:
 	return p if p is Node3D else dm.get_node_or_null(NodePath(str(p.name))) as Node3D
 
@@ -119,14 +121,14 @@ func _process(_delta: float) -> void:
 		return
 	var cam := dm.get_node_or_null("Camera3D")
 	if cam and cam.has_meta("encuadre"):
-		visible = false # durante un golpe o una habilidad no tapa los efectos
+		visible = false # During a hit or an ability it doesn't cover the effects
 		return
 	var o := _objetivo(dm)
 	var p = o[0]
 	if p == null:
 		visible = false
 		return
-	# Enemigo al alcance del héroe activo: previsión del golpe
+	# Enemy in reach of the active hero: hit preview
 	var d: Dictionary = {}
 	if p is Node3D and str(p.name).begins_with("Enemy_") and not dm.get_meta("turno_enemigo", false):
 		var c: Vector2i = p.get_meta("grid_pos")
@@ -142,6 +144,7 @@ func _process(_delta: float) -> void:
 	size = get_combined_minimum_size()
 	_colocar(dm, o[1], o[2])
 
+# Attack preview: the target's stats before -> after the hit, the reasons and the chance to hit
 func _modo_ataque(d: Dictionary) -> void:
 	titulo.text = str(d["defensor"]).to_upper()
 	rejilla.visible = false
@@ -150,7 +153,7 @@ func _modo_ataque(d: Dictionary) -> void:
 	acierto.text = "%d%% de acertar" % ceili(float(d.get("prob_acierto", 100)))
 	pista.visible = false
 	lbl_estados.visible = false
-	# Por qué: flanqueo, altura, cobertura, ayuda...
+	# Why: flanking, height, cover, help...
 	var r: PackedStringArray = d.get("razones", PackedStringArray())
 	var v := int(d.get("ventaja", 0))
 	razones.visible = not r.is_empty()
@@ -170,7 +173,7 @@ func _modo_ataque(d: Dictionary) -> void:
 		aviso.text = ""
 	aviso.visible = aviso.text != ""
 
-# Sus stats, como el bocadillo del retrato: vida arriba y una rejilla de icono + valor
+# Their stats, like the portrait bubble: health on top and a grid of icon + value
 func _modo_stats(p: Node) -> void:
 	titulo.text = str(p.get_meta("nombre_display", p.name)).to_upper()
 	filas.visible = true
@@ -178,12 +181,12 @@ func _modo_stats(p: Node) -> void:
 	acierto.visible = false
 	aviso.visible = false
 	razones.visible = false
-	# Sus estados (ardiendo, aturdido...)
+	# Their states (ardiendo, aturdido...)
 	var est: Dictionary = Estados.de(p)
 	var partes := []
 	for e in est:
 		partes.append("%s %d" % [Estados.nombre(e), int(est[e]["dias"])])
-	# Sigilo: qué clase de guardia es y si os ha visto
+	# Stealth: what kind of guard it is and whether it has seen you
 	if str(p.name).begins_with("Enemy_") and p.has_meta("vigilancia"):
 		var tipo_g: String = Sigilo.NOMBRES.get(Sigilo.tipo(p), "")
 		partes.push_front(tipo_g + (" · os ha visto" if p.get_meta("in_combat", false) else " · no os ha visto"))
@@ -225,7 +228,7 @@ func _modo_stats(p: Node) -> void:
 		l.text = str(par[1])
 		rejilla.add_child(h)
 
-# Encima de la cabeza (mapa) o debajo del retrato (barra), siempre dentro de la pantalla
+# Above the head (map) or under the portrait (bar), always inside the screen
 func _colocar(dm: Node, ficha: Node3D, slot) -> void:
 	var pantalla := get_viewport_rect().size
 	var pos := Vector2.ZERO
@@ -240,7 +243,7 @@ func _colocar(dm: Node, ficha: Node3D, slot) -> void:
 			pos = p + Vector2(24, -size.y - 8)
 	position = pos.clamp(Vector2(8, 8), pantalla - size - Vector2(8, 8))
 
-# Una stat: icono + "Vida 10 → 5" (rojo si baja, verde si sube); la vida lleva su barra
+# One stat: icon + "Vida 10 → 5" (red if it drops, green if it rises); health carries its bar
 func _fila(s: Dictionary) -> Control:
 	var stat := str(s["stat"])
 	var antes := int(s["actual"])
@@ -269,7 +272,7 @@ func _fila(s: Dictionary) -> Control:
 		caja.add_child(_barras(int(s["max"]), antes, despues))
 	return caja
 
-# Vida: fondo = vida actual, encima = lo que le quedará
+# Health: background = current health, on top = what will be left
 func _barras(maximo: int, antes: int, despues: int) -> Control:
 	var barras := Control.new()
 	barras.custom_minimum_size = Vector2(200, 7)

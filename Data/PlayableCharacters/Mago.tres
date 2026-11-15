@@ -13,7 +13,7 @@
 [resource]
 script = ExtResource("1_j0w5w")
 nombre_display = "Vivi Owl-nittier"
-retrato_path = "uid://di2242yca8rwu"
+retrato_path = ""
 fuerza = 3
 magia = 8
 ruta_cuerpo = "res://Characters/mago.tscn"

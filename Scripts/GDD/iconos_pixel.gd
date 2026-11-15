@@ -1,8 +1,8 @@
 class_name IconosPixel
 extends RefCounted
 
-# Iconos pixel art dibujados a partir de rejillas de caracteres (menú táctico, cursor...).
-#   '.' transparente  '#' contorno  'w' claro  'g' oro  'y' amarillo  'r' rojo  'b' azul
+# Pixel art icons drawn from character grids (cursor, HUD...).
+#   '.' transparent  '#' outline  'w' light  'g' gold  'y' yellow  'r' red  'b' blue
 
 const PALETA := {
 	"#": Color(0.05, 0.04, 0.08),
@@ -113,6 +113,7 @@ const DIBUJOS := {
 	],
 }
 
+# Draws one of the DIBUJOS grids into an Image ('escala' real pixels per art pixel)
 static func imagen(nombre: String, escala: int = 1) -> Image:
 	var filas: Array = DIBUJOS.get(nombre, DIBUJOS["flecha"])
 	var alto := filas.size()
@@ -128,5 +129,6 @@ static func imagen(nombre: String, escala: int = 1) -> Image:
 			img.fill_rect(Rect2i(x * escala, y * escala, escala, escala), PALETA.get(c, Color.MAGENTA))
 	return img
 
+# Same, as a texture
 static func textura(nombre: String, escala: int = 1) -> ImageTexture:
 	return ImageTexture.create_from_image(imagen(nombre, escala))
