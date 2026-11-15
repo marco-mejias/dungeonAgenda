@@ -1,3 +1,4 @@
+
 # DUNGEON AGENDA ⚔️ - Tactical C++ Dungeon Crawler made in Godot / Jenova Framework
 
 A tactical dungeon crawler where you lead a party of four heroes down a procedural dungeon, one floor at a time.
@@ -44,6 +45,8 @@ Combat is turn-based with action points and a d20 roll for every attack, shown o
 Positioning matters: **flanking** and **height** give advantage, **cover** gives disadvantage to ranged attacks, moving away from an enemy gives it an **attack of opportunity**, and pushes against walls or off high rooms stun and knock down.
 Enemies act by AI profile (tank, melee, caster, coward) using BFS distance fields, and they come in **squads**: wake one up and the whole camp joins the fight.
 
+<img width="426" height="240" alt="Video Project 8" src="https://github.com/user-attachments/assets/bd0c00cc-ef64-4b25-92bb-8ed1a0900e9c" />
+
 ### 4. Heroes, Progression & Items
 Four classes with their own starting ability. Killing grants XP; on level up you **draft 1 of 3 abilities**, and repeated passives stack into combos.
 Each hero has an inventory with weight and equipment slots that change their stats and their sprite. The backpack is a physical sack where items fall, stack and can be thrown, and everything is data-driven: items, enemies, loot tables, events and abilities are `.tres` resources, editable from a custom **database panel** inside the editor.
@@ -52,6 +55,8 @@ Survival is still there: hunger, sanity, status effects (burning, bleeding, stun
 ### 5. UI & Game Feel
 The HUD is a dark grimoire made of loose leather pieces: the hero plate, the hand of ability cards, the belt of consumables... Everything reacts to the mouse, damage shows as "ghost health", and the bottom slides away when an event opens.
 Hit stop, screen shake, zoom punches, floating indicators and loot flying to the hero card. The world uses a PS1-style shader with vertex snapping, affine textures, per-pixel line of sight with cone-shaped shadows, and a dithered fog of war.
+
+<img width="1920" height="1036" alt="cppDungeons4 6 (DEBUG) 2026-11-15 23-53-01" src="https://github.com/user-attachments/assets/5c4ef71f-a9ba-4403-bf1e-6334a2ae4a1f" />
 
 ---
 
