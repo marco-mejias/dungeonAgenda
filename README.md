@@ -1,83 +1,120 @@
-# DUNGEON AGENDA ⚔️ - Tactical RPG & C++ Framework
+# DUNGEON AGENDA ⚔️ - Tactical C++ Dungeon Crawler made in Godot / Jenova Framework
 
-A top-down 2D action and adventure CRPG built in Godot 4.6 utilizing a high-performance C++ backend alongside GDScript. Where every decision counts! Control the 4 members of your party and descend into an (almost) infinite procedural dungeon. But be careful: the dungeon is plagued with monsters, treasures, traps, and hundreds of terrifying creatures. Gather resources, sharpen your weapons, manage your party's sanity, and take a nap from time to time to unravel the mysteries and make your way out.
+A tactical dungeon crawler where you lead a party of four heroes down a procedural dungeon, one floor at a time.
+Every floor is built like a cave from a souls-like: a safe campfire at the entrance, enemy camps guarding their chests, and a locked boss room at the back with the stairs behind it. Explore freely, sneak past the guards reading their vision cones, or start a fight on your terms and roll the d20.
+The core of the game (dungeon generation, vision, pathfinding, combat, inventory and rendering) is written in C++ through the **Jenova Framework**, which runs native C++ scripts inside Godot 4.7, while the higher level systems (stealth, tactics, progression, UI) are written in GDScript. This project was a deep dive into procedural generation, tactical systems, UI/UX and performance.
 
-The game is based in survival Point and Click games like 60 Seconds or Reigns, while offering a twist inspired in classical RPG games.
-
-## 🛠️ Technologies 
-
-* **Game Engine:** Godot Engine 4.6
-* **Languages:** C++ (Core Logic) & GDScript (Input/High-level routing)
-* **Framework:** Jenova SDK (Native C++ integration for Godot)
-* **Version Control:** Git & GitHub
-
----
+### The GIFs look a bit laggy due to compression techniques, sorry for the inconvenience
 
 https://github.com/user-attachments/assets/a42db60c-42de-4637-9d8c-c5b1b3250283
 
-## 🧩 Core Gameplay Mechanics
+<!-- Add a gameplay GIF here: drag the file into a GitHub issue or the README editor and paste the link -->
 
-Dungeon Agenda blends tactical grid-based exploration with intense survival management.
+## 🛠️ Technologies
 
-### 1. Tactical Grid Movement & Exploration
-The game relies on a turn-based procedural grid. Characters navigate the dungeon using an action-point system based on their Speed stat. The map is covered in a dense *Fog of War*, requiring players to strategically position their characters to reveal paths, avoid traps, and find the exit stairs.
-
-### 2. Deep Survival System
-Time is your worst enemy. As turns pass, characters consume Food. If a character starves, they die permanently. Furthermore, characters suffer from Isolation Sanity Loss—if a party member ends their turn too far from the rest of the group, their sanity drops drastically, severely halving their stats and making subsequent events much harder to overcome.
-
-### 3. Risk/Reward Interactive Events
-Stepping on specific dungeon tiles triggers narrative events. The player must choose an action that relies on a specific character stat (Strength, Magic, Luck...). The system calculates a success probability and performs a visual "Dice Roll". Success grants loot or heals, while failure heavily penalizes the character's sanity or HP. NOTE: The game has visual squares indicating where the events are. This was for debugging purposes, but shall not be included in the final product.
-
-### 4. The Campfire
-Upon successfully escaping a floor with the surviving party members, players enter the Campfire phase. Here, the party rests, slightly recovers HP, Sanity, and Food, and prepares for the generation of the next, more difficult floor.
+* Godot Engine 4.7
+* Jenova Framework (C++ scripting for Godot)
+* C++ / MSVC
+* GDScript
+* Godot Shading Language
+* GitHub
 
 ---
 
-## ⚙️ Engine Architecture & C++ Systems
+## 💡 Core Elements
 
-### 1. Modular Manager Pattern
-The core game loop is completely decoupled, dividing responsibilities into highly specialized C++ singletons:
-* **DungeonManager (Environment & Navigation):** The backbone of the procedural world. It computes grid generation, manages the `AStarGrid2D` pathfinding, and executes complex Raycasting algorithms to calculate strict Line-of-Sight (LoS) for the Fog of War in real-time.
-* **PartyManager (State & Logic):** The "Brain" of the game. Entirely agnostic to the visual representation, this module tracks character stats, inventory, survival metrics (hunger/sanity), and turn flow. It acts as the single source of truth for the game state.
-* **HUDManager (UI & Feedback):** A purely reactive visual director. It listens to state changes from the PartyManager and updates the interface smoothly using Godot's Tween engine, maintaining a clean separation between data and presentation.
+<!-- Add a GIF of exploring + the campfire here -->
 
-### 2. Hybrid Codebase (C++ & GDScript)
-The project utilizes a "best of both worlds" approach. Computationally heavy tasks (like procedural algorithms, visibility checks, and deep state management) are written in **C++** for maximum optimization. Meanwhile, **GDScript** is used exclusively as a lightweight router for handling user input and high-level scene composition, keeping iteration times fast. Although, the decision to use C++ was at first purely for learning purposes.
+I designed the game and built its systems, art direction, UI and feel. I would like to highlight:
 
-### 3. Data-Driven Design
-Content creation is highly flexible thanks to a data-driven approach using Godot's `Resource` system (`.tres` files). Characters, items, and narrative events are defined as external data objects. This allows designers to add new encounters, tweak enemy stats, or create new loot without ever needing to touch or recompile the C++ source code.
+### 1. Procedural Dungeons with Structure
+Every floor is generated from scratch: big rooms in L and T shapes, corridors 1 to 3 tiles wide, loops, columns, two heights joined by steps, doors and decoration.
+On top of the layout, a zoning pass gives each room a role: the **entrance** with a campfire to rest, **camps** with an enemy squad around a chest, and the **boss room**, sealed with a locked door. The key is always in the deepest camp's chest, and the generator checks that every room stays reachable (and that the boss room is only reachable with the key) before accepting the floor.
+Days count: the longer you take, the more the dungeon stirs and sends reinforcements to the camps still standing. Rush for the boss or clear every zone?
 
-### 4. Robust Input & Event Routing
-The engine employs a sophisticated input interception layer to manage the overlap between the World and the User Interface. UI components act as shields: clicks on HUD elements are consumed instantly, preventing the underlying C++ pathfinding algorithms from triggering invalid actions. This guarantees a fluid, bug-free tactical experience.
+### 2. Stealth & Vision Cones
+Every enemy looks in one direction and has a role: **sentinels** never turn, **lookouts** turn every round (you can see their next cone as a ghost), and **sleepers** only wake up if you end next to them.
+Their sight is drawn on the floor as a soft pulsing light cone, cut by walls. The cone is not just a visual: detection uses **the same rays** that draw it, so if your tile is inside the light, they see you. Heroes always see further than enemies, so you spot them first.
+When a hero sees an unaware enemy the game enters **stealth mode**: turns and action points like in combat, but enemies only keep watch. You can hide against walls, put out your torch, and strike from behind for a guaranteed critical, or let them spot you and fight.
+
+<!-- Add a GIF of the vision cones here -->
+
+### 3. Tactical Combat
+Combat is turn-based with action points and a d20 roll for every attack, shown on a small die over the attacker's head.
+Positioning matters: **flanking** and **height** give advantage, **cover** gives disadvantage to ranged attacks, moving away from an enemy gives it an **attack of opportunity**, and pushes against walls or off high rooms stun and knock down.
+Enemies act by AI profile (tank, melee, caster, coward) using BFS distance fields, and they come in **squads**: wake one up and the whole camp joins the fight.
+
+### 4. Heroes, Progression & Items
+Four classes with their own starting ability. Killing grants XP; on level up you **draft 1 of 3 abilities**, and repeated passives stack into combos.
+Each hero has an inventory with weight and equipment slots that change their stats and their sprite. The backpack is a physical sack where items fall, stack and can be thrown, and everything is data-driven: items, enemies, loot tables, events and abilities are `.tres` resources, editable from a custom **database panel** inside the editor.
+Survival is still there: hunger, sanity, status effects (burning, bleeding, stunned...) and narrative events resolved with a d20 roll on one of your stats.
+
+### 5. UI & Game Feel
+The HUD is a dark grimoire made of loose leather pieces: the hero plate, the hand of ability cards, the belt of consumables and a wax seal to end the turn. Everything reacts to the mouse, damage shows as "ghost health", and the bottom slides away when an event opens.
+On top sits a layer of juice: hit stop, screen shake, zoom punches, floating indicators and loot flying to the hero card. The world uses a PS1-style shader with vertex snapping, affine textures, per-pixel line of sight with cone-shaped shadows, and a dithered fog of war.
 
 ---
 
-## 🚀 Roadmap & Future Improvements
+## ⚙️ Game Architecture & Systems
 
-While the core exploration and survival loops are fully functional, the game is in a REEEEALLLYYYY early stage, working more like a technical demo. While the game keeps advancing, changes will be made like:
+The game is split into **C++ managers** (the core, with the heavy logic) and **GDScript autoloads** (the rules on top, easy to iterate).
 
-* **Advanced Procedural Generation and Movement:** Moving from random placement to structured algorithms (BSP Trees or Cellular Automata) for more organic room and corridor generation, while also improving the movement and vision algorythm.
-* **Equipment & Inventory Expansion:** While not very useful, the game features an inventory system, which will be a main mechanic in the feature for equipping specific gear (Weapons, Armor, Accessories). In the future, items will be actually useful and while in the campfire, characters will be able to exchange gear.
-* **Audio Engine Integration:** Connecting an event-driven audio system for UI clicks, dice rolls, footsteps, background music....
-* **MVC Arquitecture:** While the game feaures a core manager pattern, currently is a bit of spaghetti code...But another build is currently being made in paral·lel featuring a MVC model
-* **AND MORE OF EVERYTHING:** Actually the game features only 3 types of events and one item. While not very exciting, because the easy making architecture and incorporation, plans are made to add hundreds of them.
+**C++ (Jenova):**
+* **DungeonManager:** The brain. Owns the logic grid, generates the floor, processes clicks and coordinates the other managers.
+* **Mazmorra:** The pure-C++ dungeon model: generation, zones, vision and fog, line of sight. It knows nothing about Godot nodes.
+* **DungeonRenderer:** The "visual hand". Builds the 3D world with MultiMeshes and paints overlays, fog and bubbles, with no game logic.
+* **PathManager:** AStarGrid2D with the static walls loaded once per floor; dynamic entities are injected only while a path is computed.
+* **PartyManager / EnemyManager / CombatManager:** Turn flow, survival, the enemy turn and the animated attack sequences.
+* **CameraManager & InputManager:** Pseudo-isometric camera anchored to the active hero, combat framing, and mouse-to-tile picking.
+
+**GDScript autoloads:**
+* **Modo, Sigilo, Tactica, Zonas:** Exploring/stealth/combat modes, vision cones and detection, positioning rules and floor zones.
+* **Progreso, Estados, Especiales:** XP, levels and abilities, status effects and the more chaotic items.
+* **Catalogo, Estilo, Feel, Indicadores...:** Data loading, the UI theme, game feel and floating indicators.
+
+### Performance
+Calling C++ from GDScript in Jenova costs around 0.8 ms per call, so the design keeps that boundary thin: the static map is fetched once and versioned, line of sight is mirrored in GDScript (validated against the C++ version on every pair of tiles), and per-frame queries are cached.
+* HUD: from ~18 to ~75 FPS.
+* Vision cones: from ~460 ms to ~3 ms per rebuild.
+* Detection: from 14 ms to 1.3 ms.
+
+### Working with Jenova
+Jenova compiles C++ scripts attached to Godot nodes from inside the editor. Its rules shaped the code: the state of each entity lives in node metadata, shared logic lives in header-only modules (`Scripts/CPP/...`), and functions exposed to `call()` avoid parameter types that the bridge doesn't handle well.
+
+### Testing
+A playable smoke test (`Tools/test_play.gd`) launches the real game, plays through exploration, inventory, stealth, combat, events, level ups and a floor change, and checks around 180 conditions while saving screenshots.
 
 ---
 
-## 💻 Build & Installation Instructions
+## 🎮 Controls
+
+| Input | Action |
+|---|---|
+| Left click | Move / interact / attack |
+| Right click (hold) | Look around |
+| Q / E · Wheel | Rotate camera · Zoom |
+| 1 · 2 · R | Attack · Help an ally · Retreat |
+| H · T | Hide · Torch on/off |
+| Z X C V | Abilities |
+| 5 - 9 | Consumables |
+| 3 · 4 | End turn · End day / rest |
+| I · M | Backpack · Minimap |
+| Shift (hold) | Full stats on hover |
+| Esc · F11 | Pause · Fullscreen |
+
+---
+
+## 🚀 Build Instructions
 
 **Prerequisites:**
-* Godot Engine 4.x (Tested on 4.6)
-* Visual Studio Community (with Desktop development with C++ workload)
-* [Jenova SDK Plugin](https://jenova-framework.github.io/docs/pages/Getting-Started/) installed in your Godot editor.
+* Windows x64
+* Godot 4.7 with the [Jenova Framework](https://github.com/Jenova-Framework/J.E.N.O.V.A) (MSVC build)
 
-**Setup Steps:**
-1. Clone this repository to your local machine
+**Steps:**
+1. Clone the repository.
+2. Open the project folder with the Jenova build of Godot 4.7.
+3. Open Jenova's **Package Manager** and install the packages the project lists (the MSVC toolchain and the Godot SDK).
+4. Click **Jenova → Build** to compile the C++ scripts.
+5. Run the project (F5). The main scene is `Scenes/menu_principal.tscn`.
 
-2. Ensure the Jenova Plugin is enabled in Project > Project Settings > Plugins.
-
-3. The C++ scripts (.cpp) are attached directly to the Manager nodes. Jenova will automatically compile them in the background.
-
-4. Wait for the Jenova compiler console to output [Jenova] Build Successful.
-
-5. Press F5 (or the Play button) in Godot to run the game!
+Sounds are not included (third-party licences, see [CREDITS.md](CREDITS.md)); the game runs silent without them.
