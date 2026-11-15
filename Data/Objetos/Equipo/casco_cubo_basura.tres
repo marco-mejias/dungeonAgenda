@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/casco_cubo_basura.png" id="2_ico"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/casco_cubo_basura.png" id="3_pue"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/modificador_stat.gd" id="4_mod"]
+
+[sub_resource type="Resource" id="Mod_0"]
+script = ExtResource("4_mod")
+stat = "defensa"
+plano = 4
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "Casco de cubo de basura"
+descripcion = "Huele a derrota y a pescado de hace tres días. +4 de defensa. Los enemigos prefieren no acercarse... y tus aliados tampoco: no te pueden dar nada."
+ranura = 2
+tipo = 1
+peso = 3.0
+valor = 8
+icono = ExtResource("2_ico")
+sprite_puesto = ExtResource("3_pue")
+clases_permitidas = PackedStringArray()
+modificadores = Array[ExtResource("4_mod")]([SubResource("Mod_0")])

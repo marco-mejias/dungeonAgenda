@@ -19,6 +19,17 @@ func _ready():
 	# Pantalla de inventario (I) y panel de depuración de inventario y equipo (F10)
 	add_child(preload("res://Scripts/GDD/pantalla_inventario.gd").new())
 	add_child(preload("res://Scripts/GDD/debug_inventario.gd").new())
+	# Subida de nivel: lo ganado y el draft de habilidades (1 de 3)
+	add_child(preload("res://Scripts/GDD/pantalla_nivel.gd").new())
+	# El mapa ocupa toda la ventana (con aspect "expand" puede ser más ancha o alta que 1152x648):
+	# su padre es un Node2D, así que no hay anclas que lo hagan solo
+	get_viewport().size_changed.connect(_ajustar_mapa)
+	_ajustar_mapa()
+
+func _ajustar_mapa() -> void:
+	if contenedor_mapa:
+		contenedor_mapa.position = Vector2.ZERO
+		contenedor_mapa.size = get_viewport().get_visible_rect().size
 
 func _process(_delta):
 	if Input.is_action_just_pressed("clic_izq"):
@@ -30,6 +41,12 @@ func _process(_delta):
 				if bajo_raton != null and bajo_raton != contenedor_mapa:
 					return
 
+				# Apuntando una habilidad: el clic elige su objetivo
+				if not Progreso.apuntando.is_empty():
+					var dm = get_node_or_null("ContenedorMapa/SubViewport/DungeonManager")
+					if dm:
+						Progreso.confirmar(dm.get_meta("hover_celda", Vector2i(-1, -1)))
+					return
 				var input_manager = get_node_or_null("ContenedorMapa/SubViewport/DungeonManager/InputManager")
 				if input_manager:
 					var mouse_pos = get_viewport().get_mouse_position()

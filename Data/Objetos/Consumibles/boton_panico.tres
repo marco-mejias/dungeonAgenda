@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ObjetoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/boton_panico.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "El botón de \"¡PÁNICO!\""
+descripcion = "Para cuando la situación te supera. Un uso: te teletransporta a una sala cualquiera del mapa. Tus compañeros se quedan atrás... y te lo recordarán (-5 de cordura para ellos)."
+tipo = 5
+peso = 1.0
+valor = 30
+usos = 1
+icono = ExtResource("2_ico")

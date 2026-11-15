@@ -43,6 +43,11 @@ namespace {
 
 	bool debug_mode = false;
 
+	// Exploración (Modo.gd, sin enemigos despiertos): andar no gasta PA y no hay turnos.
+	bool Explorando() { return self && self->has_meta("modo_exploracion") && (bool)self->get_meta("modo_exploracion"); }
+	// Sin coste de PA: el modo debug o la exploración
+	bool SinCostes() { return debug_mode || Explorando(); }
+
 
 	// ==========================================
 	// HELPERS (no expuestos a Godot)
@@ -57,6 +62,13 @@ namespace {
 			if (h && h->get_name() != StringName("DatosEquipo")) out.push_back(h);
 		}
 		return out;
+	}
+
+	// Oculto (Sigilo.gd): andar cuesta 2 PA por casilla (la ruta, el alcance y el coste lo cuentan)
+	int PaPorCasilla(Node* act) {
+		if (!act || SinCostes() || !act->has_meta("estados")) return 1;
+		Dictionary est = act->get_meta("estados");
+		return est.has("oculto") ? 2 : 1;
 	}
 
 	bool MetaBool(Node* n, const char* key) { return n && n->has_meta(key) && (bool)n->get_meta(key); }
@@ -96,7 +108,9 @@ namespace {
 
 	bool Bloqueado() {
 		return self && ((self->has_meta("bloqueo_evento") && (bool)self->get_meta("bloqueo_evento")) ||
-						(self->has_meta("is_moving") && (bool)self->get_meta("is_moving")));
+						(self->has_meta("is_moving") && (bool)self->get_meta("is_moving")) ||
+						// el mensaje de cambio de turno/día (banner_turno.gd) aún se está leyendo
+						(self->has_meta("bloqueo_banner") && (bool)self->get_meta("bloqueo_banner")));
 	}
 
 	PackedInt32Array AParesInt(const std::vector<Vector2i>& celdas) {
@@ -121,7 +135,7 @@ namespace {
 		std::vector<Foco> focos;
 		for (Node* h : Heroes()) {
 			if (!HeroeEnMapa(h)) continue;
-			focos.push_back({ (Vector2i)h->get_meta("grid_pos"), h->has_meta("radio_luz") ? (int)h->get_meta("radio_luz") : 4 });
+			focos.push_back({ (Vector2i)h->get_meta("grid_pos"), RadioVision(h) });
 		}
 		mapa.CalcularVision(focos);
 		if (m_renderer) m_renderer->call("ActualizarNiebla", mapa.EstadosNiebla(debug_mode), debug_mode ? 1 : 0);
@@ -157,18 +171,21 @@ namespace {
 	bool DescribirInteraccion(Vector2i p, Node* act, String& accion, int& coste, int& tipo_overlay) {
 		if (!Mazmorra::InBounds(p.x, p.y)) return false;
 		const Cell& c = mapa.map_data[p.x][p.y];
-		coste = debug_mode ? 0 : COSTE_INTERACCION;
+		coste = SinCostes() ? 0 : COSTE_INTERACCION;
 		tipo_overlay = 1;
 		if (c.has_enemy) {
-			Node* e = self->get_node_or_null(NodePath(NombreEnemigo(p)));
-			int dano = (e && act) ? reglas::DanoBase(act, e) : 1;
 			if (act && !debug_mode) coste = reglas::CosteAtaque(act);
-			// Jenova recodifica el .cpp al preprocesarlo: los caracteres no ASCII van como bytes UTF-8 escapados
-			accion = String("Atacar: ") + String::num_int64(dano) + String::utf8(" de da\xC3\xB1o");
+			// Sin cuentas: lo que hace el golpe lo enseña la tarjeta de previsión
+			accion = "Atacar";
 			tipo_overlay = 2;
 			return true;
 		}
+		if (p == mapa.m_hoguera) { accion = String::utf8("Descansar en la hoguera"); coste = 0; return true; }
 		if (c.is_chest && !c.chest_opened) { accion = "Abrir cofre"; return true; }
+		if (c.is_door && !c.door_open && c.is_locked) {
+			accion = MetaBool(self, "llave_jefe") ? String("Abrir con la llave") : String("Cerrada con llave");
+			return true;
+		}
 		if (c.is_door && !c.door_open) { accion = "Abrir puerta"; return true; }
 		if (mapa.EventoManualActivo(c)) { accion = "Investigar"; return true; }
 		if (p == mapa.m_salida) { accion = "Bajar la escalera"; coste = 0; return true; }
@@ -176,6 +193,7 @@ namespace {
 	}
 
 	String TextoBocadillo(const String& accion, int coste) {
+		if (Explorando()) return accion; // sin turnos no hay PA que contar
 		return accion + String("\n") + String::num_int64(coste) + String(" PA");
 	}
 
@@ -199,7 +217,7 @@ namespace {
 			if (!DescribirInteraccion(n, act, accion, coste, tipo)) continue;
 			if (tipo == 2 && !PuedeAtacar(act, n)) continue; // p.ej. con un arco no se dispara a bocajarro
 			if (n == mapa.m_salida) coste = 1; // un paso
-			if (debug_mode) coste = 0;
+			if (SinCostes()) coste = 0;
 			celdas.push_back(n.x); celdas.push_back(n.y);
 			textos.push_back(TextoBocadillo(accion, coste));
 			estilos.push_back(pa < coste ? 1 : 0);
@@ -233,11 +251,15 @@ namespace {
 				if (!Mazmorra::InBounds(n.x, n.y) || visitado[n.x][n.y]) continue;
 				visitado[n.x][n.y] = true;
 
-				if (!mapa.EsSueloLibre(n.x, n.y) || HayHeroeEn(n, act)) continue;
-				if (!mapa.CheckLineOfSight(inicio, n)) continue;
+				if (!mapa.EsSueloLibre(n.x, n.y)) continue;
+				// Explorando se puede ir a cualquier sitio ya explorado; en combate, solo a lo que se ve
+				if (Explorando() ? !mapa.map_data[n.x][n.y].is_explored : !mapa.CheckLineOfSight(inicio, n)) continue;
 
-				mapa.map_data[n.x][n.y].is_highlighted = true;
-				iluminadas.push_back(n);
+				// Se puede pasar por encima de un compañero, pero no acabar en su casilla
+				if (!HayHeroeEn(n, act)) {
+					mapa.map_data[n.x][n.y].is_highlighted = true;
+					iluminadas.push_back(n);
+				}
 				cola.push({ n, coste + 1 });
 			}
 		}
@@ -248,7 +270,8 @@ namespace {
 		std::vector<std::vector<bool>> marcado(GRID_SIZE, std::vector<bool>(GRID_SIZE, false));
 		iluminadas.push_back(inicio);
 		for (const Vector2i& c : iluminadas) {
-			ternas.push_back(c.x); ternas.push_back(c.y); ternas.push_back(0);
+			// Explorando no se dibuja el área de andar (se puede ir a todo lo explorado)
+			if (!Explorando()) { ternas.push_back(c.x); ternas.push_back(c.y); ternas.push_back(0); }
 			marcado[c.x][c.y] = true;
 		}
 		for (const Vector2i& c : iluminadas) {
@@ -276,7 +299,8 @@ namespace {
 		}
 		int pa = act->has_meta("pa_actual") ? (int)act->get_meta("pa_actual") : 0;
 		if (debug_mode) pa = std::max(pa, 8);
-		HighlightReachableCells(ActivePos(), pa);
+		if (Explorando()) pa = GRID_SIZE * GRID_SIZE; // sin límite
+		HighlightReachableCells(ActivePos(), pa / PaPorCasilla(act));
 		ActualizarBocadillos(act, ActivePos());
 
 		// La ruta/coste del hover se calculó desde la posición anterior: que se recalcule
@@ -289,7 +313,7 @@ namespace {
 	// ==========================================
 
 	void RestarPA(Node* act, int cantidad) {
-		if (!act || debug_mode || cantidad <= 0) return;
+		if (!act || SinCostes() || cantidad <= 0) return;
 		int pa = act->has_meta("pa_actual") ? (int)act->get_meta("pa_actual") : 0;
 		act->set_meta("pa_actual", std::max(0, pa - cantidad));
 	}
@@ -320,6 +344,7 @@ namespace {
 		Ref<Tween> tw = self->get_meta("current_move_tween", Variant());
 		if (tw.is_valid()) tw->kill();
 		self->set_meta("is_moving", false);
+		if (self->has_meta("interaccion_pendiente")) self->remove_meta("interaccion_pendiente");
 
 		Node* act = ActiveChar();
 		Node3D* token = Token(act);
@@ -348,20 +373,40 @@ namespace {
 		return -1;
 	}
 
+	// ¿Ve algún enemigo dormido a algún héroe? Regla única y simétrica: el enemigo tiene que estar a
+	// la vista del grupo (su casilla visible) y, desde cualquier héroe en el mapa (el líder o los de
+	// su fila), dentro de su radio de detección medido en círculo y con la misma línea de visión que
+	// las sombras. Vale también en mitad de un combate (despierta a otro pelotón).
 	bool ComprobarAggro(Node* act, Vector2i pos) {
-		if (!act || MetaBool(act, "in_combat")) return false;
+		if (!act) return false;
+		// Con Sigilo.gd: conos de visión (hacia dónde mira cada enemigo). 1 = empieza el sigilo (frena
+		// para que el jugador decida), 2 = le han visto (combate)
+		Node* sigilo = self->get_node_or_null("/root/Sigilo");
+		if (sigilo) {
+			int r = (int)sigilo->call("comprobar", act, pos.x, pos.y);
+			if (r == 2) {
+				act->set_meta("in_combat", true);
+				UtilityFunctions::print("[Combate] ", act->get_name(), " ha sido visto: combate");
+			}
+			return r != 0;
+		}
+		std::vector<Vector2i> ojos;
+		for (Node* h : Heroes())
+			if (HeroeEnMapa(h)) ojos.push_back(h == act ? pos : (Vector2i)h->get_meta("grid_pos"));
 
 		bool detectado = false;
 		for (int x = 0; x < GRID_SIZE; x++)
 			for (int y = 0; y < GRID_SIZE; y++) {
-				if (!mapa.map_data[x][y].has_enemy) continue;
+				if (!mapa.map_data[x][y].has_enemy || !mapa.map_data[x][y].is_visible) continue;
 				Node* enemigo = self->get_node_or_null(NodePath(NombreEnemigo(Vector2i(x, y))));
 				if (!enemigo || MetaBool(enemigo, "in_combat")) continue;
-				int dist = std::abs(pos.x - x) + std::abs(pos.y - y);
-				int radio = enemigo->get_meta("radio_deteccion", 6); // cada tipo ve hasta donde dice su ficha
-				if (dist <= radio && mapa.CheckLineOfSight(pos, Vector2i(x, y))) {
-					enemigo->set_meta("in_combat", true);
-					detectado = true;
+				float radio = (int)enemigo->get_meta("radio_deteccion", 6) + 0.5f;
+				for (const Vector2i& o : ojos) {
+					if (mapa.VeCasilla(Vector2i(x, y), radio, o)) {
+						enemigo->set_meta("in_combat", true);
+						detectado = true;
+						break;
+					}
 				}
 			}
 
@@ -394,6 +439,33 @@ namespace {
 	}
 }
 
+// Crea la ficha del enemigo de la casilla. Los de un campamento o de la sala del jefe salen ya en
+// su pelotón (id fijo por sala); el de la casilla del jefe se hace jefe (Zonas.gd)
+static Node3D* CrearFichaEnemigo(Vector2i celda, int sala) {
+	Ref<PackedScene> escena = ResourceLoader::get_singleton()->load("res://Scenes/Enemy.tscn"); // la caché del loader la guarda
+	if (escena.is_null()) {
+		UtilityFunctions::printerr("[DungeonManager] ERROR: no se pudo cargar res://Scenes/Enemy.tscn");
+		return nullptr;
+	}
+	int piso = (m_party_manager && m_party_manager->has_meta("piso_actual")) ? (int)m_party_manager->get_meta("piso_actual") : 1;
+	Node* catalogo = inventario::Catalogo(self);
+	Node3D* enemigo = Object::cast_to<Node3D>(escena->instantiate());
+	if (!enemigo) return nullptr;
+	enemigo->set_name(NombreEnemigo(celda));
+	enemigo->set_position(GridToWorld(celda));
+	enemigo->set_visible(false);
+	Ref<Resource> tipo = catalogo ? Ref<Resource>(catalogo->call("elegir_enemigo", piso)) : Ref<Resource>();
+	enemigos::Configurar(enemigo, tipo, piso, celda);
+	if (sala >= 0) {
+		enemigo->set_meta("sala", sala);
+		enemigo->set_meta("peloton", 100000 + piso * 100 + sala);
+	}
+	self->add_child(enemigo);
+	Node* zonas = self->get_node_or_null("/root/Zonas");
+	if (zonas && celda == mapa.m_jefe) zonas->call("hacer_jefe", enemigo);
+	return enemigo;
+}
+
 JENOVA_SCRIPT_BEGIN
 
 // ==========================================
@@ -401,6 +473,7 @@ JENOVA_SCRIPT_BEGIN
 // ==========================================
 
 void ConstruirLogica(Caller* instance) {
+	mapa.m_piso = m_party_manager ? (int)m_party_manager->get_meta("piso_actual", 1) : 1;
 	mapa.GenerarPiso();
 	self->set_meta("botin_cofres", Dictionary()); // botín pendiente de los cofres del piso anterior
 
@@ -435,6 +508,19 @@ void ConstruirLogica(Caller* instance) {
 	self->set_meta("lista_puertas", puertas);
 	self->set_meta("lista_braseros", braseros);
 
+	// Estructura del piso (la usa Zonas.gd): hoguera, jefe, llave, campamentos
+	Array puertas_jefe;
+	for (const Vector2i& p : mapa.m_puertas_jefe) puertas_jefe.push_back(p);
+	self->set_meta("zonas", mapa.ListaZonas());
+	self->set_meta("casilla_hoguera", mapa.m_hoguera);
+	self->set_meta("casilla_jefe", mapa.m_jefe);
+	self->set_meta("cofre_llave", mapa.m_cofre_llave);
+	self->set_meta("cofre_jefe", mapa.m_cofre_jefe);
+	self->set_meta("puertas_jefe", puertas_jefe);
+	self->set_meta("llave_jefe", false);
+	self->set_meta("semilla_piso", (int64_t)(UtilityFunctions::randi() % 1000000) + 1);
+	self->set_meta("version_mapa", (int)self->get_meta("version_mapa", 0) + 1); // ObtenerMapaFijo
+
 	UtilityFunctions::print("[DungeonManager] Lógica lista. Eventos: ", (int)mapa.m_eventos.size(), " | Cofres: ", cofres.size(), " | Enemigos: ", mapa.ListaEnemigos().size());
 }
 
@@ -449,7 +535,7 @@ void ConstruirVisual(Caller* instance) {
 	for (int x = 0; x < GRID_SIZE; x++)
 		for (int y = 0; y < GRID_SIZE; y++) {
 			const Cell& c = mapa.map_data[x][y];
-			tipos[x * GRID_SIZE + y] = c.is_wall ? 0 : (c.is_door ? (c.door_open ? 3 : 2) : 1);
+			tipos[x * GRID_SIZE + y] = c.is_pillar ? 4 : (c.is_wall ? 0 : (c.is_door ? (c.door_open ? 3 : 2) : 1));
 		}
 	m_renderer->call("ConstruirMundo", tipos, GRID_SIZE);
 
@@ -461,32 +547,30 @@ void ConstruirVisual(Caller* instance) {
 	for (const Vector2i& b : mapa.m_braseros) m_renderer->call("CrearBrasero", b.x, b.y);
 	m_renderer->call("CrearDecoracion", mapa.GenerarDecoracion());
 
-	// Solo los eventos MANUALES tienen marcador: las trampas son ocultas
-	for (const EventInfo& e : mapa.m_eventos)
-		if (e.gatillo == 0 || debug_mode) m_renderer->call("CrearMarcadorEvento", e.pos.x, e.pos.y);
-
-	// ENEMIGOS: el Catálogo elige el tipo (Data/Enemigos) según el piso
-	Ref<PackedScene> escena = ResourceLoader::get_singleton()->load("res://Scenes/Enemy.tscn");
-	if (escena.is_valid()) {
-		int piso = (m_party_manager && m_party_manager->has_meta("piso_actual")) ? (int)m_party_manager->get_meta("piso_actual") : 1;
-		Node* catalogo = inventario::Catalogo(self);
-		for (int x = 0; x < GRID_SIZE; x++)
-			for (int y = 0; y < GRID_SIZE; y++) {
-				if (!mapa.map_data[x][y].has_enemy) continue;
-				Node3D* enemigo = Object::cast_to<Node3D>(escena->instantiate());
-				if (!enemigo) continue;
-				enemigo->set_name(NombreEnemigo(Vector2i(x, y)));
-				enemigo->set_position(GridToWorld(Vector2i(x, y)));
-				enemigo->set_visible(false);
-				Ref<Resource> tipo = catalogo ? Ref<Resource>(catalogo->call("elegir_enemigo", piso)) : Ref<Resource>();
-				enemigos::Configurar(enemigo, tipo, piso, Vector2i(x, y));
-				self->add_child(enemigo);
-			}
-	} else {
-		UtilityFunctions::printerr("[DungeonManager] ERROR: no se pudo cargar res://Scenes/Enemy.tscn");
+	// Los eventos manuales y los de proximidad se ven en el mapa (su sprite); las trampas son ocultas
+	for (const EventInfo& e : mapa.m_eventos) {
+		if (e.gatillo != 2) m_renderer->call("CrearSpriteEvento", e.pos.x, e.pos.y, e.path);
+		else if (debug_mode) m_renderer->call("CrearMarcadorEvento", e.pos.x, e.pos.y);
 	}
 
+	// ENEMIGOS: el Catálogo elige el tipo (Data/Enemigos) según el piso
+	for (int x = 0; x < GRID_SIZE; x++)
+		for (int y = 0; y < GRID_SIZE; y++)
+			if (mapa.map_data[x][y].has_enemy) CrearFichaEnemigo(Vector2i(x, y), mapa.map_data[x][y].peloton);
+
 	RefrescarVision();
+}
+
+// Un enemigo nuevo en una casilla libre (refuerzos de los campamentos). 'sala' = la del pelotón
+// al que se une (-1 = suelto). Devuelve su ficha o null.
+Variant CrearEnemigoEn(Caller* instance, int x, int y, int sala) {
+	if (!Mazmorra::InBounds(x, y) || !mapa.EsSueloLibre(x, y) || Vector2i(x, y) == mapa.m_salida || HayHeroeEn(Vector2i(x, y), nullptr)) return Variant();
+	mapa.map_data[x][y].has_enemy = true;
+	Node3D* e = CrearFichaEnemigo(Vector2i(x, y), sala);
+	if (!e) { mapa.map_data[x][y].has_enemy = false; return Variant(); }
+	self->set_meta("lista_enemigos", mapa.ListaEnemigos());
+	RefrescarVision();
+	return e;
 }
 
 void SpawnVisualCharacter(Caller* instance, Resource* recurso_ficha, int index_posicion) {
@@ -534,6 +618,40 @@ Variant IsCasillaIluminada(Caller* instance, int x, int y) {
 
 void UpdateHighlightForWarrior(Caller* instance) { UpdateHighlight(); }
 
+// Rueda del HUD: al pasar el ratón por ATACAR (tipo 0) se ve en rojo hasta dónde llega el arma
+// (con línea de visión si es a distancia) y los enemigos que se pueden golpear; por HABILIDAD
+// (tipo 1), en azul, dónde puede aparecer la gallina. Al salir, OcultarRangoAccion.
+void MostrarRangoAccion(Caller* instance, int tipo) {
+	Node* act = ActiveChar();
+	if (!act || !HeroeEnMapa(act) || mapa.map_data.empty() || !m_renderer || Bloqueado()) return;
+	Vector2i pos = ActivePos();
+	PackedInt32Array ternas;
+	auto meter = [&](int x, int y, int t) { ternas.push_back(x); ternas.push_back(y); ternas.push_back(t); };
+	if (tipo == 0) {
+		bool vision = reglas::RequiereVision(act);
+		for (int x = 0; x < GRID_SIZE; x++) {
+			for (int y = 0; y < GRID_SIZE; y++) {
+				const Cell& c = mapa.map_data[x][y];
+				Vector2i p(x, y);
+				if (c.is_wall || p == pos || !(c.is_explored || debug_mode)) continue;
+				if (!reglas::EnAlcance(act, pos, p)) continue;
+				if (vision && !mapa.CheckLineOfSight(pos, p)) continue;
+				bool objetivo = c.has_enemy && (c.is_visible || debug_mode);
+				meter(x, y, objetivo ? 2 : 3);
+			}
+		}
+	} else {
+		const Vector2i vecinas[] = { {1, 0}, {0, 1}, {-1, 0}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1} };
+		for (const Vector2i& d : vecinas) {
+			Vector2i n = pos + d;
+			if (Mazmorra::InBounds(n.x, n.y) && mapa.EsSueloLibre(n.x, n.y) && !HayHeroeEn(n, act)) meter(n.x, n.y, 4);
+		}
+	}
+	m_renderer->call("PintarAlcance", ternas);
+}
+
+void OcultarRangoAccion(Caller* instance) { UpdateHighlight(); }
+
 void RefrescarLuces(Caller* instance) { UpdateHighlight(); }
 
 void ApagarLucesMapa(Caller* instance) { LimpiarAlcance(); }
@@ -541,14 +659,64 @@ void ApagarLucesMapa(Caller* instance) { LimpiarAlcance(); }
 void ApagarLucesRuta(Caller* instance) { LimpiarAlcance(); }
 
 // Lo usa el PathManager para inyectar entidades dinámicas en el AStar (pares x,y)
+// Tipo de cada casilla (0 muro, 1 suelo, 2/3 puerta cerrada/abierta, 4 columna): para ver mapas generados
+PackedByteArray ObtenerTiposMapa(Caller* instance) {
+	PackedByteArray tipos;
+	tipos.resize(GRID_SIZE * GRID_SIZE);
+	for (int x = 0; x < GRID_SIZE && !mapa.map_data.empty(); x++)
+		for (int y = 0; y < GRID_SIZE; y++) {
+			const Cell& c = mapa.map_data[x][y];
+			uint8_t v = c.is_pillar ? 4 : (c.is_wall ? 0 : (c.is_door ? (c.door_open ? 3 : 2) : 1));
+			if (v == 1 && c.nivel == alturas::ALTO) v = 5;
+			if (v == 1 && c.nivel == alturas::ESCALON) v = 6;
+			tipos[x * GRID_SIZE + y] = v;
+		}
+	return tipos;
+}
+
 PackedInt32Array ObtenerObstaculosDinamicos(Caller* instance) {
 	std::vector<Vector2i> obst;
+	// Los héroes solo trazan rutas por donde ya han explorado: no saben el camino por lo oscuro
 	for (int x = 0; x < GRID_SIZE && !mapa.map_data.empty(); x++)
-		for (int y = 0; y < GRID_SIZE; y++)
-			if (mapa.map_data[x][y].has_enemy || mapa.map_data[x][y].is_chest) obst.push_back(Vector2i(x, y));
-	for (Node* h : Heroes())
-		if (HeroeEnMapa(h)) obst.push_back(h->get_meta("grid_pos"));
+		for (int y = 0; y < GRID_SIZE; y++) {
+			const Cell& c = mapa.map_data[x][y];
+			if (c.has_enemy || c.is_chest || (!c.is_explored && !c.is_wall && !debug_mode)) obst.push_back(Vector2i(x, y));
+		}
+	// Los héroes no tapan: se puede cruzar a un compañero (PathManager evita acabar encima)
 	return AParesInt(obst);
+}
+
+// Pone a un héroe (cualquiera, no solo el activo) en una casilla: empujones, saltos, intercambios,
+// el grupo que sigue al líder... (Tactica/Modo). No mira si está libre: eso lo decide quien llama.
+// refrescar = 0 no recalcula la visión (es cara): para los pasos intermedios de un recorrido.
+void ColocarHeroe(Caller* instance, String nombre, int x, int y, int refrescar) {
+	if (!m_party_manager || !Mazmorra::InBounds(x, y)) return;
+	Node* h = m_party_manager->get_node_or_null(NodePath(nombre));
+	if (!h) return;
+	h->set_meta("grid_pos", Vector2i(x, y));
+	if (refrescar == 0) return;
+	RefrescarVision();
+	if (h == ActiveChar()) UpdateHighlight();
+}
+
+// Braseros que se ven ahora (pares x, y): el shader de las sombras los usa como luces, igual que la
+// visión del juego (Mazmorra::CalcularVision)
+PackedInt32Array BraserosVisibles(Caller* instance) {
+	std::vector<Vector2i> out;
+	if (!mapa.map_data.empty())
+		for (const Vector2i& b : mapa.m_braseros)
+			if (mapa.map_data[b.x][b.y].is_visible) out.push_back(b);
+	return AParesInt(out);
+}
+
+// Para los tests: ¿hay un evento que se investiga con clic (manual y activo) en esa casilla?
+Variant EsEventoManual(Caller* instance, int x, int y) {
+	return Mazmorra::InBounds(x, y) && !mapa.map_data.empty() && mapa.EventoManualActivo(mapa.map_data[x][y]);
+}
+
+// ¿Hay otro héroe (no el activo) en esa casilla? El PathManager no deja que una ruta acabe ahí
+Variant HayAliadoEn(Caller* instance, int x, int y) {
+	return HayHeroeEn(Vector2i(x, y), ActiveChar());
 }
 
 // ==========================================
@@ -571,6 +739,24 @@ PackedByteArray ObtenerTransitables(Caller* instance) {
 		if (HeroeEnMapa(h)) {
 			Vector2i p = h->get_meta("grid_pos");
 			if (Mazmorra::InBounds(p.x, p.y)) out[p.x * GRID_SIZE + p.y] = 0;
+		}
+	return out;
+}
+
+// Mapa FIJO para los scripts (Tactica.gd lo guarda y lo usa sin volver a llamar al C++: cada llamada
+// de GDScript al C++ cuesta ~0.8 ms). Por casilla: bit 1 = no se puede pasar (muro, columna, puerta
+// cerrada, cofre, brasero, escalera); bit 2 = tapa la vista (muro, columna, puerta cerrada). Las
+// unidades no cuentan. Cambia poco: la meta "version_mapa" sube cada vez (piso nuevo, puerta abierta).
+PackedByteArray ObtenerMapaFijo(Caller* instance) {
+	PackedByteArray out;
+	out.resize(GRID_SIZE * GRID_SIZE);
+	out.fill(0);
+	if (mapa.map_data.empty()) return out;
+	for (int x = 0; x < GRID_SIZE; x++)
+		for (int y = 0; y < GRID_SIZE; y++) {
+			const Cell& c = mapa.map_data[x][y];
+			bool bloquea_paso = c.is_wall || (c.is_door && !c.door_open) || c.is_chest || c.is_brasero || Vector2i(x, y) == mapa.m_salida;
+			out[x * GRID_SIZE + y] = (bloquea_paso ? 1 : 0) | (mapa.BloqueaVision(x, y) ? 2 : 0);
 		}
 	return out;
 }
@@ -693,7 +879,7 @@ void ActualizarHover(Caller* instance, int hover_x, int hover_y) {
 	if (!c.is_highlighted && !interactuable) return;
 
 	// Enemigo al alcance de un arma a distancia: se ataca desde aquí, sin caminar
-	int pa_ahora = debug_mode ? 999 : (int)act->get_meta("pa_actual", 0);
+	int pa_ahora = SinCostes() ? 999 : (int)act->get_meta("pa_actual", 0);
 	if (tipo == 2 && interactuable && reglas::Distancia(origen, destino) > 1 && PuedeAtacar(act, destino)) {
 		PackedInt32Array celdas; celdas.push_back(hover_x); celdas.push_back(hover_y);
 		PackedStringArray textos; textos.push_back(TextoBocadillo(accion, coste_accion));
@@ -704,14 +890,15 @@ void ActualizarHover(Caller* instance, int hover_x, int hover_y) {
 
 	Array ruta = m_path_manager->call("CalcularRuta", origen.x, origen.y, hover_x, hover_y);
 	int pa = act->get_meta("pa_actual", 0);
-	if (debug_mode) pa = 999;
+	if (SinCostes()) pa = 999;
 
 	std::vector<Vector2i> puntos;
 	for (int i = 1; i < ruta.size(); i++) puntos.push_back(ruta[i]);
 	int pasos = (int)puntos.size();
-	m_renderer->call("PintarRuta", AParesInt(puntos), std::min(pa, pasos));
+	int por_casilla = PaPorCasilla(act);
+	m_renderer->call("PintarRuta", AParesInt(puntos), std::min(pa / por_casilla, pasos));
 
-	int coste_paso = debug_mode ? 0 : pasos;
+	int coste_paso = SinCostes() ? 0 : pasos * por_casilla;
 	bool adyacente = std::abs(origen.x - hover_x) + std::abs(origen.y - hover_y) == 1;
 
 	if (interactuable && destino != mapa.m_salida) {
@@ -733,13 +920,15 @@ void ActualizarHover(Caller* instance, int hover_x, int hover_y) {
 		return;
 	}
 
-	if (c.is_highlighted) {
+	if (c.is_highlighted && !Explorando()) {
 		m_renderer->call("MostrarCoste", hover_x, hover_y, String::num_int64(coste_paso) + String(" PA"), 0);
 	}
 }
 
 void ToggleMenuTactico(Caller* instance) {
 	if (!m_ui_manager) return;
+	// Con el HUD nuevo las acciones están en la rueda de abajo a la derecha: no hay menú flotante
+	if (m_ui_manager->get_node_or_null("HUD")) return;
 
 	Node* existente = m_ui_manager->get_node_or_null("MenuTactico_Instancia");
 	if (existente) {
@@ -774,6 +963,7 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 	}
 
 	if (!Mazmorra::InBounds(x, y) || Bloqueado()) return;
+	if (self->has_meta("interaccion_pendiente")) self->remove_meta("interaccion_pendiente");
 
 	Node* act = ActiveChar();
 	if (!act || !HeroeEnMapa(act)) return;
@@ -799,9 +989,10 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 	bool puerta_cerrada = c.is_door && !c.door_open;
 	bool enemigo = c.has_enemy;
 	bool evento_manual = mapa.EventoManualActivo(c);
+	bool hoguera = Vector2i(x, y) == mapa.m_hoguera;
 	bool visible = c.is_visible || debug_mode;
 
-	if ((cofre || puerta_cerrada || enemigo || evento_manual) && visible) {
+	if ((cofre || puerta_cerrada || enemigo || evento_manual || hoguera) && visible) {
 		// Enemigo al alcance del arma (pegado o, con arma a distancia, más lejos): atacar
 		if (enemigo && PuedeAtacar(act, Vector2i(x, y))) {
 			Node* combat = self->get_node_or_null("CombatManager");
@@ -817,14 +1008,29 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 		}
 		if (dist == 1) {
 			if (m_event_manager) {
-				String tipo = cofre ? "COFRE" : (puerta_cerrada ? "PUERTA" : "EVENTO");
+				String tipo = hoguera ? "HOGUERA" : (cofre ? "COFRE" : (puerta_cerrada ? "PUERTA" : "EVENTO"));
 				String path = evento_manual ? mapa.m_eventos[c.event_idx].path : String("");
 				m_event_manager->call("Interactuar", x, y, tipo, path);
 			}
 			return;
 		}
 		// MODO ENJAMBRE: el PathManager nos lleva a la casilla adyacente alcanzable
-		if (m_path_manager) m_path_manager->call("MoverPersonaje", x, y);
+		if (m_path_manager) {
+			if (evento_manual) {
+				// El evento está en una casilla de suelo: la marcamos sólida un momento para que la
+				// ruta acabe al lado (como con los cofres) y al llegar se investiga solo
+				self->set_meta("interaccion_pendiente", Vector2i(x, y));
+				m_path_manager->call("SetCasillaSolida", x, y, 1);
+				m_path_manager->call("MoverPersonaje", x, y);
+				m_path_manager->call("SetCasillaSolida", x, y, 0);
+				if (!(self->has_meta("is_moving") && (bool)self->get_meta("is_moving"))) self->remove_meta("interaccion_pendiente");
+			} else {
+				// La hoguera ya es sólida: al llegar a su lado se descansa solo
+				if (hoguera) self->set_meta("interaccion_pendiente", Vector2i(x, y));
+				m_path_manager->call("MoverPersonaje", x, y);
+				if (hoguera && !(self->has_meta("is_moving") && (bool)self->get_meta("is_moving"))) self->remove_meta("interaccion_pendiente");
+			}
+		}
 		return;
 	}
 
@@ -836,6 +1042,8 @@ void ProcesarClicEnCasilla(Caller* instance, int x, int y) {
 void PasoDado(Caller* instance, int x, int y, int pasos) {
 	if (!self || !m_party_manager) return;
 	Vector2i pos(x, y);
+	Node* antes = ActiveChar();
+	Vector2i previa = antes ? (Vector2i)antes->get_meta("grid_pos", pos) : pos;
 	m_party_manager->call("SetActiveGridPos", x, y);
 
 	Node* audio = self->get_node_or_null("/root/AudioManager");
@@ -845,6 +1053,18 @@ void PasoDado(Caller* instance, int x, int y, int pasos) {
 
 	Node* act = ActiveChar();
 	if (!act) return;
+	// Posicionamiento (Tactica.gd): ataques de oportunidad, sangrado, peligros del suelo.
+	// Si cae o queda aturdido, se para aquí.
+	Node* tac = self->get_node_or_null("/root/Tactica");
+	if (tac && previa != pos && (bool)tac->call("al_mover", act, previa, pos)) {
+		DetenerMovimiento(pos, pasos);
+		UpdateUI();
+		ComprobarFinDeTurno();
+		UpdateHighlight();
+		return;
+	}
+	// Cruzando a un compañero: aquí no puede quedarse, así que nada lo frena en esta casilla
+	if (HayHeroeEn(pos, act)) return;
 
 	int idx = BuscarEventoAutomatico(act, pos);
 	bool aggro = ComprobarAggro(act, pos);
@@ -881,6 +1101,25 @@ void AtLast(Caller* instance, int x, int y, int steps_taken) {
 		m_party_manager->call("PersonajeEscapa", act);
 	}
 
+	// Íbamos a investigar un evento: si hemos llegado a su lado (y sigue ahí), se abre
+	if (self->has_meta("interaccion_pendiente")) {
+		Vector2i obj = self->get_meta("interaccion_pendiente");
+		self->remove_meta("interaccion_pendiente");
+		if (act && Mazmorra::InBounds(obj.x, obj.y) && std::abs(obj.x - x) + std::abs(obj.y - y) == 1) {
+			const Cell& c = mapa.map_data[obj.x][obj.y];
+			if (obj == mapa.m_hoguera && m_event_manager) {
+				UpdateUI();
+				m_event_manager->call("Interactuar", obj.x, obj.y, String("HOGUERA"), String(""));
+				return;
+			}
+			if (mapa.EventoManualActivo(c) && m_event_manager) {
+				UpdateUI();
+				m_event_manager->call("Interactuar", obj.x, obj.y, String("EVENTO"), mapa.m_eventos[c.event_idx].path);
+				return;
+			}
+		}
+	}
+
 	UpdateUI();
 	ComprobarFinDeTurno();
 	UpdateHighlight();
@@ -899,6 +1138,8 @@ void AplicarEstadoCofre(Caller* instance, int x, int y) {
 void AplicarEstadoPuerta(Caller* instance, int x, int y) {
 	if (!Mazmorra::InBounds(x, y)) return;
 	mapa.map_data[x][y].door_open = true;
+	self->set_meta("version_mapa", (int)self->get_meta("version_mapa", 0) + 1); // ObtenerMapaFijo
+	mapa.map_data[x][y].is_locked = false;
 	if (m_path_manager) m_path_manager->call("SetCasillaSolida", x, y, 0);
 	if (m_renderer) m_renderer->call("AbrirPuerta", x, y);
 	RefrescarVision();
@@ -1016,7 +1257,7 @@ void ToggleModoDebug(Caller* instance) {
 	// Las trampas ocultas solo se marcan en debug
 	if (m_renderer)
 		for (const EventInfo& e : mapa.m_eventos) {
-			if (!e.activo || e.gatillo == 0) continue;
+			if (!e.activo || e.gatillo != 2) continue; // solo las trampas se ocultan fuera de debug
 			if (debug_mode) m_renderer->call("CrearMarcadorEvento", e.pos.x, e.pos.y);
 			else m_renderer->call("QuitarMarcadorEvento", e.pos.x, e.pos.y);
 		}

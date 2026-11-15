@@ -6,6 +6,13 @@ class_name EventoData
 @export_multiline var descripcion: String = "Un anciano encapuchado te corta el paso..."
 @export var ilustracion: Texture2D
 
+@export_category("Arte (Assets/Eventos/<evento>/)")
+## Cómo se ve en el mapa: 16x16, o una tira de 16 px de alto con varios fotogramas (se anima)
+@export var sprite_mapa: Texture2D
+## Imagen al ganar / perder (si la opción no tiene la suya)
+@export var imagen_exito: Texture2D
+@export var imagen_fracaso: Texture2D
+
 @export_category("Caminos Posibles")
 @export var opciones: Array[OpcionEvento] = []
 enum TipoTrigger { MANUAL, PROXIMIDAD, CONDICIONAL }

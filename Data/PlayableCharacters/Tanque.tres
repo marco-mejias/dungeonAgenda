@@ -7,18 +7,20 @@
 [ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_grande.tres" id="4_n4vrn"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_ibnrb"]
 [ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_lrfvu"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/yelmo_rejilla.tres" id="eq_yelmo_rejilla"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/armadura_placas.tres" id="eq_armadura_placas"]
 
 [resource]
 script = ExtResource("1_suixd")
 nombre_display = "Doom Snailer"
 retrato_path = "uid://inja7yuwguog"
 vida_max = 150
-velocidad = 2
+velocidad = 5
 fuerza = 8
 suerte = 2
 ruta_cuerpo = "res://Characters/tanque.tscn"
 radio_luz = 3
 clase = "Tanque"
-equipo_inicial = Array[ExtResource("1_wtwvb")]([ExtResource("2_6s3kq"), ExtResource("3_vu6u0"), ExtResource("4_n4vrn")])
+equipo_inicial = Array[ExtResource("1_wtwvb")]([ExtResource("2_6s3kq"), ExtResource("3_vu6u0"), ExtResource("4_n4vrn"), ExtResource("eq_yelmo_rejilla"), ExtResource("eq_armadura_placas")])
 inventario_inicial = Array[ExtResource("5_ibnrb")]([ExtResource("6_lrfvu")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

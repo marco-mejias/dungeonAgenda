@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/sed_sangre.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "sed_sangre"
+nombre = "Sed de sangre"
+clase = ""
+tipo = 1
+descripcion = "Al matar, recuperas 6 de vida por pila."
+disparador = 3
+reaccion = 2
+probabilidad = 100
+valor = 6

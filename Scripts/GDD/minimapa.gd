@@ -4,7 +4,7 @@ extends Control
 # "arriba" sea siempre hacia donde mira y acompaña su zoom. M lo oculta/muestra.
 # Mantener pulsado = vistazo de la cámara a ese punto; al soltar vuelve al héroe.
 
-const GRID := 35
+const GRID := 40 # = mazmorra::GRID_SIZE
 const LADO := 132.0
 # Zoom del minimapa: ZOOM_BASE con la cámara a su distancia de referencia; sigue al zoom de la cámara
 const ZOOM_BASE := 2.2

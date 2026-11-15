@@ -15,6 +15,7 @@
 #include <Godot/classes/property_tweener.hpp>
 #include <Godot/classes/callback_tweener.hpp>
 #include <vector>
+#include "Scripts/CPP/Mazmorra/Alturas.hpp"
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -22,9 +23,10 @@ using namespace jenova::sdk;
 namespace {
 	Ref<AStarGrid2D> astar;
 	const float TIEMPO_PASO = 0.28f;
+	const float TIEMPO_PASO_EXPLORANDO = 0.15f;
 	const float ALTURA_SALTO = 0.16f;
 
-	Vector3 GridToWorld(Vector2i c) { return Vector3(c.x + 0.5f, 0.0f, c.y + 0.5f); }
+	Vector3 GridToWorld(Vector2i c) { return Vector3(c.x + 0.5f, alturas::Y(c.x, c.y), c.y + 0.5f); }
 
 	bool EnRegion(Vector2i p) {
 		return astar.is_valid() && astar->is_in_boundsv(p);
@@ -42,6 +44,16 @@ namespace {
 			marcadas.push_back(p);
 		}
 		return marcadas;
+	}
+
+	// ¿Hay un aliado que no se va a apartar en esa casilla? (una ruta no puede acabar ahí)
+	// Explorando, los de su grupo siguen al líder y dejan sitio: solo cuentan los que se quedan
+	// quietos (Modo.gd). En combate, cualquier aliado.
+	bool AliadoBloquea(Node* dungeon, Vector2i c) {
+		bool explorando = dungeon->has_meta("modo_exploracion") && (bool)dungeon->get_meta("modo_exploracion");
+		Node* modo = dungeon->get_node_or_null("/root/Modo");
+		if (explorando && modo) return (bool)modo->call("aliado_quieto_en", c.x, c.y);
+		return (bool)dungeon->call("HayAliadoEn", c.x, c.y);
 	}
 
 	void RetirarDinamicos(const std::vector<Vector2i>& marcadas) {
@@ -64,6 +76,7 @@ namespace {
 			for (const Vector2i& d : vecinos) {
 				Vector2i junto = destino + d;
 				if (junto == origen) { ruta = Array(); ruta.push_back(origen); break; }
+				if (EnRegion(junto) && AliadoBloquea(dungeon, junto)) continue; // ahí no se puede acabar
 				Array candidata = RutaDirecta(origen, junto);
 				if (candidata.size() > 0 && (ruta.size() == 0 || candidata.size() < ruta.size())) ruta = candidata;
 			}
@@ -131,8 +144,11 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 	Array path = RutaInteligente(dungeon, origen, Vector2i(dest_x, dest_y));
 
 	bool debug = dungeon->has_meta("debug_mode") && (bool)dungeon->get_meta("debug_mode");
+	bool explorando = dungeon->has_meta("modo_exploracion") && (bool)dungeon->get_meta("modo_exploracion");
 	int pa = act_char->has_meta("pa_actual") ? (int)act_char->get_meta("pa_actual") : 0;
-	if (debug) pa = 999;
+	if (debug || explorando) pa = 999;
+	// Oculto (Sigilo.gd): cada casilla cuesta 2 PA
+	else if (act_char->has_meta("estados") && Dictionary(act_char->get_meta("estados")).has("oculto")) pa /= 2;
 
 	if (pa <= 0 || path.size() <= 1) {
 		UtilityFunctions::print("[PathManager] Movimiento abortado. PA: ", pa, " | Pasos de ruta: ", path.size());
@@ -143,6 +159,13 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 
 	// Recortar ruta por PA
 	if (path.size() - 1 > pa) path.resize(pa + 1);
+	// Se puede cruzar a un compañero, pero no acabar en su casilla: retrocede a la última libre
+	while (path.size() > 1) {
+		Vector2i fin = path[path.size() - 1];
+		if (!AliadoBloquea(dungeon, fin)) break;
+		path.resize(path.size() - 1);
+	}
+	if (path.size() <= 1) return;
 
 	Node3D* token = Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(String(act_char->get_name()))));
 	if (!token) return;
@@ -157,6 +180,8 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 	dungeon->set_meta("current_move_tween", tween);
 
 	float y_base = cuerpo ? (float)cuerpo->get_position().y : 0.0f;
+	// Explorando se anda más deprisa (no hay nada que pensar entre paso y paso)
+	float paso_t = explorando ? TIEMPO_PASO_EXPLORANDO : TIEMPO_PASO;
 	Vector2i anterior = origen;
 	for (int i = 1; i < path.size(); i++) {
 		Vector2i paso = path[i];
@@ -170,10 +195,10 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 			if (mira_izq || mira_der) tween->tween_callback(Callable(cuerpo, StringName("set_flip_h")).bind(mira_izq));
 		}
 
-		tween->tween_property(token, "position", destino, TIEMPO_PASO)->set_trans(Tween::TRANS_LINEAR);
+		tween->tween_property(token, "position", destino, paso_t)->set_trans(Tween::TRANS_LINEAR);
 		if (cuerpo) {
-			tween->parallel()->tween_property(cuerpo, "position:y", y_base + ALTURA_SALTO, TIEMPO_PASO * 0.5f)->set_trans(Tween::TRANS_SINE)->set_ease(Tween::EASE_OUT);
-			tween->parallel()->tween_property(cuerpo, "position:y", y_base, TIEMPO_PASO * 0.5f)->set_delay(TIEMPO_PASO * 0.5f)->set_trans(Tween::TRANS_SINE)->set_ease(Tween::EASE_IN);
+			tween->parallel()->tween_property(cuerpo, "position:y", y_base + ALTURA_SALTO, paso_t * 0.5f)->set_trans(Tween::TRANS_SINE)->set_ease(Tween::EASE_OUT);
+			tween->parallel()->tween_property(cuerpo, "position:y", y_base, paso_t * 0.5f)->set_delay(paso_t * 0.5f)->set_trans(Tween::TRANS_SINE)->set_ease(Tween::EASE_IN);
 		}
 
 		tween->tween_callback(Callable(dungeon, StringName("PasoDado")).bind(paso.x, paso.y, i));
@@ -182,6 +207,9 @@ void MoverPersonaje(Caller* instance, int dest_x, int dest_y) {
 
 	Vector2i fin = path[path.size() - 1];
 	tween->tween_callback(Callable(dungeon, StringName("AtLast")).bind(fin.x, fin.y, (int)path.size() - 1));
+	// Explorando, el resto del grupo sigue al que anda (Modo.gd)
+	Node* modo = self_node->get_node_or_null("/root/Modo");
+	if (modo && explorando) modo->call("lider_se_mueve", path, (double)paso_t);
 }
 
 JENOVA_SCRIPT_END

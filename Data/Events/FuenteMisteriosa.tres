@@ -1,0 +1,105 @@
+[gd_resource type="Resource" script_class="EventoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion3_exito.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/opcion3_fracaso.png" id="t5"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/escena.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/mapa.png" id="t7"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/exito.png" id="t8"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/fuente_misteriosa/fracaso.png" id="t9"]
+
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 0
+valor = 25
+
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = -5
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 0
+valor = 25
+
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = 10
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
+texto_boton = "Beber un trago"
+stat_usada = "suerte"
+multiplicador_dificultad = 1.0
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
+texto_exito = "Sabe a menta y a gloria. Notas cómo se te cierran las heridas."
+texto_fracaso = "Sabe a calcetín. Mucho. Te pasas un rato muy malo."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 6
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
+efectos_fracaso = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_3"), SubResource("Ef_4")])
+
+[sub_resource type="Resource" id="Ef_5"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 30
+
+[sub_resource type="Resource" id="Ef_6"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = -5
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
+texto_boton = "Lanzar una moneda y pedir un deseo"
+stat_usada = "ninguna"
+multiplicador_dificultad = 1.2
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
+texto_exito = "La fuente escupe la moneda... y otras treinta detrás. ¡Deseo concedido!"
+texto_fracaso = "La moneda se hunde. Y tu dignidad con ella."
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_5")])
+efectos_fracaso = Array[ExtResource("s_ef")]([SubResource("Ef_6")])
+
+[sub_resource type="Resource" id="Ef_7"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = 15
+
+[sub_resource type="Resource" id="Ef_8"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = -10
+
+[sub_resource type="Resource" id="Op_3"]
+script = ExtResource("s_op")
+texto_boton = "Mirar tu reflejo"
+stat_usada = "magia"
+multiplicador_dificultad = 1.2
+imagen_exito = ExtResource("t4")
+imagen_fracaso = ExtResource("t5")
+texto_exito = "Tu reflejo te guiña un ojo y te sientes mucho más tranquilo."
+texto_fracaso = "Tu reflejo se ríe de ti. Y tú no te estabas riendo."
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_7")])
+efectos_fracaso = Array[ExtResource("s_ef")]([SubResource("Ef_8")])
+
+[resource]
+script = ExtResource("s_ev")
+titulo = "Fuente Misteriosa"
+descripcion = "En mitad de la sala brota una fuente de agua que brilla con un tono verdoso. Huele a menta... y un poco a calcetín. Alguien ha tallado en la piedra: 'BEBE SI TE ATREVES'."
+ilustracion = ExtResource("t6")
+sprite_mapa = ExtResource("t7")
+imagen_exito = ExtResource("t8")
+imagen_fracaso = ExtResource("t9")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2"), SubResource("Op_3")])
+gatillo = 0

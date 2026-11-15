@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/carga.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "carga"
+nombre = "Carga"
+clase = "Caballero"
+tipo = 0
+descripcion = "Corres en línea recta hacia un enemigo (2-4 casillas, sin nada en medio) y lo tiras al suelo. +1 de daño por casilla recorrida."
+coste_pa = 2
+usos = 2
+enfriamiento = 1
+objetivo = 1
+alcance_min = 2
+alcance_max = 4
+movimiento = "carga"
+dano_base = 2
+stat_dano = "fuerza"
+mult_stat = 1.0
+estado = "derribado"
+estado_dias = 1

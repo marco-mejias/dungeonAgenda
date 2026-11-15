@@ -1,6 +1,7 @@
 extends Control
 
 # Franja que cruza la pantalla al cambiar de héroe ("TURNO DE IRONCAT") o de día ("DÍA 2").
+# anunciar(texto): la misma franja, más corta, al lanzar una habilidad ("INVOCAR GALLINA").
 
 var ORO: Color = Estilo.color("oro")
 
@@ -13,6 +14,7 @@ var ultimo_heroe := ""
 var ultimo_dia := -1
 var pendiente := ""
 var turno_enemigo := false
+var bloqueando := false # el mensaje actual impide actuar hasta que desaparezca
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -51,6 +53,12 @@ func _linea(abajo: int) -> ColorRect:
 	return l
 
 func _process(_delta: float) -> void:
+	# Mientras se lee un cambio de turno o de día, el DungeonManager y el HUD no aceptan acciones
+	var dm_b := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
+	if dm_b:
+		var activo := bloqueando and tween != null and tween.is_running() and not Engine.has_meta("test_sin_espera_banner")
+		if bool(dm_b.get_meta("bloqueo_banner", false)) != activo:
+			dm_b.set_meta("bloqueo_banner", activo)
 	var pm := get_node_or_null("/root/Main/PartyManager")
 	if not pm:
 		return
@@ -70,21 +78,30 @@ func _process(_delta: float) -> void:
 		ultimo_dia = dia
 		ultimo_heroe = nombre
 		return
+	var explorando: bool = not Modo.con_turnos()
 	if dia != ultimo_dia:
 		ultimo_dia = dia
 		ultimo_heroe = nombre
-		mostrar("Día %d" % dia)
-		pendiente = "Turno de %s" % nombre if nombre != "" else ""
+		# Explorando el día pasa andando: se avisa, pero sin parar al jugador
+		mostrar("Día %d" % dia, 0.85, not explorando)
+		pendiente = "Turno de %s" % nombre if nombre != "" and not explorando else ""
 	elif nombre != "" and nombre != ultimo_heroe:
 		ultimo_heroe = nombre
-		mostrar("Turno de %s" % nombre)
+		# Explorando no hay turnos: cambiar de héroe no se anuncia
+		if not explorando:
+			mostrar("Turno de %s" % nombre)
 
-func mostrar(mensaje: String) -> void:
+## Habilidad lanzada: la franja de los turnos pero más breve (no frena el combate)
+func anunciar(mensaje: String) -> void:
+	mostrar(mensaje, 0.45, false) # una habilidad no bloquea: ya la está haciendo el jugador
+
+func mostrar(mensaje: String, lectura: float = 0.85, bloquea: bool = true) -> void:
 	# No tapamos eventos ni la fogata
 	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	var fogata := get_node_or_null("/root/Main/CanvasLayer3")
 	if (dm and dm.get_meta("bloqueo_evento", false)) or (fogata and fogata.visible):
 		return
+	bloqueando = bloquea
 	if tween:
 		tween.kill()
 	texto.text = mensaje
@@ -95,7 +112,7 @@ func mostrar(mensaje: String) -> void:
 	tween = create_tween()
 	tween.tween_property(self, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(texto, "position:x", 0.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.85)
+	tween.tween_interval(lectura)
 	tween.tween_property(self, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(_siguiente)
 

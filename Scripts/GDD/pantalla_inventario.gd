@@ -12,18 +12,16 @@ extends CanvasLayer
 # Clic derecho = menú. Nada de esto cuesta PA. Todo pasa por el PartyManager (Inventario.hpp).
 
 const Textos := preload("res://Scripts/GDD/textos_objetos.gd")
-const HOJA := preload("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png")
 const SHADER_CONTORNO := preload("res://Shaders/contorno_ui.gdshader")
 
-const ESCALA_HEROE := 16          # el sprite de 16x16 se ve a 256x256 (dibujado a 64x64 con PixelHD)
-const TAM_OBJETO := 88            # objetos del saco
-const RADIO := 40.0               # su "radio" para chocar entre ellos
+const ESCALA_HEROE := 18          # cada píxel del sprite de 16x16 se ve de 18x18 (píxel nítido, sin suavizar)
+const TAM_OBJETO := 150           # tamaño del objeto más grande del saco; los demás, según lo que sean (_escala_objeto)
 const GRAVEDAD := 1500.0
-const T_IDLE := 0.5               # cada cuánto alterna el sprite (como en el mapa)
 const UMBRAL_ARRASTRE := 6.0
 # Orden de dibujo de lo puesto: la mochila detrás del héroe, el resto encima
-const CAPAS_DETRAS := ["mochila"]
-const CAPAS_DELANTE := ["cuerpo", "cabeza", "accesorio_1", "accesorio_2", "luz", "mano_secundaria", "mano_principal"]
+const CAPAS_DETRAS := ["mochila", "luz"] # detrás del héroe (la antorcha va a la espalda)
+# Mismo orden que en el mapa (Apariencia.ORDEN): las manos van encima de lo que empuñan
+const CAPAS_DELANTE := ["cuerpo", "cabeza", "mano_secundaria", "mano_principal", "manos", "accesorio_1", "accesorio_2"]
 const ARMAS_EN_MANO := ["mano_principal"]
 const STATS_ESTADO := [["vida", "hp_actual", "hp_max", "Vida"], ["pa", "pa_actual", "pa_max", "PA (acciones de este turno)"],
 	["cordura", "sanidad_actual", "sanidad_max", "Cordura"], ["hambre", "hambre_actual", "hambre_max", "Saciedad"]]
@@ -35,8 +33,7 @@ var cat: Node
 var heroe := ""
 var seleccion := {} # {"origen": "inv", "indice": i} o {"origen": "eq", "ranura": r}
 var firma := ""
-var t_idle := 0.0
-var fase_idle := 0
+var fotograma_pintado := -1 # fotograma de reposo dibujado (el reloj es el de Apariencia, igual que en el mapa)
 
 # Nodos
 var fondo: ColorRect
@@ -73,17 +70,10 @@ var resaltado_saco := -1
 
 var material_resalte: ShaderMaterial
 var imagenes_cache := {}
-var hoja_img: Image # la hoja de personajes, descomprimida (de una imagen comprimida no se recorta nada)
-
-func _hoja() -> Image:
-	if hoja_img == null:
-		hoja_img = HOJA.get_image()
-		if hoja_img.is_compressed():
-			hoja_img.decompress()
-	return hoja_img
 
 func _ready() -> void:
 	layer = 12
+	add_to_group("pantalla_inventario") # Indicadores: los cambios de equipo no son buffs
 	pm = get_node_or_null("/root/Main/PartyManager")
 	cat = get_node_or_null("/root/Catalogo")
 	material_resalte = ShaderMaterial.new()
@@ -356,61 +346,6 @@ func _objeto_de(clave: Dictionary) -> ObjetoData:
 			return _def(inv[i]["id"]) if i < inv.size() else null
 	return null
 
-# Fotograma del sprite del héroe en la hoja y su pareja de reposo (igual que en el mapa)
-func _frame(h: Node) -> int:
-	return {"Ladron": 0, "Mago": 2, "Caballero": 4, "Tanque": 6}.get(str(h.get_meta("clase", "")), 4)
-
-static func pareja(f: int) -> int:
-	return {0: 1, 1: 0, 2: 3, 3: 2, 4: 5, 5: 4, 6: 5, 9: 10, 10: 9, 11: 12, 12: 11, 13: 12}.get(f, f)
-
-# Sprite del héroe a mayor resolución (PixelHD, 64x64); sin el arma que trae dibujada si lleva
-# otra en la mano. 'desplaz' es cuánto se ha movido el cuerpo en este fotograma.
-func _textura_heroe(f: int, sin_arma: bool, desplaz: Vector2i = Vector2i.ZERO) -> Texture2D:
-	var clave := "%d_%s_%s" % [f, sin_arma, desplaz] # el 5 es pareja del caballero y del tanque, con distinto desplazamiento
-	if imagenes_cache.has(clave):
-		return imagenes_cache[clave]
-	var im := _hoja().get_region(Rect2i((f % 7) * 16, (f / 7) * 16, 16, 16))
-	if sin_arma:
-		for x in range(13 + desplaz.x, 16):
-			for y in range(0, 11):
-				if x >= 0:
-					im.set_pixel(x, y, Color(0, 0, 0, 0))
-	var tex := ImageTexture.create_from_image(PixelHD.imagen_x4(im))
-	imagenes_cache[clave] = tex
-	return tex
-
-# En el reposo el sprite alterna dos fotogramas que son el mismo cuerpo DESPLAZADO (el ladrón 1 px
-# a la derecha, el mago 1 a la izquierda, el tanque 2...). Buscamos ese desplazamiento comparando
-# los dos fotogramas (sin la columna del arma) para mover con él todo lo que lleva puesto.
-func _desplazamiento(f: int) -> Vector2i:
-	var clave := "desplaz_%d" % f
-	if imagenes_cache.has(clave):
-		return imagenes_cache[clave]
-	var hoja := _hoja()
-	var g := pareja(f)
-	var mejor := Vector2i.ZERO
-	var menos := 1 << 30
-	for dx in range(-2, 3):
-		for dy in range(-2, 3):
-			var dif := 0
-			for y in 16:
-				for x in 12: # sin las columnas del arma
-					var xx := x + dx
-					var yy := y + dy
-					var ca := hoja.get_pixel((f % 7) * 16 + x, (f / 7) * 16 + y)
-					var cb := hoja.get_pixel((g % 7) * 16 + xx, (g / 7) * 16 + yy) if xx >= 0 and xx < 16 and yy >= 0 and yy < 16 else Color(0, 0, 0, 0)
-					if not ca.is_equal_approx(cb):
-						dif += 1
-			if dif < menos or (dif == menos and absi(dx) + absi(dy) < absi(mejor.x) + absi(mejor.y)):
-				menos = dif
-				mejor = Vector2i(dx, dy)
-	imagenes_cache[clave] = mejor
-	return mejor
-
-func _desplazamiento_actual() -> Vector2i:
-	var h := _nodo(heroe)
-	return _desplazamiento(_frame(h)) if h and fase_idle == 1 else Vector2i.ZERO
-
 func _imagen(tex: Texture2D) -> Image:
 	if not imagenes_cache.has(tex):
 		var im: Image = tex.get_image() if tex else null
@@ -440,10 +375,9 @@ func _process(delta: float) -> void:
 	if not marco.visible:
 		return
 	_refrescar(false)
-	t_idle += delta
-	if t_idle >= T_IDLE:
-		t_idle = 0.0
-		fase_idle = 1 - fase_idle
+	var h_actual := _nodo(heroe)
+	var f_ahora: int = Apariencia.fotograma(h_actual) if h_actual else 0
+	if f_ahora != fotograma_pintado:
 		_pintar_heroe()
 		_animar_retratos()
 	_fisica(minf(delta, 1.0 / 30.0))
@@ -487,20 +421,21 @@ func _fisica(dt: float) -> void:
 			o["ang"] += o["giro"] * dt
 			o["giro"] *= 0.9
 			# Paredes y suelo del saco
-			if o["pos"].y > area.y - RADIO:
-				o["pos"].y = area.y - RADIO
+			var radio: float = o["r"]
+			if o["pos"].y > area.y - radio:
+				o["pos"].y = area.y - radio
 				o["vel"].y *= -0.25
 				o["vel"].x *= 0.82
-				o["giro"] = o["vel"].x / RADIO
+				o["giro"] = o["vel"].x / radio
 				o["ang"] = lerpf(o["ang"], 0.0, 0.08)
-			if o["pos"].x < RADIO:
-				o["pos"].x = RADIO
+			if o["pos"].x < radio:
+				o["pos"].x = radio
 				o["vel"].x *= -0.4
-			elif o["pos"].x > area.x - RADIO:
-				o["pos"].x = area.x - RADIO
+			elif o["pos"].x > area.x - radio:
+				o["pos"].x = area.x - radio
 				o["vel"].x *= -0.4
-			if o["pos"].y < RADIO:
-				o["pos"].y = RADIO
+			if o["pos"].y < radio:
+				o["pos"].y = radio
 				o["vel"].y *= -0.3
 	# Choques entre objetos (se empujan para no solaparse)
 	for _iter in 2:
@@ -510,10 +445,11 @@ func _fisica(dt: float) -> void:
 				var pb: Dictionary = objetos[b]
 				var d: Vector2 = pb["pos"] - pa["pos"]
 				var l := d.length()
-				if l >= RADIO * 2.0 or l < 0.001:
+				var suma: float = pa["r"] + pb["r"]
+				if l >= suma or l < 0.001:
 					continue
 				var n := d / l
-				var empuje := (RADIO * 2.0 - l) * 0.5
+				var empuje := (suma - l) * 0.5
 				if a != cogido:
 					pa["pos"] -= n * empuje * (2.0 if b == cogido else 1.0)
 				if b != cogido:
@@ -560,8 +496,9 @@ func _pintar_retratos() -> void:
 		r.tooltip_text = str(h.get_meta("nombre_display", nombre)) + ("" if junto else "\nEstá lejos: solo podéis intercambiar pegados o en la fogata")
 		r.mouse_filter = Control.MOUSE_FILTER_STOP
 		var t := TextureRect.new()
-		t.texture = _textura_heroe(_frame(h), false)
-		t.set_meta("frame", _frame(h))
+		t.texture = Apariencia.textura(h)
+		t.set_meta("frame", Apariencia.fotograma(h))
+		t.set_meta("heroe", nombre)
 		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -579,8 +516,9 @@ func _animar_retratos() -> void:
 		if r.get_child_count() == 0:
 			continue
 		var t: TextureRect = r.get_child(0)
-		var f: int = t.get_meta("frame", 4)
-		t.texture = _textura_heroe(f if fase_idle == 0 else pareja(f), false, Vector2i.ZERO if fase_idle == 0 else _desplazamiento(f))
+		var h := _nodo(str(t.get_meta("heroe", "")))
+		if h:
+			t.texture = Apariencia.textura(h)
 
 func _cambiar_heroe(nombre: String) -> void:
 	if nombre == heroe:
@@ -599,16 +537,13 @@ func _pintar_heroe() -> void:
 	var h := _nodo(heroe)
 	if not h:
 		return
-	var f := _frame(h)
-	var fr := f if fase_idle == 0 else pareja(f)
-	var con_arma := _equipado("mano_principal") != null
-	var desplaz := _desplazamiento_actual()
-	capas["heroe"].texture = _textura_heroe(fr, con_arma, desplaz)
+	# Las mismas capas y el mismo fotograma que el sprite del mapa (Apariencia)
+	var f: int = Apariencia.fotograma(h)
+	fotograma_pintado = f
+	capas["heroe"].texture = Apariencia.textura_capa(h, "persona", f)
 	for ranura in CAPAS_DETRAS + CAPAS_DELANTE:
-		var o := _equipado(ranura)
 		var t: TextureRect = capas[ranura]
-		t.texture = PixelHD.textura_x4(o.sprite_puesto) if o is EquipoData and o.sprite_puesto else null
-		t.position = Vector2(desplaz) * ESCALA_HEROE # lo puesto se mueve con el cuerpo
+		t.texture = Apariencia.textura_capa(h, ranura, f)
 		t.material = material_resalte if ranura == bajo_raton else null
 
 func _pintar_stats(h: Node) -> void:
@@ -683,11 +618,18 @@ func _pintar_saco() -> void:
 		else:
 			var nodo := _nodo_objeto()
 			interior.add_child(nodo)
-			var inicial: Vector2 = guardadas.get(clave, Vector2(randf_range(RADIO, maxf(RADIO + 1.0, interior.size.x - RADIO)), RADIO))
+			var r0 := _tam_objeto(_def(inv[i]["id"])) * 0.42
+			var inicial: Vector2 = guardadas.get(clave, Vector2(randf_range(r0, maxf(r0 + 1.0, interior.size.x - r0)), r0))
 			o = {"nodo": nodo, "pos": inicial, "vel": Vector2(randf_range(-60, 60), 0), "ang": randf_range(-0.4, 0.4), "giro": 0.0, "clave": clave}
 		o["indice"] = i
+		# Cada cosa a su tamaño: un casco es bastante más grande que una poción
+		var tam := _tam_objeto(_def(inv[i]["id"]))
+		o["r"] = tam * 0.42
+		o["nodo"].size = Vector2(tam, tam)
+		o["nodo"].pivot_offset = o["nodo"].size * 0.5
+		(o["nodo"].get_node("Cantidad") as Label).position = Vector2(tam - 22, tam - 22)
 		var tex: TextureRect = o["nodo"].get_node("Icono")
-		tex.texture = PixelHD.textura_x4(inv[i]["icono"])
+		tex.texture = inv[i]["icono"] # píxel nítido: lo escala el TextureRect (filtro nearest)
 		(o["nodo"].get_node("Cantidad") as Label).text = str(inv[i]["cantidad"]) if int(inv[i]["cantidad"]) > 1 else ""
 		o["nodo"].set_meta("indice", i)
 		nuevos.append(o)
@@ -704,6 +646,28 @@ func _pintar_saco() -> void:
 	barra_carga.add_theme_stylebox_override("fill", Estilo.caja("barra_vida" if peso >= cap * 0.9 else "barra_pa"))
 	barra_carga.tooltip_text = "Carga: %.1f / %.1f kg (lo equipado no pesa)" % [peso, cap]
 	lbl_carga.text = "%.0f/%.0f\nkg" % [peso, cap]
+
+# Tamaño en el saco según lo que es (el icono siempre es de 16x16, nítido)
+func _tam_objeto(o: ObjetoData) -> float:
+	return TAM_OBJETO * _escala_objeto(o)
+
+static func _escala_objeto(o: ObjetoData) -> float:
+	if o == null:
+		return 0.6
+	if o is EquipoData:
+		match o.ranura:
+			EquipoData.Ranura.CUERPO: return 1.0
+			EquipoData.Ranura.MOCHILA: return 0.95
+			EquipoData.Ranura.CABEZA: return 0.85
+			EquipoData.Ranura.MANO_PRINCIPAL: return 0.9
+			EquipoData.Ranura.MANO_SECUNDARIA: return 0.8
+			EquipoData.Ranura.LUZ: return 0.7
+			EquipoData.Ranura.ACCESORIO: return 0.38
+	match o.tipo:
+		ObjetoData.Tipo.CONSUMIBLE, ObjetoData.Tipo.COMIDA: return 0.48
+		ObjetoData.Tipo.LLAVE: return 0.4
+		ObjetoData.Tipo.MATERIAL: return 0.5
+	return 0.6
 
 func _nodo_objeto() -> Control:
 	var c := Control.new()
@@ -803,18 +767,18 @@ func _soltar_del_saco(pos: Vector2) -> void:
 
 # Qué pieza puesta hay bajo el ratón (la de más arriba que tenga un píxel opaco ahí)
 func _puesto_en(local: Vector2) -> String:
-	var px := Vector2i(int(local.x / ESCALA_HEROE), int(local.y / ESCALA_HEROE)) - _desplazamiento_actual()
+	var px := Vector2i(int(local.x / ESCALA_HEROE), int(local.y / ESCALA_HEROE))
 	if px.x < 0 or px.y < 0 or px.x >= 16 or px.y >= 16:
 		return ""
 	var orden: Array = CAPAS_DELANTE.duplicate()
 	orden.reverse()
 	orden.append_array(CAPAS_DETRAS)
 	for ranura in orden:
-		var o := _equipado(ranura)
-		if o is EquipoData and o.sprite_puesto:
-			var im := _imagen(o.sprite_puesto)
-			if im and im.get_pixelv(px).a > 0.1:
-				return ranura
+		if ranura == "manos":
+			continue
+		var im: Image = Apariencia.hoja_capa(_nodo(heroe), ranura) if _nodo(heroe) else null
+		if im and im.get_pixel(fotograma_pintado * 16 + px.x, px.y).a > 0.1:
+			return ranura
 	return ""
 
 func _resaltar_puesto(ranura: String) -> void:

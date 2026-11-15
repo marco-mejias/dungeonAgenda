@@ -1,0 +1,112 @@
+[gd_resource type="Resource" script_class="EventoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="o0"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_malir_sal.tres" id="o1"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion3_exito.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/opcion3_fracaso.png" id="t5"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/grano_oro.tres" id="o2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/escena.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/mapa.png" id="t7"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/exito.png" id="t8"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/mercader_sospechoso/fracaso.png" id="t9"]
+
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 8
+valor = 1
+objeto = ExtResource("o0")
+
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = -15
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 8
+valor = 1
+objeto = ExtResource("o1")
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
+texto_boton = "Regatear"
+stat_usada = "suerte"
+multiplicador_dificultad = 1.0
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
+texto_exito = "Le sacas una poción a precio de risa. Se va murmurando algo sobre su familia."
+texto_fracaso = "Acabas pagando el doble y sin saber muy bien por qué."
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
+efectos_fracaso = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_3")])
+
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 40
+
+[sub_resource type="Resource" id="Ef_5"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = -20
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
+texto_boton = "Robarle la bolsa"
+stat_usada = "velocidad"
+multiplicador_dificultad = 1.0
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
+texto_exito = "Ni se entera. La bolsa pesa bastante más de lo que esperabas."
+texto_fracaso = "Te pilla con la mano dentro y te da con un frasco en la cabeza."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 8
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_4")])
+efectos_pifia = Array[ExtResource("s_ef")]([SubResource("Ef_5")])
+
+[sub_resource type="Resource" id="Ef_6"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = -10
+
+[sub_resource type="Resource" id="Ef_7"]
+script = ExtResource("s_ef")
+tipo = 8
+valor = 1
+objeto = ExtResource("o2")
+
+[sub_resource type="Resource" id="Ef_8"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = -10
+
+[sub_resource type="Resource" id="Op_3"]
+script = ExtResource("s_op")
+texto_boton = "Comprarle un 'grano de oro'"
+stat_usada = "ninguna"
+multiplicador_dificultad = 2.0
+imagen_exito = ExtResource("t4")
+imagen_fracaso = ExtResource("t5")
+texto_exito = "Diez monedas por un grano que brilla de verdad. La gallina estará contenta."
+texto_fracaso = "Diez monedas por un garbanzo pintado. Genial."
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_6"), SubResource("Ef_7")])
+efectos_fracaso = Array[ExtResource("s_ef")]([SubResource("Ef_8")])
+
+[resource]
+script = ExtResource("s_ev")
+titulo = "Mercader Sospechoso"
+descripcion = "Un tipo encapuchado abre su gabardina llena de frascos: 'Psst... ¿pociones? ¿Granos de oro? Todo de primerísima calidad, recién caído de un carro'."
+ilustracion = ExtResource("t6")
+sprite_mapa = ExtResource("t7")
+imagen_exito = ExtResource("t8")
+imagen_fracaso = ExtResource("t9")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2"), SubResource("Op_3")])
+gatillo = 1
+radio_activacion = 3

@@ -40,6 +40,7 @@
 #include <Godot/classes/property_tweener.hpp>
 #include <Godot/classes/callback_tweener.hpp>
 #include <Godot/classes/scene_tree.hpp>
+#include <Godot/classes/window.hpp>
 #include <Godot/classes/time.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include "Scripts/CPP/Render/Mallas.hpp"
@@ -56,6 +57,9 @@ namespace {
 	const int O_ANDAR = 0;
 	const int O_INTERACTUAR = 1;
 	const int O_ENEMIGO = 2;
+	const int O_RANGO_ATAQUE = 3;    // alcance del arma (hover en ATACAR de la rueda): rojo
+	const int O_RANGO_HABILIDAD = 4; // alcance de la habilidad (hover en HABILIDAD): azul
+	bool EsArea(int tipo) { return tipo == O_ANDAR || tipo == O_RANGO_ATAQUE || tipo == O_RANGO_HABILIDAD; }
 
 	Node3D* self = nullptr;
 	int grid = 0;
@@ -87,6 +91,8 @@ namespace {
 	Ref<Texture2D> m_atlas;
 	Ref<Image> m_fog_img;
 	Ref<ImageTexture> m_fog_tex;
+	Ref<Image> m_occ_img;        // qué casillas tapan la vista (muros, columnas, puertas cerradas)
+	Ref<ImageTexture> m_occ_tex;
 	Ref<ShaderMaterial> m_mat_suelo, m_mat_muro, m_mat_puerta, m_mat_cofre, m_mat_piedra, m_mat_marco;
 	std::vector<Ref<ShaderMaterial>> m_mats_mundo;
 
@@ -96,6 +102,46 @@ namespace {
 	}
 
 	Node* Dungeon() { return self ? self->get_parent() : nullptr; }
+
+	// Línea de visión del shader: dónde están los héroes (sus fichas, también mientras andan) y hasta
+	// dónde ven (radio_luz). Lo que no ve ninguno queda a la sombra.
+	void ActualizarVista(Node* dungeon) {
+		if (m_mats_mundo.empty()) return;
+		Node* pm = dungeon->get_node_or_null("/root/Main/PartyManager");
+		Vector4 vistas[4];
+		int n = 0;
+		if (pm) {
+			TypedArray<Node> hijos = pm->get_children();
+			for (int i = 0; i < hijos.size() && n < 4; i++) {
+				Node* h = Object::cast_to<Node>(hijos[i]);
+				if (!h || h->get_name() == StringName("DatosEquipo") || !h->has_meta("grid_pos")) continue;
+				if ((h->has_meta("esta_muerto") && (bool)h->get_meta("esta_muerto")) || (h->has_meta("ha_escapado") && (bool)h->get_meta("ha_escapado"))) continue;
+				Node3D* ficha = Object::cast_to<Node3D>(dungeon->get_node_or_null(NodePath(String(h->get_name()))));
+				if (!ficha || !ficha->is_visible()) continue;
+				// = Mazmorra.hpp RadioVision: luz + 3 (VISION_EXTRA); sin antorcha, 2
+				int vision = (h->has_meta("radio_luz") ? (int)h->get_meta("radio_luz") : 4) + 3;
+				if (h->has_meta("antorcha_apagada") && (bool)h->get_meta("antorcha_apagada")) vision = std::min(vision, 2);
+				float radio = vision + 0.5f;
+				Vector3 p = ficha->get_position();
+				vistas[n++] = Vector4(p.x, p.z, radio, 1.0f);
+			}
+		}
+		// Braseros a la vista: también iluminan (mismo radio que Mazmorra::RADIO_BRASERO + 0.5)
+		Array luces;
+		PackedInt32Array bras = dungeon->call("BraserosVisibles");
+		for (int i = 0; i + 1 < bras.size() && luces.size() < 8; i += 2)
+			luces.push_back(Vector4(bras[i] + 0.5f, bras[i + 1] + 0.5f, 3.5f, 1.0f));
+		while (luces.size() < 8) luces.push_back(Vector4(0, 0, 0, 0));
+		for (const Ref<ShaderMaterial>& m : m_mats_mundo) {
+			if (m.is_null()) continue;
+			m->set_shader_parameter("luces", luces);
+			m->set_shader_parameter("vista0", vistas[0]);
+			m->set_shader_parameter("vista1", vistas[1]);
+			m->set_shader_parameter("vista2", vistas[2]);
+			m->set_shader_parameter("vista3", vistas[3]);
+			m->set_shader_parameter("ver_todo", niebla_debug);
+		}
+	}
 
 	Camera3D* Camara() {
 		Node* d = Dungeon();
@@ -112,6 +158,7 @@ namespace {
 		mat->set_shader_parameter("use_cutaway", cutaway);
 		mat->set_shader_parameter("use_instance_tile", tile_instancia);
 		mat->set_shader_parameter("fog_tex", m_fog_tex);
+		mat->set_shader_parameter("occ_tex", m_occ_tex);
 		mat->set_shader_parameter("grid_size", (float)grid);
 		m_mats_mundo.push_back(mat);
 		return mat;
@@ -194,6 +241,8 @@ namespace {
 		m_capa2d->set_name("Capa2D");
 		m_capa2d->set_layer(2);
 		self->add_child(m_capa2d);
+		// Se dibuja en la ventana principal (nítida), no en el mundo pixelado
+		if (self->get_tree() && self->get_tree()->get_root()) m_capa2d->set_custom_viewport(self->get_tree()->get_root());
 
 		m_raiz2d = memnew(Control);
 		m_raiz2d->set_name("Raiz");
@@ -202,7 +251,7 @@ namespace {
 
 		Label* coste = memnew(Label);
 		coste->set_name("Coste");
-		coste->add_theme_font_size_override("font_size", 8);
+		coste->add_theme_font_size_override("font_size", 11);
 		coste->add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05));
 		coste->add_theme_constant_override("outline_size", 3);
 		coste->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
@@ -271,8 +320,11 @@ namespace {
 
 			if (!cuerpo->has_meta("frame_a")) cuerpo->set_meta("frame_a", cuerpo->get_frame());
 			int fa = cuerpo->get_meta("frame_a");
-			int fase = (int)(t * 1.8f + (ficha->get_instance_id() % 7) * 0.37f) % 2;
-			cuerpo->set_frame(fase == 0 ? fa : Pareja(fa));
+			// Los héroes los anima el autoload Apariencia (mismo reloj en el mapa y en la mochila)
+			if (!cuerpo->has_meta("anim_externa")) {
+				int fase = (int)(t * 1.8f + (ficha->get_instance_id() % 7) * 0.37f) % 2;
+				cuerpo->set_frame(fase == 0 ? fa : Pareja(fa));
+			}
 
 			String nombre = ficha->get_name();
 			if (!m_raiz2d || !nombre.begins_with("Enemy_") || nombre.ends_with("_muerto")) continue;
@@ -383,6 +435,12 @@ namespace {
 		}
 
 		// Gemas de evento flotando
+		// Sprites de evento: recorren sus fotogramas (220 ms, como los héroes)
+		TypedArray<Node> sprites_ev = self->get_tree()->get_nodes_in_group("sprites_evento");
+		for (int i = 0; i < sprites_ev.size(); i++) {
+			Sprite3D* s = Object::cast_to<Sprite3D>(sprites_ev[i]);
+			if (s && s->get_hframes() > 1) s->set_frame((int)(t * 4.5f + i) % s->get_hframes());
+		}
 		TypedArray<Node> gemas = self->get_tree()->get_nodes_in_group("gemas_evento");
 		for (int i = 0; i < gemas.size(); i++) {
 			Node3D* g = Object::cast_to<Node3D>(gemas[i]);
@@ -437,9 +495,17 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	m_fog_img = Image::create_empty(grid, grid, false, Image::FORMAT_R8);
 	m_fog_img->fill(Color(0, 0, 0));
 	m_fog_tex = ImageTexture::create_from_image(m_fog_img);
+	m_occ_img = Image::create_empty(grid, grid, false, Image::FORMAT_R8);
+	for (int x = 0; x < grid; x++)
+		for (int y = 0; y < grid; y++) {
+			uint8_t tp = tipos[x * grid + y];
+			m_occ_img->set_pixel(x, y, Color((tp == T_MURO || tp == T_COLUMNA || tp == T_PUERTA) ? 1.0f : 0.0f, 0, 0));
+		}
+	m_occ_tex = ImageTexture::create_from_image(m_occ_img);
 
 	m_mat_suelo = CrearMaterialMundo(Tile(7, 1), Tile(7, 1), false, true);
 	m_mat_muro = CrearMaterialMundo(Tile(2, 0), Tile(8, 7), true, false);
+	m_mat_muro->set_shader_parameter("es_muro", true);
 	m_mat_puerta = CrearMaterialMundo(Tile(8, 3), Tile(8, 7), false, false);
 	m_mat_cofre = CrearMaterialMundo(Tile(3, 8), Tile(3, 8), false, false);
 	m_mat_piedra = CrearMaterialMundo(Tile(2, 4), Tile(7, 2), false, false);
@@ -483,6 +549,20 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 	}
 	m_mundo->add_child(mm_suelo);
 
+	// --- DOS ALTURAS: bajo cada suelo alto o escalón, un pedestal de piedra que llega al suelo ---
+	for (int nivel = alturas::ESCALON; nivel <= alturas::ALTO; nivel++) {
+		std::vector<Vector2i> pedestales;
+		for (const Vector2i& s : suelos)
+			if (alturas::Nivel(s.x, s.y) == nivel) pedestales.push_back(s);
+		if (pedestales.empty()) continue;
+		MultiMeshInstance3D* mm_ped = CrearMultiMesh(nivel == alturas::ALTO ? "PedestalAlto" : "Escalones", CrearBloque(nivel * alturas::PASO), m_mat_muro, false);
+		Ref<MultiMesh> mmp = mm_ped->get_multimesh();
+		mmp->set_instance_count(pedestales.size());
+		for (size_t i = 0; i < pedestales.size(); i++)
+			mmp->set_instance_transform(i, Transform3D(Basis(), Vector3(pedestales[i].x + 0.5f, -0.001f, pedestales[i].y + 0.5f)));
+		m_mundo->add_child(mm_ped);
+	}
+
 	MultiMeshInstance3D* mm_muro = CrearMultiMesh("Muros", CrearBloque(WALL_H), m_mat_muro, false);
 	Ref<MultiMesh> mmm = mm_muro->get_multimesh();
 	mmm->set_instance_count(muros.size());
@@ -490,6 +570,20 @@ void ConstruirMundo(Caller* instance, PackedByteArray tipos_celdas, int grid_siz
 		mmm->set_instance_transform(i, Transform3D(Basis(), GridToWorld(muros[i].x, muros[i].y)));
 	}
 	m_mundo->add_child(mm_muro);
+
+	// --- COLUMNAS: pilares más finos que un muro, con su suelo debajo ---
+	std::vector<Vector2i> columnas;
+	for (int x = 0; x < grid; x++)
+		for (int y = 0; y < grid; y++)
+			if (tipos[x * grid + y] == T_COLUMNA) columnas.push_back(Vector2i(x, y));
+	if (!columnas.empty()) {
+		MultiMeshInstance3D* mm_col = CrearMultiMesh("Columnas", CrearBloque(WALL_H), m_mat_muro, false);
+		Ref<MultiMesh> mmc = mm_col->get_multimesh();
+		mmc->set_instance_count(columnas.size());
+		for (size_t i = 0; i < columnas.size(); i++)
+			mmc->set_instance_transform(i, Transform3D(Basis().scaled(Vector3(0.56f, 1.0f, 0.56f)), GridToWorld(columnas[i].x, columnas[i].y)));
+		m_mundo->add_child(mm_col);
+	}
 
 	// --- PUERTAS ---
 	Ref<ArrayMesh> bloque = CrearBloque(1.0f);
@@ -596,7 +690,10 @@ void AbrirCofre(Caller* instance, int x, int y) {
 
 void AbrirPuerta(Caller* instance, int x, int y) {
 	if (!m_props) return;
-	if (x >= 0 && y >= 0 && x < grid && y < grid) tipos[x * grid + y] = T_PUERTA_ABIERTA;
+	if (x >= 0 && y >= 0 && x < grid && y < grid) {
+		tipos[x * grid + y] = T_PUERTA_ABIERTA;
+		if (m_occ_img.is_valid()) { m_occ_img->set_pixel(x, y, Color(0, 0, 0)); m_occ_tex->update(m_occ_img); }
+	}
 	Node3D* bisagra = Object::cast_to<Node3D>(m_props->get_node_or_null(NodePath(NombreProp("Puerta", x, y) + "/Bisagra")));
 	if (!bisagra) return;
 	Ref<Tween> tw = bisagra->create_tween();
@@ -689,6 +786,28 @@ void CrearMarcadorEvento(Caller* instance, int x, int y) {
 	m->add_to_group("gemas_evento");
 }
 
+// El evento con su sprite de mapa (EventoData.sprite_mapa: 16x16 o una tira de fotogramas de 16 px
+// de alto, que se anima). Si no tiene, la gema de siempre.
+void CrearSpriteEvento(Caller* instance, int x, int y, String ruta_evento) {
+	if (!m_props) return;
+	Ref<Resource> evento = ResourceLoader::get_singleton()->load(ruta_evento);
+	Ref<Texture2D> tex = evento.is_valid() ? Ref<Texture2D>(evento->get("sprite_mapa")) : Ref<Texture2D>();
+	if (tex.is_null()) { CrearMarcadorEvento(instance, x, y); return; }
+	Node3D* prop = CrearProp(NombreProp("Evento", x, y), x, y, true);
+	Sprite3D* s = memnew(Sprite3D);
+	s->set_name("Sprite");
+	s->set_texture(tex);
+	int alto = std::max(1, (int)tex->get_height());
+	s->set_hframes(std::max(1, (int)tex->get_width() / alto));
+	s->set_pixel_size(0.055f);
+	s->set_billboard_mode(BaseMaterial3D::BILLBOARD_FIXED_Y);
+	s->set_alpha_cut_mode(SpriteBase3D::ALPHA_CUT_DISCARD);
+	s->set_texture_filter(BaseMaterial3D::TEXTURE_FILTER_NEAREST);
+	s->set_position(Vector3(0, 0.44f, 0));
+	s->add_to_group("sprites_evento");
+	prop->add_child(s);
+}
+
 void QuitarMarcadorEvento(Caller* instance, int x, int y) {
 	if (!m_props) return;
 	Node* prop = m_props->get_node_or_null(NodePath(NombreProp("Evento", x, y)));
@@ -735,30 +854,32 @@ void ActualizarNiebla(Caller* instance, PackedByteArray estados, int modo_debug)
 	}
 }
 
-// Ternas (x, y, tipo): 0 = andar, 1 = interactuable, 2 = enemigo.
-// Las casillas de andar solo dibujan borde en los lados que dan fuera del área.
+// Ternas (x, y, tipo): 0 = andar, 1 = interactuable, 2 = enemigo, 3 = alcance de ataque,
+// 4 = alcance de habilidad. Las áreas (0, 3, 4) solo dibujan borde en los lados que dan fuera.
 void PintarAlcance(Caller* instance, PackedInt32Array ternas) {
 	if (!m_alcance || grid == 0) return;
 	int count = ternas.size() / 3;
-	std::vector<uint8_t> andar(grid * grid, 0);
+	std::vector<uint8_t> area(grid * grid, 0); // tipo de área + 1 (0 = nada)
 	for (int i = 0; i < count; i++) {
-		int x = ternas[i * 3], y = ternas[i * 3 + 1];
-		if (ternas[i * 3 + 2] == O_ANDAR && x >= 0 && y >= 0 && x < grid && y < grid) andar[x * grid + y] = 1;
+		int x = ternas[i * 3], y = ternas[i * 3 + 1], tipo = ternas[i * 3 + 2];
+		if (EsArea(tipo) && x >= 0 && y >= 0 && x < grid && y < grid) area[x * grid + y] = (uint8_t)(tipo + 1);
 	}
-	auto es_andar = [&](int x, int y) { return x >= 0 && y >= 0 && x < grid && y < grid && andar[x * grid + y]; };
+	auto mismo = [&](int x, int y, int tipo) { return x >= 0 && y >= 0 && x < grid && y < grid && area[x * grid + y] == tipo + 1; };
 
 	Ref<MultiMesh> mm = m_alcance->get_multimesh();
 	mm->set_instance_count(count);
 	for (int i = 0; i < count; i++) {
 		int x = ternas[i * 3], y = ternas[i * 3 + 1], tipo = ternas[i * 3 + 2];
 		Vector3 pos = GridToWorld(x, y);
-		pos.y = 0.012f;
+		pos.y += 0.012f; // encima de SU suelo (salas altas y escalones)
 		mm->set_instance_transform(i, Transform3D(Basis(), pos));
 
 		int mascara = 15;
-		Color color(0.35, 0.72, 1.0);
-		if (tipo == O_ANDAR) {
-			mascara = (es_andar(x, y - 1) ? 0 : 1) | (es_andar(x, y + 1) ? 0 : 2) | (es_andar(x - 1, y) ? 0 : 4) | (es_andar(x + 1, y) ? 0 : 8);
+		Color color(0.62, 0.52, 0.36); // caminar: tono de antorcha apagado (el azul molestaba)
+		if (EsArea(tipo)) {
+			mascara = (mismo(x, y - 1, tipo) ? 0 : 1) | (mismo(x, y + 1, tipo) ? 0 : 2) | (mismo(x - 1, y, tipo) ? 0 : 4) | (mismo(x + 1, y, tipo) ? 0 : 8);
+			if (tipo == O_RANGO_ATAQUE) color = Color(1.0, 0.25, 0.2);
+			else if (tipo == O_RANGO_HABILIDAD) color = Color(0.35, 0.65, 1.0);
 		} else if (tipo == O_INTERACTUAR) {
 			color = Color(1.0, 0.8, 0.25);
 		} else {
@@ -778,12 +899,12 @@ void PintarRuta(Caller* instance, PackedInt32Array celdas, int alcanzables) {
 	int ultima = std::min(alcanzables, count) - 1;
 	for (int i = 0; i < count; i++) {
 		Vector3 pos = GridToWorld(celdas[i * 2], celdas[i * 2 + 1]);
-		pos.y = 0.025f;
+		pos.y += 0.025f;
 		bool es_final = (i == ultima);
 		float s = es_final ? 0.38f : 0.2f;
 		Basis b = Basis().rotated(Vector3(0, 1, 0), es_final ? (float)Math_PI * 0.25f : 0.0f).scaled(Vector3(s, 1, s));
 		mm->set_instance_transform(i, Transform3D(b, pos));
-		Color c = i < alcanzables ? Color(0.75, 0.95, 1.0, 0.95) : Color(0.45, 0.45, 0.5, 0.7);
+		Color c = i < alcanzables ? Color(0.92, 0.8, 0.58, 0.9) : Color(0.45, 0.42, 0.42, 0.6);
 		mm->set_instance_color(i, c);
 	}
 }
@@ -792,7 +913,7 @@ void PintarCursor(Caller* instance, int x, int y) {
 	if (!m_cursor) return;
 	if (x < 0 || y < 0 || x >= grid || y >= grid) { m_cursor->set_visible(false); return; }
 	Vector3 pos = GridToWorld(x, y);
-	pos.y = 0.018f;
+	pos.y += 0.018f;
 	m_cursor->set_position(pos);
 	m_cursor->set_visible(true);
 }
@@ -872,6 +993,7 @@ void OnProcess(Caller* instance, double delta) {
 	std::vector<String> uis_vivas = AnimarFichas(dungeon, cam, escala, t);
 	RecolocarCapa2D(cam, escala, uis_vivas);
 	AnimarNiebla(delta);
+	ActualizarVista(dungeon);
 	AnimarAmbiente(cam, t);
 }
 
@@ -890,7 +1012,7 @@ void OnDestroy(Caller* instance) {
 	m_coste = nullptr;
 	m_mats_mundo.clear();
 	m_mat_suelo.unref(); m_mat_muro.unref(); m_mat_puerta.unref(); m_mat_cofre.unref(); m_mat_piedra.unref(); m_mat_marco.unref();
-	m_fog_tex.unref(); m_fog_img.unref(); m_shader.unref(); m_shader_overlay.unref(); m_atlas.unref();
+	m_fog_tex.unref(); m_fog_img.unref(); m_occ_tex.unref(); m_occ_img.unref(); m_shader.unref(); m_shader_overlay.unref(); m_atlas.unref();
 }
 
 JENOVA_SCRIPT_END

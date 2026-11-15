@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://bl1k2m0cb3oir"]
 
 [ext_resource type="Script" uid="uid://ccftwsw3jaw5n" path="res://Scripts/GDD/main.gd" id="1_wsu2k"]
+[ext_resource type="Script" path="res://Scripts/GDD/pantalla_evento.gd" id="99_pantalla_evento"]
 [ext_resource type="Script" uid="uid://la3o4sxf6mh4" path="res://Scripts/CPP/DungeonManager.cpp" id="2_k12tt"]
 [ext_resource type="Script" uid="uid://dtxk5rqpb7bm1" path="res://Scripts/CPP/partyManager.cpp" id="4_b3802"]
 [ext_resource type="Script" uid="uid://de8lgwkdug0rx" path="res://Scripts/GDD/DatosEquipo.gd" id="5_fevyy"]
@@ -24,6 +25,7 @@
 [ext_resource type="Script" uid="uid://jm4up4v856e8" path="res://Scripts/GDD/minimapa.gd" id="24_minimapa"]
 [ext_resource type="Script" uid="uid://sgxtioyg3e8y" path="res://Scripts/GDD/banner_turno.gd" id="25_banner"]
 [ext_resource type="Script" uid="uid://cvpmgagfghl0" path="res://Scripts/GDD/prevision_ataque.gd" id="26_prevision"]
+[ext_resource type="Script" path="res://Scripts/GDD/hud.gd" id="40_hud"]
 [ext_resource type="Script" uid="uid://db5fudoo24uyx" path="res://Scripts/GDD/cursor_juego.gd" id="27_cursor"]
 [ext_resource type="Script" uid="uid://t5mv6ykvwu5o" path="res://Scripts/GDD/dado3d.gd" id="28_dado"]
 
@@ -249,6 +251,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme = SubResource("Theme_evento")
+script = ExtResource("99_pantalla_evento")
 
 [node name="Titulo" type="Label" parent="CanvasLayer2/PantallaEvento" unique_id=826220811]
 layout_mode = 0
@@ -357,6 +360,16 @@ offset_bottom = 164.0
 grow_horizontal = 0
 mouse_filter = 2
 script = ExtResource("24_minimapa")
+
+[node name="HUD" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("40_hud")
 
 [node name="Banner" type="Control" parent="CanvasLayer" unique_id=167022098]
 layout_mode = 3

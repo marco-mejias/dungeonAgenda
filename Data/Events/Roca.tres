@@ -1,48 +1,96 @@
-[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://bo4r77bwmf4bp"]
+[gd_resource type="Resource" script_class="EventoData" format=3]
 
-[ext_resource type="Texture2D" uid="uid://dvrneoj6icvt4" path="res://Assets/icon.svg" id="1_kmbii"]
-[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_csuuj"]
-[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_7448k"]
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion3_exito.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/opcion3_fracaso.png" id="t5"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/escena.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/mapa.png" id="t7"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/exito.png" id="t8"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/roca_rodante/fracaso.png" id="t9"]
 
-[sub_resource type="Resource" id="Resource_kmbii"]
-script = ExtResource("2_csuuj")
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 4
+valor = 1
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
 texto_boton = "CORRE HA TODA OSTIA"
 stat_usada = "velocidad"
 multiplicador_dificultad = 1.3
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
 texto_exito = "Echas a correr y...milagrosamente escapas!"
 texto_fracaso = "Te tropiezas con una piedra y...auch"
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 3
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
 
-[sub_resource type="Resource" id="Resource_csuuj"]
-script = ExtResource("2_csuuj")
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = 10
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 7
+valor = 2
+stat = "defensa"
+duracion_turnos = 3
+
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 1
+valor = 6
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
 texto_boton = "Parala con ese pechamen"
+stat_usada = "fuerza"
 multiplicador_dificultad = 0.7
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
 texto_exito = "Sorprendentemente le metes una ostia y la paras en seco, genial..."
 texto_fracaso = "Enserio creías que.....joder tio..."
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 3
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_3")])
+efectos_pifia = Array[ExtResource("s_ef")]([SubResource("Ef_4")])
 
-[sub_resource type="Resource" id="Resource_7448k"]
-script = ExtResource("2_csuuj")
+[sub_resource type="Resource" id="Ef_5"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = 5
+
+[sub_resource type="Resource" id="Op_3"]
+script = ExtResource("s_op")
 texto_boton = "Quedarse quieto"
 stat_usada = "ninguna"
 multiplicador_dificultad = 0.2
+imagen_exito = ExtResource("t4")
+imagen_fracaso = ExtResource("t5")
 texto_exito = "La roca te va a golpear y...PUM! Papel maché con mejunje Art Attack! Casualmente colocado en la mazmorra más peligrosa del mundo!"
 texto_fracaso = "Eh...deberías apreciar más tu vida"
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 3
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_5")])
 
 [resource]
-script = ExtResource("3_7448k")
+script = ExtResource("s_ev")
 titulo = "Roca Rodante"
 descripcion = "Desde arriba del techo, una roca gigante desciende! Yo te recomendaría salir corriendo....a no ser que quieras convertirte en una nueva baldosa de la mazmorra!"
-ilustracion = ExtResource("1_kmbii")
-opciones = Array[ExtResource("2_csuuj")]([SubResource("Resource_kmbii"), SubResource("Resource_csuuj"), SubResource("Resource_7448k")])
+ilustracion = ExtResource("t6")
+sprite_mapa = ExtResource("t7")
+imagen_exito = ExtResource("t8")
+imagen_fracaso = ExtResource("t9")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2"), SubResource("Op_3")])
 gatillo = 2
 stat_objetivo = "sanidad_actual"
 valor_critico = 50
-metadata/_custom_type_script = "uid://bov68belyjx5p"

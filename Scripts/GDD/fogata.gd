@@ -3,8 +3,6 @@ extends Control
 # Pantalla de descanso entre pisos: hoguera animada (partículas pixeladas) y el grupo
 # sentado alrededor con su animación idle. Se monta sola al hacerse visible.
 
-const HOJA := preload("res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Character_2.png")
-const PAREJAS := {0: 1, 1: 0, 2: 3, 3: 2, 4: 5, 5: 4, 6: 5}
 const CENTRO := Vector2(576, 372)
 
 var resplandor: TextureRect
@@ -137,35 +135,30 @@ func _al_mostrarse() -> void:
 	sentados.clear()
 
 	var pm := get_node_or_null("/root/Main/PartyManager")
-	var dm := get_node_or_null("/root/Main/ContenedorMapa/SubViewport/DungeonManager")
 	if not pm:
 		return
 	var vivos := []
 	for h in pm.get_children():
 		if h.name != "DatosEquipo" and not h.get_meta("esta_muerto", false):
 			vivos.append(h)
+	# Junto al fuego se recargan todas las habilidades
+	Progreso.restaurar_todos()
 
 	# Sentados en semicírculo alrededor del fuego
 	for i in vivos.size():
 		var h: Node = vivos[i]
-		var frame := 0
-		if dm:
-			var cuerpo := dm.get_node_or_null(NodePath(str(h.name) + "/Cuerpo"))
-			if cuerpo:
-				frame = cuerpo.get_meta("frame_a", cuerpo.frame)
+		var frame: int = Apariencia.fotograma(h)
 		var ang: float = PI * (0.15 + 0.7 * (float(i) / maxf(1.0, vivos.size() - 1))) if vivos.size() > 1 else PI * 0.5
 		var pos := CENTRO + Vector2(cos(ang + PI) * 150.0, -sin(ang + PI) * 40.0 + 10.0)
 
-		var at := AtlasTexture.new()
-		at.atlas = HOJA
-		at.region = Rect2((frame % 7) * 16, (frame / 7) * 16, 16, 16)
 		var r := TextureRect.new()
-		r.texture = at
+		r.texture = Apariencia.textura(h, frame) # el héroe con lo que lleva puesto
 		r.size = Vector2(64, 64)
 		r.position = pos - Vector2(32, 52)
 		r.flip_h = pos.x > CENTRO.x
 		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		r.set_meta("frame", frame)
+		r.set_meta("heroe", h.get_path())
 		add_child(r)
 		move_child(r, boton.get_index())
 		sentados.append(r)
@@ -178,10 +171,8 @@ func _process(delta: float) -> void:
 		var f := 1.0 + 0.06 * sin(t * 9.0) + 0.04 * sin(t * 23.0)
 		resplandor.scale = Vector2(f, f)
 		resplandor.modulate.a = 0.85 + 0.15 * sin(t * 13.0)
-	# Idle de los sentados (alternan sus dos frames)
-	var fase := int(t * 1.8) % 2
-	for i in sentados.size():
-		var r := sentados[i]
-		var base: int = r.get_meta("frame")
-		var frame: int = base if (fase + i) % 2 == 0 else PAREJAS.get(base, base)
-		(r.texture as AtlasTexture).region = Rect2((frame % 7) * 16, (frame / 7) * 16, 16, 16)
+	# Idle de los sentados: el mismo fotograma que en el mapa (reloj de Apariencia)
+	for r in sentados:
+		var h := get_node_or_null(r.get_meta("heroe"))
+		if h:
+			(r.texture as AtlasTexture).region = Rect2(Apariencia.fotograma(h) * 16, 0, 16, 16)

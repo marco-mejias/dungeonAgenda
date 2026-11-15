@@ -22,12 +22,24 @@ AudioManager="*uid://7alit7602tr"
 Feel="*res://Scripts/GDD/feel.gd"
 Catalogo="*res://Scripts/GDD/catalogo.gd"
 Estilo="*res://Scripts/GDD/estilo.gd"
+Apariencia="*res://Scripts/GDD/apariencia.gd"
+DadoCombate="*res://Scripts/GDD/dado_combate.gd"
+Especiales="*res://Scripts/GDD/especiales.gd"
+Indicadores="*res://Scripts/GDD/indicadores.gd"
+Ventana="*res://Scripts/GDD/ventana.gd"
+Estados="*res://Scripts/GDD/estados.gd"
+Tactica="*res://Scripts/GDD/tactica.gd"
+Modo="*res://Scripts/GDD/modo.gd"
+Progreso="*res://Scripts/GDD/progreso.gd"
+Zonas="*res://Scripts/GDD/zonas.gd"
+Sigilo="*res://Scripts/GDD/sigilo.gd"
 
 [display]
 
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [editor_plugins]
 
@@ -36,7 +48,7 @@ enabled=PackedStringArray("res://addons/base_datos/plugin.cfg")
 [gui]
 
 theme/custom="res://Assets/UI/Piedra/tema_piedra.tres"
-theme/custom_font="uid://o56g6df03otk"
+theme/custom_font="res://Assets/Fonts/alegreya/alegreya_texto.tres"
 
 [input]
 

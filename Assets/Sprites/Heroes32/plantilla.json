@@ -1,0 +1,76 @@
+{
+  "tamano": 16,
+  "fotogramas": 4,
+  "duracion_ms": 220,
+  "desplazamiento_arriba": [
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "capas_fijas": [
+    "Piernas",
+    "Sombra"
+  ],
+  "anclas": {
+    "mano_der": [
+      14,
+      10
+    ],
+    "mano_izq": [
+      4,
+      12
+    ],
+    "cabeza": [
+      7,
+      1
+    ],
+    "ojos": [
+      [
+        8,
+        4
+      ],
+      [
+        11,
+        4
+      ]
+    ],
+    "boca": [
+      9,
+      6
+    ],
+    "torso": [
+      8,
+      10
+    ],
+    "pies": [
+      8,
+      14
+    ]
+  },
+  "orden_capas": [
+    "Sombra",
+    "Espalda",
+    "Piernas",
+    "Cuerpo",
+    "Ropa_torso",
+    "Ropa_cabeza",
+    "Mano_izq",
+    "Mano_der",
+    "Manos"
+  ],
+  "contorno": "#2a1d26, 1 px dibujado en cada pieza; nunca debajo de los pies",
+  "nota": "Una prenda u objeto se dibuja a 16x16 en la posición del fotograma 0; las capas no fijas bajan con desplazamiento_arriba."
+}

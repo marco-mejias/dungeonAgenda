@@ -108,7 +108,11 @@ func _icosaedro() -> ArrayMesh:
 			st.add_vertex(p)
 	return st.commit()
 
-func tirar(resultado: int, exito: bool, duracion: float = 1.5) -> void:
+var sello_texto := "" # si no está vacío, sustituye a ÉXITO/FALLO (p. ej. ¡CRÍTICO! en combate)
+var solo_sellos_especiales := false # combate: un acierto normal no lleva sello (solo crítico o fallo)
+
+func tirar(resultado: int, exito: bool, duracion: float = 1.5, texto_sello: String = "") -> void:
+	sello_texto = texto_sello
 	visible = true
 	numero.visible = false
 	sello.visible = false
@@ -132,9 +136,9 @@ func _mostrar_resultado(resultado: int, exito: bool) -> void:
 	numero.visible = true
 	numero.pivot_offset = numero.size * 0.5
 	numero.scale = Vector2(1.8, 1.8)
-	sello.text = "ÉXITO" if exito else "FALLO"
+	sello.text = sello_texto if sello_texto != "" else ("ÉXITO" if exito else "FALLO")
 	sello.add_theme_color_override("font_color", color)
-	sello.visible = true
+	sello.visible = not (solo_sellos_especiales and sello_texto == "" and exito)
 	var tw := create_tween()
 	tw.tween_property(numero, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var feel := get_node_or_null("/root/Feel")

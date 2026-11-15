@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/chispa_estatica.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "chispa_estatica"
+nombre = "Chispa estática"
+clase = ""
+tipo = 1
+descripcion = "Al golpear, 25% por pila de que salte una chispa a otro enemigo cercano (3 de daño)."
+disparador = 0
+reaccion = 1
+probabilidad = 25
+valor = 3

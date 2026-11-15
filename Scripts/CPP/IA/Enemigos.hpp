@@ -18,7 +18,7 @@ namespace enemigos {
 
 using namespace godot;
 
-const int LADO = 35; // = mazmorra::GRID_SIZE
+const int LADO = 40; // = mazmorra::GRID_SIZE
 
 // Mismo orden que EnemigoData.Perfil
 enum Perfil { P_TANQUE, P_CUERPO_A_CUERPO, P_LANZADOR, P_COBARDE };

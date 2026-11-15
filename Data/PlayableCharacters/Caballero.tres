@@ -14,6 +14,7 @@ nombre_display = "IronCat"
 retrato_path = "uid://dbfvxgwybojdm"
 vida_max = 125
 magia = 4
+velocidad = 6
 ruta_cuerpo = "res://Characters/caballero.tscn"
 equipo_inicial = Array[ExtResource("1_gh8fb")]([ExtResource("2_774hh"), ExtResource("3_pj8nk"), ExtResource("4_1lmn8")])
 inventario_inicial = Array[ExtResource("5_hwyw7")]([ExtResource("6_1o4do")])

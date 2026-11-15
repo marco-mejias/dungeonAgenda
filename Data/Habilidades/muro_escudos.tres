@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/muro_escudos.png" id="2_ico"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="3_ef"]
+
+[sub_resource type="Resource" id="Efecto_efectos_objetivo_0"]
+script = ExtResource("3_ef")
+tipo = 7
+valor = 2
+stat = "defensa"
+duracion_turnos = 2
+
+[sub_resource type="Resource" id="Efecto_efectos_propios_0"]
+script = ExtResource("3_ef")
+tipo = 7
+valor = 5
+stat = "defensa"
+duracion_turnos = 2
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "muro_escudos"
+nombre = "Muro de escudos"
+clase = "Tanque"
+tipo = 0
+descripcion = "+5 de defensa 2 días; los aliados pegados a ti, +2."
+coste_pa = 1
+usos = 1
+enfriamiento = 2
+objetivo = 0
+area = 1
+tirada = false
+especial = "muro"
+efectos_objetivo = Array[ExtResource("3_ef")]([SubResource("Efecto_efectos_objetivo_0")])
+efectos_propios = Array[ExtResource("3_ef")]([SubResource("Efecto_efectos_propios_0")])

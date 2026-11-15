@@ -1,35 +1,87 @@
-[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://uw5varh5ov7c"]
+[gd_resource type="Resource" script_class="EventoData" format=3]
 
-[ext_resource type="Texture2D" uid="uid://cchcy4n5slbap" path="res://Assets/cult.jpg" id="1_7f2yx"]
-[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_cm4am"]
-[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_f36fu"]
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/tonico_cordura.tres" id="o0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/escena.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/mapa.png" id="t5"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/exito.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/culto_ermitanos/fracaso.png" id="t7"]
 
-[sub_resource type="Resource" id="Resource_7f2yx"]
-script = ExtResource("2_cm4am")
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = 10
+
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 8
+valor = 1
+objeto = ExtResource("o0")
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 2
+valor = -10
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
 texto_boton = "Canaliza tu magia!"
 stat_usada = "magia"
 multiplicador_dificultad = 1.4
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
 texto_exito = "Sacas una chispa de tus manos y quedan anonadados con tu gran poder! Creo que ayudan que sean pequeñitos..."
 texto_fracaso = "Intentas canalizar tu poder pero creo que te da algo de vergüenza. CABRON! Empiezan a pegarte todos en unisono, por suerte, no es que sean muy fuertes tampoco..."
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 2
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+efectos_pifia = Array[ExtResource("s_ef")]([SubResource("Ef_3")])
 
-[sub_resource type="Resource" id="Resource_cm4am"]
-script = ExtResource("2_cm4am")
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 15
+
+[sub_resource type="Resource" id="Ef_5"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 25
+
+[sub_resource type="Resource" id="Ef_6"]
+script = ExtResource("s_ef")
+tipo = 1
+valor = 4
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
 texto_boton = "Pegales una patada"
-multiplicador_dificultad = 1.2000000000000002
+stat_usada = "fuerza"
+multiplicador_dificultad = 1.2
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
 texto_exito = "Empiezas a pegarle poco a poco patadas a cada uno de ellos, lograndoles mandar a la mierda. Te vas corriendo por si acaso..."
 texto_fracaso = "Al pegarle una patada al primero, los demas se empiezan a abalanzar encima tuyo, cayendo rápidamente mientras lloras del dolor. Quien diria que algo tan pequeño podia ser tan doloroso..."
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 6
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_4")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_5")])
+efectos_pifia = Array[ExtResource("s_ef")]([SubResource("Ef_6")])
 
 [resource]
-script = ExtResource("3_f36fu")
+script = ExtResource("s_ev")
 titulo = "Culto de Ermitaños"
 descripcion = "Te encuentras unos pequeños ermitaños con sombreros puntiagudos: Demuestranos tu poder! Estan pirados pero...creo que seran peores si no les haces caso..."
-ilustracion = ExtResource("1_7f2yx")
-opciones = Array[ExtResource("2_cm4am")]([SubResource("Resource_7f2yx"), SubResource("Resource_cm4am")])
+ilustracion = ExtResource("t4")
+sprite_mapa = ExtResource("t5")
+imagen_exito = ExtResource("t6")
+imagen_fracaso = ExtResource("t7")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2")])
 gatillo = 1
-metadata/_custom_type_script = "uid://bov68belyjx5p"
+radio_activacion = 3

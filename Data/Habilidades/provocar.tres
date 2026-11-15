@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/provocar.png" id="2_ico"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="3_ef"]
+
+[sub_resource type="Resource" id="Efecto_efectos_propios_0"]
+script = ExtResource("3_ef")
+tipo = 7
+valor = 3
+stat = "defensa"
+duracion_turnos = 1
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "provocar"
+nombre = "Provocar"
+clase = "Tanque"
+tipo = 0
+descripcion = "Insultas a su madre. Los enemigos a 4 casillas solo te atacarán a ti mañana, y te pones +3 de defensa."
+coste_pa = 1
+usos = 2
+enfriamiento = 2
+objetivo = 0
+area = 4
+tirada = false
+especial = "provocar"
+efectos_propios = Array[ExtResource("3_ef")]([SubResource("Efecto_efectos_propios_0")])

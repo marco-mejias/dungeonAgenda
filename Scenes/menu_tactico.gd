@@ -57,8 +57,24 @@ func _construir() -> void:
 
 	var estado := _estado_ataque()
 	_fila(v, "atacar", "espada", "ATAQUE", "1", estado[0], estado[1])
-	_fila(v, "habilidad", "chispa", "HABILIDADES", "2", false, "Próximamente")
+	var gallina := _estado_gallina()
+	_fila(v, "habilidad", "chispa", "GALLINA", "2", gallina[0], gallina[1])
 	_fila(v, "pasar", "reloj", "PASAR TURNO", "3", true, "Fin del turno")
+
+# Habilidad: invocar a la gallina lanza-huevos (Especiales.gd). [disponible, texto de la derecha]
+func _estado_gallina() -> Array:
+	var esp = get_node_or_null("/root/Especiales")
+	var pm = get_node_or_null("/root/Main/PartyManager")
+	var act = pm.call("GetActiveCharacter") if pm else null
+	if not esp or not act:
+		return [false, "—"]
+	if is_instance_valid(esp.gallina):
+		return [false, "Ya está en el campo"]
+	var debug: bool = dungeon.get_meta("debug_mode", false) if dungeon else false
+	var pa: int = act.get_meta("pa_actual", 0)
+	if pa < esp.COSTE_GALLINA and not debug:
+		return [false, "Invocar · %d PA (tienes %d)" % [esp.COSTE_GALLINA, pa]]
+	return [true, "Invocar · %d PA" % esp.COSTE_GALLINA]
 
 # [disponible, texto de la derecha]
 func _estado_ataque() -> Array:

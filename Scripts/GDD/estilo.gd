@@ -10,8 +10,8 @@ extends Node
 # El C++ y los scripts piden aquí sus cajas y colores: Estilo.caja("panel"), Estilo.color("oro").
 
 const DIR := "res://Assets/UI/Piedra/"
-# Títulos en letra gótica; el resto del texto sigue con la letra del proyecto (Symtext)
-const FUENTE_TITULO := preload("res://Assets/Fonts/gothicbyte/GothicByte.ttf")
+# Títulos en IM Fell (imprenta antigua); el resto del texto, con la letra del proyecto (Alegreya)
+const FUENTE_TITULO := preload("res://Assets/Fonts/imfell/grimorio_titulo.tres")
 const ESCALA := 2 # píxeles reales por píxel de arte
 
 const COLORES := {
@@ -45,6 +45,18 @@ const CAJAS := {
 	"barra_vida": ["barra_vida", 1, 0], "barra_pa": ["barra_pa", 1, 0], "barra_cordura": ["barra_cordura", 1, 0], "barra_hambre": ["barra_hambre", 1, 0],
 }
 
+# Aspecto de GRIMORIO (como el HUD): las cajas son de cuero con filete dorado, generadas por
+# Tools/generar_ui_grimorio.gd. nombre -> [archivo, margen px, relleno px]. Las barras siguen siendo
+# las de piedra (CAJAS).
+const DIR_GRIMORIO := "res://Assets/UI/Grimorio/"
+const CAJAS_GRIMORIO := {
+	"panel": ["estilo_panel", 14, 10], "panel_oro": ["estilo_panel_oro", 14, 10], "panel_rojo": ["estilo_panel_rojo", 14, 10],
+	"panel_alerta": ["estilo_panel_alerta", 14, 10], "tooltip": ["estilo_tooltip", 12, 9],
+	"ficha": ["estilo_panel", 14, 4], "ficha_activa": ["estilo_panel_oro", 14, 4], "ficha_enemigo": ["estilo_panel_rojo", 14, 4], "ficha_alerta": ["estilo_panel_alerta", 14, 4],
+	"boton": ["estilo_boton", 7, 6], "boton_hover": ["estilo_boton_hover", 7, 6], "boton_pulsado": ["estilo_boton_pulsado", 7, 6], "boton_off": ["estilo_boton_off", 7, 6],
+	"hueco": ["estilo_hueco", 6, 4], "hueco_oro": ["estilo_hueco_oro", 6, 4], "hueco_hover": ["estilo_hueco_hover", 6, 4],
+}
+
 var _cajas := {}
 
 func color(nombre: String) -> Color:
@@ -53,6 +65,15 @@ func color(nombre: String) -> Color:
 func caja(nombre: String) -> StyleBox:
 	if _cajas.has(nombre):
 		return _cajas[nombre]
+	if CAJAS_GRIMORIO.has(nombre):
+		var g: Array = CAJAS_GRIMORIO[nombre]
+		var sg := StyleBoxTexture.new()
+		sg.texture = load(DIR_GRIMORIO + g[0] + ".png")
+		for lado in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+			sg.set_texture_margin(lado, g[1])
+			sg.set_content_margin(lado, g[2])
+		_cajas[nombre] = sg
+		return sg
 	var def: Array = CAJAS.get(nombre, CAJAS["panel"])
 	var s := StyleBoxTexture.new()
 	s.texture = load(DIR + def[0] + ".png")

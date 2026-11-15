@@ -6,6 +6,8 @@
 // Q/E rotan 90° alrededor del héroe, rueda = zoom (distancia).
 // Clic derecho mantenido = mirar libremente; al soltar vuelve al héroe deslizándose.
 // El minimapa puede pedir un "vistazo" (meta "vistazo") mientras se mantiene pulsado.
+// El combate pide un "encuadre" (meta "encuadre": PackedVector3Array): la cámara se centra en esos
+// puntos y se acerca todo lo que puede sin que se salgan (con un tope de zoom). Un solo punto = primer plano.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/node.hpp>
@@ -26,7 +28,7 @@ namespace {
 	const float DIST_MIN = 9.0f;
 	const float DIST_MAX = 34.0f;
 	const float DIST_REF = 18.0f; // distancia de referencia para escalar la UI anclada
-	const float GRID = 35.0f;
+	const float GRID = 40.0f; // = mazmorra::GRID_SIZE
 
 	Vector3 pivote;
 	float yaw = 45.0f, yaw_obj = 45.0f;
@@ -43,6 +45,14 @@ namespace {
 	const float ESCALA_ARRASTRE = 0.0016f; // antes 0.0025: la mazmorra se movía demasiado por cada píxel
 	const float VEL_ARRASTRE = 6.0f;       // cuánto tarda la cámara en alcanzar al ratón
 	Vector3 objetivo_arrastre;
+
+	// Encuadre de combate
+	const float DIST_COMBATE_MIN = 7.5f; // tope de zoom al encuadrar (más cerca que la rueda)
+	const float MARGEN_ENCUADRE = 1.45f; // aire alrededor de los personajes
+	const float ALTO_FICHA = 1.9f;       // cabezas + dado e indicadores encima
+	const float VEL_ENCUADRE = 6.0f;
+	float peso_enc = 0.0f;   // 0 = distancia del jugador, 1 = distancia del encuadre
+	float dist_enc = 18.0f;
 
 	Vector3 Direccion() {
 		float p = PITCH_DEG * (float)Math_PI / 180.0f;
@@ -136,15 +146,50 @@ void OnProcess(Caller* instance, double delta) {
 
 	// === VISTAZO DESDE EL MINIMAPA (mientras se mantiene pulsado) ===
 	bool vistazo = cam->has_meta("vistazo");
-	if (vistazo && !derecho) {
+	if (vistazo && !derecho && !cam->has_meta("encuadre")) {
 		Vector3 punto = cam->get_meta("vistazo");
 		pivote = pivote.lerp(punto, (float)UtilityFunctions::minf(1.0, 6.0 * delta));
 		volviendo = true;
 	}
 
+	// === ENCUADRE DE COMBATE (manda sobre el vistazo y sobre seguir al héroe) ===
+	bool encuadre = cam->has_meta("encuadre") && !derecho;
+	if (encuadre) {
+		PackedVector3Array puntos = cam->get_meta("encuadre");
+		if (puntos.size() > 0) {
+			Vector3 centro;
+			for (int i = 0; i < puntos.size(); i++) centro += puntos[i];
+			centro /= (float)puntos.size();
+			// Ejes de la pantalla con la rotación a la que vamos
+			float p = PITCH_DEG * (float)Math_PI / 180.0f;
+			float y = yaw_obj * (float)Math_PI / 180.0f;
+			Vector3 haciaCam(std::sin(y) * std::cos(p), std::sin(p), std::cos(y) * std::cos(p));
+			Vector3 frente = -haciaCam;
+			Vector3 derecha = frente.cross(Vector3(0, 1, 0)).normalized();
+			Vector3 arriba = derecha.cross(frente).normalized();
+			Vector2 vp = cam->get_viewport() ? cam->get_viewport()->get_visible_rect().size : Vector2(16, 9);
+			float aspecto = vp.y > 0 ? vp.x / vp.y : 1.78f;
+			float tv = std::tan(FOV * 0.5f * (float)Math_PI / 180.0f);
+			float necesaria = 0.0f;
+			for (int i = 0; i < puntos.size(); i++) {
+				for (int k = 0; k < 2; k++) {
+					Vector3 o = puntos[i] + Vector3(0, k * ALTO_FICHA, 0) - centro;
+					necesaria = UtilityFunctions::maxf(necesaria, std::abs(o.dot(derecha)) / (tv * aspecto));
+					necesaria = UtilityFunctions::maxf(necesaria, std::abs(o.dot(arriba)) / tv);
+				}
+			}
+			float objetivo_d = UtilityFunctions::clampf(necesaria * MARGEN_ENCUADRE, DIST_COMBATE_MIN, DIST_MAX);
+			if (peso_enc < 0.01f) dist_enc = dist; // empieza desde donde está el jugador
+			dist_enc += (objetivo_d - dist_enc) * (float)UtilityFunctions::minf(1.0, VEL_ENCUADRE * delta);
+			pivote = pivote.lerp(centro, (float)UtilityFunctions::minf(1.0, VEL_ENCUADRE * delta));
+			volviendo = true;
+		}
+	}
+	peso_enc += ((encuadre ? 1.0f : 0.0f) - peso_enc) * (float)UtilityFunctions::minf(1.0, (encuadre ? 8.0 : 4.0) * delta);
+
 	// === ANCLADA AL HÉROE ACTIVO ===
 	if (cam->has_meta("recentrar")) cam->remove_meta("recentrar"); // ya siempre seguimos al héroe
-	if (token && token->is_visible() && !derecho && !vistazo) {
+	if (token && token->is_visible() && !derecho && !vistazo && !encuadre) {
 		Vector3 objetivo = token->get_position();
 		float vel = volviendo ? VEL_VOLVER : VEL_SEGUIR;
 		pivote = pivote.lerp(objetivo, (float)UtilityFunctions::minf(1.0, vel * delta));
@@ -159,7 +204,8 @@ void OnProcess(Caller* instance, double delta) {
 	float punch = cam->has_meta("punch") ? (float)cam->get_meta("punch") : 0.0f;
 	punch = UtilityFunctions::maxf(0.0, punch - 4.0 * delta);
 	cam->set_meta("punch", punch);
-	float dist_visual = dist * (1.0f - 0.12f * punch);
+	float dist_base = dist + (dist_enc - dist) * peso_enc;
+	float dist_visual = dist_base * (1.0f - 0.12f * punch);
 
 	cam->set_position(pivote + Direccion() * dist_visual);
 	cam->look_at(pivote, Vector3(0, 1, 0));
@@ -170,7 +216,7 @@ void OnProcess(Caller* instance, double delta) {
 
 	// Datos para la UI anclada (menú táctico) y el renderer
 	cam->set_meta("pivote", pivote);
-	cam->set_meta("zoom_factor", 2.0f * DIST_REF / dist);
+	cam->set_meta("zoom_factor", 2.0f * DIST_REF / dist_base);
 	cam->set_meta("yaw", yaw);
 }
 

@@ -12,6 +12,7 @@
 #include <Godot/classes/viewport.hpp>
 #include <Godot/variant/utility_functions.hpp>
 #include <cmath>
+#include "Scripts/CPP/Mazmorra/Alturas.hpp"
 
 using namespace godot;
 using namespace jenova::sdk;
@@ -41,10 +42,15 @@ namespace {
 		Vector3 origen = cam->project_ray_origin(mp);
 		Vector3 dir = cam->project_ray_normal(mp);
 		if (std::abs(dir.y) < 0.0001f) return Vector2i(-1, -1);
-		float t = -origen.y / dir.y;
-		if (t < 0) return Vector2i(-1, -1);
-		Vector3 hit = origen + dir * t;
-		return Vector2i((int)std::floor(hit.x), (int)std::floor(hit.z));
+		// Con dos alturas: el rayo choca primero con el suelo alto si lo hay bajo el ratón
+		for (int nivel = alturas::ALTO; nivel >= 0; nivel--) {
+			float t = (nivel * alturas::PASO - origen.y) / dir.y;
+			if (t < 0) continue;
+			Vector3 hit = origen + dir * t;
+			Vector2i c((int)std::floor(hit.x), (int)std::floor(hit.z));
+			if (nivel == 0 || alturas::Nivel(c) == nivel) return c;
+		}
+		return Vector2i(-1, -1);
 	}
 }
 

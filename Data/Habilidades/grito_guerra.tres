@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/grito_guerra.png" id="2_ico"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="3_ef"]
+
+[sub_resource type="Resource" id="Efecto_efectos_objetivo_0"]
+script = ExtResource("3_ef")
+tipo = 7
+valor = 2
+stat = "fuerza"
+duracion_turnos = 2
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "grito_guerra"
+nombre = "Grito de guerra"
+clase = "Caballero"
+tipo = 0
+descripcion = "Los aliados a 3 casillas (tú incluido) ganan +2 de fuerza durante 2 días."
+coste_pa = 1
+usos = 1
+enfriamiento = 3
+objetivo = 0
+area = 3
+tirada = false
+especial = "grito"
+efectos_objetivo = Array[ExtResource("3_ef")]([SubResource("Efecto_efectos_objetivo_0")])

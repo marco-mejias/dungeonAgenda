@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/onda_choque.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "onda_choque"
+nombre = "Onda de choque"
+clase = "Mago"
+tipo = 0
+descripcion = "Una explosión de fuerza empuja 2 casillas a todos los enemigos pegados a ti. Contra una pared: aturdidos."
+coste_pa = 2
+usos = 2
+enfriamiento = 2
+objetivo = 0
+area = 1
+tirada = false
+dano_base = 1
+stat_dano = "magia"
+mult_stat = 0.4
+empuje = 2

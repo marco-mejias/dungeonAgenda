@@ -2,6 +2,7 @@
 // Piezas de construcción del mundo 3D del DungeonRenderer: bloques con UV por cara,
 // materiales de overlay, MultiMesh, partículas y sprites del tileset. Sin estado propio.
 
+#include "Scripts/CPP/Mazmorra/Alturas.hpp"
 #include <Godot/godot.hpp>
 #include <Godot/classes/node3d.hpp>
 #include <Godot/classes/mesh_instance3d.hpp>
@@ -27,13 +28,15 @@ const uint8_t T_MURO = 0;
 const uint8_t T_SUELO = 1;
 const uint8_t T_PUERTA = 2;
 const uint8_t T_PUERTA_ABIERTA = 3;
+const uint8_t T_COLUMNA = 4; // columna dentro de una sala (suelo debajo y un pilar fino encima)
 
 const float WALL_H = 1.0f;
 const float TILE = 0.1f; // 16px de 160px en el atlas
 
 inline Vector4 Tile(int col, int fila) { return Vector4(col * TILE, fila * TILE, TILE, TILE); }
 
-inline Vector3 GridToWorld(int x, int y) { return Vector3(x + 0.5f, 0.0f, y + 0.5f); }
+// Centro de la casilla, a la altura de su suelo (Mazmorra/Alturas.hpp)
+inline Vector3 GridToWorld(int x, int y) { return Vector3(x + 0.5f, alturas::Y(x, y), y + 0.5f); }
 
 // Bloque de base 1x1 centrado en el origen, desde y=0 hasta y=h. UV2.x = 1 en la tapa superior.
 inline Ref<ArrayMesh> CrearBloque(float h, bool con_lados = true) {

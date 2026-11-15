@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/bola_fuego.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "bola_fuego"
+nombre = "Bola de fuego"
+clase = "Mago"
+tipo = 0
+descripcion = "Explota en una casilla y quema a todo lo que esté a su lado (aliados incluidos, ojo). Deja el suelo ardiendo 2 días."
+coste_pa = 3
+usos = 2
+enfriamiento = 1
+objetivo = 3
+alcance_min = 2
+alcance_max = 5
+area = 1
+dano_base = 3
+stat_dano = "magia"
+mult_stat = 1.0
+estado = "ardiendo"
+estado_dias = 2
+peligro = "fuego"
+peligro_dias = 2

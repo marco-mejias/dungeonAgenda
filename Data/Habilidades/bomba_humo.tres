@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/bomba_humo.png" id="2_ico"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="3_ef"]
+
+[sub_resource type="Resource" id="Efecto_efectos_propios_0"]
+script = ExtResource("3_ef")
+tipo = 7
+valor = 4
+stat = "defensa"
+duracion_turnos = 2
+
+[sub_resource type="Resource" id="Efecto_efectos_propios_1"]
+script = ExtResource("3_ef")
+tipo = 4
+valor = 3
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "bomba_humo"
+nombre = "Bomba de humo"
+clase = "Ladron"
+tipo = 0
+descripcion = "Desapareces entre el humo: +4 de defensa 2 días y +2 PA ahora mismo."
+coste_pa = 1
+usos = 1
+enfriamiento = 2
+objetivo = 0
+tirada = false
+efectos_propios = Array[ExtResource("3_ef")]([SubResource("Efecto_efectos_propios_0"), SubResource("Efecto_efectos_propios_1")])

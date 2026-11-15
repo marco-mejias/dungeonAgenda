@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/veneno_hoja.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "veneno_hoja"
+nombre = "Veneno en la hoja"
+clase = "Ladron"
+tipo = 1
+descripcion = "Al golpear, 30% por pila de envenenar 3 días (2 de daño al día)."
+disparador = 0
+reaccion = 10
+probabilidad = 30
+estado = "envenenado"
+estado_dias = 3

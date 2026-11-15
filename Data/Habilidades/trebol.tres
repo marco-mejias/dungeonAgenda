@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/trebol.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "trebol"
+nombre = "Trébol de cuatro hojas"
+clase = ""
+tipo = 1
+descripcion = "Al empezar el día, 35% por pila de que tus habilidades se recarguen un día antes."
+disparador = 5
+reaccion = 4
+probabilidad = 35
+valor = 1

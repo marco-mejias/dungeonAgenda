@@ -1,0 +1,88 @@
+[gd_resource type="Resource" script_class="EventoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion3_exito.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/opcion3_fracaso.png" id="t5"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/mascara_no_estoy.tres" id="o0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/escena.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/mapa.png" id="t7"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/exito.png" id="t8"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/cofre_mimico/fracaso.png" id="t9"]
+
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 35
+
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 35
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
+texto_boton = "Abrirlo con cuidado"
+stat_usada = "suerte"
+multiplicador_dificultad = 1.0
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
+texto_exito = "Era un cofre normal y corriente, lleno de monedas. Qué paranoia."
+texto_fracaso = "¡Era un mímico! Te muerde la mano y no la suelta en un buen rato."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 8
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 20
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
+texto_boton = "Darle una patada primero"
+stat_usada = "fuerza"
+multiplicador_dificultad = 1.2
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
+texto_exito = "El cofre suelta un gemido y escupe unas monedas para que lo dejes en paz."
+texto_fracaso = "Te haces daño en el pie. Y el cofre se ríe. Los cofres no deberían reírse."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 5
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_3")])
+
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 8
+valor = 1
+objeto = ExtResource("o0")
+
+[sub_resource type="Resource" id="Op_3"]
+script = ExtResource("s_op")
+texto_boton = "Hacerle cosquillas"
+stat_usada = "ninguna"
+multiplicador_dificultad = 0.8
+imagen_exito = ExtResource("t4")
+imagen_fracaso = ExtResource("t5")
+texto_exito = "El mímico se parte de risa y te regala una máscara rarísima que tenía dentro."
+texto_fracaso = "Al mímico no le hacen gracia las cosquillas. Nada de gracia."
+funcion_fracaso = "RecibirDano"
+parametro_fracaso = 3
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_4")])
+
+[resource]
+script = ExtResource("s_ev")
+titulo = "Cofre Sospechoso"
+descripcion = "Un cofre precioso, solo en mitad del pasillo. Juraría que acaba de respirar. Y que tiene dientes."
+ilustracion = ExtResource("t6")
+sprite_mapa = ExtResource("t7")
+imagen_exito = ExtResource("t8")
+imagen_fracaso = ExtResource("t9")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2"), SubResource("Op_3")])
+gatillo = 0

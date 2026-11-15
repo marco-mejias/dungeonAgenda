@@ -40,7 +40,9 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 
 	Node* feel = self_node->get_node_or_null("/root/Feel");
 	bool debug_mode = dungeon->has_meta("debug_mode") && (bool)dungeon->get_meta("debug_mode");
-	int coste = (debug_mode || tipo == "TRAMPA") ? 0 : 2;
+	bool explorando = dungeon->has_meta("modo_exploracion") && (bool)dungeon->get_meta("modo_exploracion");
+	int coste = (debug_mode || explorando || tipo == "TRAMPA" || tipo == "HOGUERA") ? 0 : 2;
+	Node* zonas = self_node->get_node_or_null("/root/Zonas");
 
 	int pa = act_char->has_meta("pa_actual") ? (int)act_char->get_meta("pa_actual") : 0;
 	if (pa < coste) {
@@ -67,6 +69,8 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 			int piso = pm->get_meta("piso_actual", 1);
 			if (cat) botin = cat->call("tirar_botin", String("cofre"), piso);
 		}
+		// La llave del jefe (si es este cofre) se coge siempre, quepa o no el resto
+		if (zonas) zonas->call("al_abrir_cofre", x, y, act_char);
 		Array restos = inventario::EntregarBotin(act_char, botin, pos_mundo);
 		if (restos.is_empty()) {
 			pendientes.erase(celda);
@@ -83,8 +87,22 @@ void Interactuar(Caller* instance, int x, int y, String tipo, String res_path) {
 	}
 	// === B. PUERTAS ===
 	else if (tipo == "PUERTA") {
+		// La de la sala del jefe solo se abre con la llave
+		if (zonas && !(bool)zonas->call("puede_abrir", x, y, act_char)) {
+			if (audio) audio->call("play_ui", "no");
+			if (feel) feel->call("sacudir_ficha", String(act_char->get_name()));
+			return;
+		}
 		dungeon->call("AplicarEstadoPuerta", x, y);
 		if (feel) feel->call("sacudir", 0.12);
+		interactuo = true;
+	}
+	// === B2. HOGUERA: descansar (cura, recarga habilidades y pasa el día) ===
+	else if (tipo == "HOGUERA") {
+		if (!zonas || !(bool)zonas->call("descansar", act_char)) {
+			if (audio) audio->call("play_ui", "no");
+			return;
+		}
 		interactuo = true;
 	}
 	// === C. EVENTOS Y TRAMPAS (animación de texto + pantalla de evento) ===

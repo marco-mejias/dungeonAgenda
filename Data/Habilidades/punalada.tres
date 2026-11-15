@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/punalada.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "punalada"
+nombre = "Puñalada"
+clase = "Ladron"
+tipo = 0
+descripcion = "A traición y sin avisar: daño enorme a un enemigo pegado, que se queda sangrando. Crítico con 15 o más en el d20."
+coste_pa = 2
+usos = 2
+enfriamiento = 1
+objetivo = 1
+alcance_min = 1
+alcance_max = 1
+dano_base = 4
+stat_dano = "fuerza"
+mult_stat = 1.5
+especial = "punalada"
+estado = "sangrando"
+estado_dias = 2

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/sobrecarga.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "sobrecarga"
+nombre = "Sobrecarga"
+clase = "Mago"
+tipo = 1
+descripcion = "Cada habilidad que lanzas te da +1 de magia durante 2 días (por pila). Se acumula."
+disparador = 6
+reaccion = 6
+probabilidad = 100
+valor = 1
+stat = "magia"
+duracion = 2

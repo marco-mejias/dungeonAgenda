@@ -250,6 +250,15 @@ void TerminarTurnoPersonaje(Caller* instance) {
 	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
 }
 
+// Explorando (Modo.gd), el día pasa por casillas andadas: hambre, cordura, efectos y PA como cada
+// noche, pero sin turno enemigo y sin cambiar de héroe activo.
+void PasarDiaExplorando(Caller* instance) {
+	if (!self) return;
+	Noche();
+	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
+	if (m_dungeon_manager) m_dungeon_manager->call("RefrescarLuces");
+}
+
 // Lo llama el EnemyManager al terminar el turno enemigo
 void IniciarNuevoDia(Caller* instance) {
 	if (!self) return;
@@ -340,6 +349,20 @@ Variant UsarObjeto(Caller* instance, String heroe, int indice) {
 	Node* h = Heroe(heroe);
 	if (!h || MetaBool(h, "esta_muerto")) return String("No puede usarlo");
 	String resultado;
+	// Consumibles con efectos raros (poción "¿qué podría malir sal?", botón de pánico): Especiales.gd
+	Array inv_especial = inventario::Inventario(h);
+	if (indice >= 0 && indice < inv_especial.size()) {
+		String id = Dictionary(inv_especial[indice])["id"];
+		Node* esp = h->get_node_or_null("/root/Especiales");
+		if (esp && (bool)esp->call("es_especial", id)) {
+			String error_esp = esp->call("usar", h, id);
+			if (!error_esp.is_empty()) return error_esp;
+			inventario::Quitar(h, indice, 1);
+			UtilityFunctions::print("[PartyManager] ", heroe, " usa ", id);
+			TrasCambiarEquipo(h);
+			return String("");
+		}
+	}
 	String error = inventario::Usar(h, indice, resultado);
 	if (error.is_empty()) {
 		UtilityFunctions::print("[PartyManager] ", heroe, " usa un objeto: ", resultado);
@@ -358,6 +381,8 @@ Variant DarObjeto(Caller* instance, String origen, int indice, String destino, i
 	Node* para = Heroe(destino);
 	if (!de || !para || de == para) return String::utf8("No existe ese h\xC3\xA9roe");
 	if (!PuedenIntercambiarObjetos(de, para)) return String("Tienen que estar juntos (o en la fogata)");
+	if (inventario::Lleva(de, "casco_cubo_basura") || inventario::Lleva(para, "casco_cubo_basura"))
+		return String::utf8("\xC2\xA1" "Qu\xC3\xA9 peste! Nadie se acerca al del cubo de basura");
 	Array inv = inventario::Inventario(de);
 	if (indice < 0 || indice >= inv.size()) return String("No existe ese objeto");
 	Dictionary e = inv[indice];
@@ -368,6 +393,15 @@ Variant DarObjeto(Caller* instance, String origen, int indice, String destino, i
 	UtilityFunctions::print("[PartyManager] ", origen, " da ", entran, "x ", e["id"], " a ", destino);
 	if (m_ui_manager) m_ui_manager->call("UpdateWarriorUI");
 	return entran < n ? String("Solo le caben ") + String::num_int64(entran) : String("");
+}
+
+// Aplica una lista de Efecto.tres a un héroe (eventos): devuelve el resumen ("+20 PV, -10 oro")
+Variant AplicarEfectosA(Caller* instance, String heroe, Array efectos) {
+	Node* h = Heroe(heroe);
+	if (!h) return String("");
+	String texto = inventario::AplicarEfectos(efectos, h);
+	TrasCambiarEquipo(h);
+	return texto;
 }
 
 Variant DescribirInventario(Caller* instance, String heroe) {

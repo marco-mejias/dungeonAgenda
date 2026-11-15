@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_4y1g7"]
 [ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_gsg4e"]
 [ext_resource type="Resource" path="res://Data/Objetos/Consumibles/tonico_cordura.tres" id="7_nu8p8"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/sombrero_mago.tres" id="eq_sombrero_mago"]
 
 [resource]
 script = ExtResource("1_j0w5w")
@@ -17,7 +18,8 @@ fuerza = 3
 magia = 8
 ruta_cuerpo = "res://Characters/mago.tscn"
 radio_luz = 5
+velocidad = 6
 clase = "Mago"
-equipo_inicial = Array[ExtResource("1_meqfh")]([ExtResource("2_p5oyo"), ExtResource("3_2v377"), ExtResource("4_fdfsj")])
+equipo_inicial = Array[ExtResource("1_meqfh")]([ExtResource("2_p5oyo"), ExtResource("3_2v377"), ExtResource("4_fdfsj"), ExtResource("eq_sombrero_mago")])
 inventario_inicial = Array[ExtResource("5_4y1g7")]([ExtResource("6_gsg4e"), ExtResource("7_nu8p8")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

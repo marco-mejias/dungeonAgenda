@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ObjetoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/grano_oro.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "Grano de oro"
+descripcion = "El pienso favorito de la gallina lanza-huevos. Si lo llevas, cada 5 disparos se lo come en vez de volverse contra ti."
+tipo = 8
+peso = 0.1
+valor = 10
+apilable = true
+max_pila = 10
+icono = ExtResource("2_ico")

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/parpadeo.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "parpadeo"
+nombre = "Parpadeo"
+clase = "Mago"
+tipo = 0
+descripcion = "Te teletransportas a una casilla libre que veas, a 2-4 casillas. Sin ataques de oportunidad."
+coste_pa = 1
+usos = 2
+enfriamiento = 1
+objetivo = 3
+alcance_min = 2
+alcance_max = 4
+tirada = false
+movimiento = "teletransporte"

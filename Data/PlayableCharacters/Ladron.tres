@@ -7,17 +7,18 @@
 [ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_pequena.tres" id="4_1ab2a"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="5_0x2rm"]
 [ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_vida.tres" id="6_exdfg"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/chaqueta_cuero.tres" id="eq_chaqueta_cuero"]
 
 [resource]
 script = ExtResource("1_tqqmb")
 nombre_display = "Nathan Snake"
 retrato_path = "uid://dgcawfionqxmg"
 vida_max = 75
-velocidad = 5
+velocidad = 8
 fuerza = 6
 suerte = 8
 ruta_cuerpo = "res://Characters/ladron.tscn"
 clase = "Ladron"
-equipo_inicial = Array[ExtResource("1_ynhmi")]([ExtResource("2_dalue"), ExtResource("3_8k0ik"), ExtResource("4_1ab2a")])
+equipo_inicial = Array[ExtResource("1_ynhmi")]([ExtResource("2_dalue"), ExtResource("3_8k0ik"), ExtResource("4_1ab2a"), ExtResource("eq_chaqueta_cuero")])
 inventario_inicial = Array[ExtResource("5_0x2rm")]([ExtResource("6_exdfg"), ExtResource("6_exdfg")])
 metadata/_custom_type_script = "uid://bq1ry7f5g8dcv"

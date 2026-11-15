@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/mente_afilada.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "mente_afilada"
+nombre = "Mente afilada"
+clase = "Mago"
+tipo = 1
+descripcion = "Con un crítico recuperas un uso de una habilidad (50% por pila)."
+disparador = 1
+reaccion = 3
+probabilidad = 50
+valor = 1

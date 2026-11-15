@@ -1,7 +1,8 @@
 #pragma once
 // Capa 2D del DungeonRenderer: elementos de interfaz anclados a posiciones 3D
-// (bocadillos de cómic, "!" y barra de vida de enemigos). Se dibujan dentro del
-// SubViewport de baja resolución, así que se pixelan igual que el mundo.
+// (bocadillos de cómic, "!" y barra de vida de enemigos). La capa vive en el SubViewport del mundo
+// pero se DIBUJA en la ventana principal (custom_viewport), a resolución completa: el texto se lee
+// nítido aunque el mundo vaya pixelado. Anclar() pasa de píxeles del mundo a los de la ventana.
 
 #include <Godot/godot.hpp>
 #include <Godot/classes/camera3d.hpp>
@@ -30,17 +31,16 @@ const int B_HOVER = 2;
 inline Ref<StyleBoxFlat> EstiloGlobo(int estilo) {
 	Ref<StyleBoxFlat> s;
 	s.instantiate();
-	// Papel hueso (paleta de piedra); sin PA rosado, en hover con un toque de oro
-	Color fondo = estilo == B_SIN_PA ? Color(0.93, 0.78, 0.74) : (estilo == B_HOVER ? Color(0.96, 0.9, 0.72, 0.96) : Color(0.85, 0.84, 0.8));
-	s->set_bg_color(fondo);
-	s->set_border_color(Color(0.08, 0.09, 0.11));
+	// Cuero oscuro con ribete dorado (como el HUD); sin PA, el ribete rojo; en hover, más dorado
+	s->set_bg_color(Color(0.12, 0.08, 0.06, 0.95));
+	s->set_border_color(estilo == B_SIN_PA ? Color(0.75, 0.25, 0.2) : (estilo == B_HOVER ? Color(0.9, 0.72, 0.38) : Color(0.6, 0.46, 0.24)));
 	s->set_border_width_all(1);
-	s->set_corner_radius_all(3);
-	s->set_corner_detail(2);
-	s->set_content_margin(SIDE_LEFT, 4);
-	s->set_content_margin(SIDE_RIGHT, 4);
-	s->set_content_margin(SIDE_TOP, 1);
-	s->set_content_margin(SIDE_BOTTOM, 2);
+	s->set_corner_radius_all(4);
+	s->set_corner_detail(3);
+	s->set_content_margin(SIDE_LEFT, 6);
+	s->set_content_margin(SIDE_RIGHT, 6);
+	s->set_content_margin(SIDE_TOP, 2);
+	s->set_content_margin(SIDE_BOTTOM, 3);
 	return s;
 }
 
@@ -66,7 +66,7 @@ inline Control* CrearBocadillo(const String& nombre, const String& texto, int es
 	wrapper->add_child(escala);
 
 	Ref<StyleBoxFlat> estilo_globo = EstiloGlobo(estilo);
-	escala->add_child(Triangulo("ColaBorde", Vector2(-4, -6), Vector2(4, -6), Vector2(0, 1), Color(0.05, 0.04, 0.06)));
+	escala->add_child(Triangulo("ColaBorde", Vector2(-4, -6), Vector2(4, -6), Vector2(0, 1), estilo_globo->get_border_color()));
 
 	PanelContainer* globo = memnew(PanelContainer);
 	globo->set_name("Globo");
@@ -80,9 +80,9 @@ inline Control* CrearBocadillo(const String& nombre, const String& texto, int es
 	label->set_name("Texto");
 	label->set_text(texto);
 	label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
-	label->add_theme_font_size_override("font_size", estilo == B_HOVER ? 7 : 8);
-	label->add_theme_color_override("font_color", estilo == B_SIN_PA ? Color(0.55, 0.13, 0.1) : Color(0.13, 0.14, 0.17));
-	label->add_theme_constant_override("line_spacing", -2);
+	label->add_theme_font_size_override("font_size", 11);
+	label->add_theme_color_override("font_color", estilo == B_SIN_PA ? Color(1.0, 0.55, 0.45) : Color(0.93, 0.87, 0.70));
+	label->add_theme_constant_override("line_spacing", -3);
 	globo->add_child(label);
 
 	wrapper->set_meta("texto", texto);
@@ -94,21 +94,26 @@ inline Control* CrearBocadillo(const String& nombre, const String& texto, int es
 	return wrapper;
 }
 
+// Tamaño de la capa según el zoom de la cámara (dibujada a resolución completa: no depende de la
+// reducción del mundo)
 inline float EscalaZoom(Camera3D* cam) {
 	float z = cam && cam->has_meta("zoom_factor") ? (float)cam->get_meta("zoom_factor") : 2.0f;
-	// Con menos reducción de resolución (opción del menú) el viewport es mayor: compensamos
-	float shrink = 2.0f;
-	Node* sub = cam ? cam->get_viewport() : nullptr;
-	Node* contenedor = sub ? sub->get_parent() : nullptr;
-	if (contenedor && contenedor->has_method("get_stretch_shrink")) shrink = (float)(int)contenedor->call("get_stretch_shrink");
-	return UtilityFunctions::clampf(z * 0.5f, 0.7f, 1.4f) * (2.0f / UtilityFunctions::maxf(1.0f, shrink));
+	return UtilityFunctions::clampf(z * 0.5f, 0.75f, 1.3f) * 1.25f;
 }
 
-// Coloca un elemento 2D sobre un punto 3D; lo oculta si queda detrás de la cámara
+// Coloca un elemento 2D sobre un punto 3D; lo oculta si queda detrás de la cámara. El punto se
+// proyecta en el SubViewport del mundo y se pasa a la ventana (origen y reducción del contenedor)
 inline void Anclar(Control* c, Camera3D* cam, Vector3 mundo, float escala) {
 	if (!c || !cam) return;
 	if (cam->is_position_behind(mundo)) { c->set_visible(false); return; }
-	c->set_position(cam->unproject_position(mundo).round());
+	Vector2 p = cam->unproject_position(mundo);
+	Node* sub = cam->get_viewport();
+	Control* cont = Object::cast_to<Control>(sub ? sub->get_parent() : nullptr);
+	if (cont && cont->has_method("get_stretch_shrink")) {
+		float shrink = UtilityFunctions::maxf(1.0f, (float)(int)cont->call("get_stretch_shrink"));
+		p = cont->get_global_position() + p * shrink;
+	}
+	c->set_position(p.round());
 	c->set_scale(Vector2(escala, escala));
 }
 

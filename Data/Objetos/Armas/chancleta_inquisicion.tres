@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/arma_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/chancleta_inquisicion.png" id="2_ico"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/chancleta_inquisicion.png" id="3_pue"]
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "Chancleta de la Inquisición"
+descripcion = "Nadie se espera la ira de una madre... ni de esta sandalia. +3 de daño a quien te haya atacado (desobediente). Si fallas, rebota: 1 de daño para ti."
+dano = 2
+ranura = 0
+tipo = 0
+peso = 0.8
+valor = 25
+coste_pa = 2
+icono = ExtResource("2_ico")
+sprite_puesto = ExtResource("3_pue")
+clases_permitidas = PackedStringArray()

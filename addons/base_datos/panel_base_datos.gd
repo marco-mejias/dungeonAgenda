@@ -1,13 +1,13 @@
 @tool
 extends VBoxContainer
 
-# Panel "Base de datos" del editor: todos los .tres de Data/Objetos, Data/Enemigos y
+# Panel "Base de datos" del editor: todos los .tres de Data/Objetos, Data/Enemigos, Data/Events y
 # Data/Botin en una tabla, con filtro por tipo y búsqueda. Clic = abrirlo en el Inspector;
 # doble clic = mostrarlo en el Sistema de archivos. Crear (con valores por defecto y en
 # su carpeta), duplicar y borrar (a la papelera). A la derecha, los avisos de
 # BaseDatos.validar (los mismos que da el juego al arrancar).
 
-const FILTROS := ["Todo", "Armas", "Equipo", "Mochilas", "Consumibles y otros", "Enemigos", "Tablas de botín"]
+const FILTROS := ["Todo", "Armas", "Equipo", "Mochilas", "Consumibles y otros", "Enemigos", "Tablas de botín", "Eventos"]
 const NUEVOS := [
 	["Arma", "res://Scripts/GDD/Datos/arma_data.gd", "res://Data/Objetos/Armas"],
 	["Equipo (armadura, accesorio, luz)", "res://Scripts/GDD/Datos/equipo_data.gd", "res://Data/Objetos/Equipo"],
@@ -16,7 +16,10 @@ const NUEVOS := [
 	["Objeto (llave, material...)", "res://Scripts/GDD/Datos/objeto_data.gd", "res://Data/Objetos/Varios"],
 	["Enemigo", "res://Scripts/GDD/Datos/enemigo_data.gd", "res://Data/Enemigos"],
 	["Tabla de botín", "res://Scripts/GDD/Datos/tabla_botin.gd", "res://Data/Botin"],
+	["Evento", "res://Scripts/GDD/EventoData.gd", "res://Data/Events"],
 ]
+const GATILLOS := ["manual", "proximidad", "condicional (trampa)"]
+const CARPETA_EVENTOS := "res://Data/Events"
 const PERFILES := ["Tanque", "Cuerpo a cuerpo", "Lanzador", "Cobarde"]
 const RANURAS := ["mano principal", "mano secundaria", "cabeza", "cuerpo", "accesorio", "luz", "mochila"]
 
@@ -130,6 +133,9 @@ func _filas() -> Array:
 		filas.append(datos["enemigos"][id])
 	for id in datos.get("tablas", {}):
 		filas.append(datos["tablas"][id])
+	for e in BaseDatos.cargar_carpeta(CARPETA_EVENTOS, true):
+		if e is EventoData:
+			filas.append(e)
 	return filas
 
 func _pasa_filtro(r: Resource) -> bool:
@@ -140,6 +146,7 @@ func _pasa_filtro(r: Resource) -> bool:
 		4: return r is ObjetoData and not r is EquipoData
 		5: return r is EnemigoData
 		6: return r is TablaBotin
+		7: return r is EventoData
 	return true
 
 func _pintar() -> void:
@@ -171,6 +178,16 @@ func _pintar() -> void:
 
 # [nombre, id, tipo, datos, peso, pisos/valor, icono]
 func describir(r: Resource) -> Array:
+	if r is EventoData:
+		var stats: PackedStringArray = []
+		var sin_arte := 0
+		for o in r.opciones:
+			if o:
+				stats.append(o.stat_usada)
+				if o.imagen_exito == null or o.imagen_fracaso == null:
+					sin_arte += 1
+		var arte := "" if r.sprite_mapa and r.ilustracion and sin_arte == 0 else " · falta arte"
+		return [r.titulo, r.resource_path.get_file().get_basename(), "Evento", "%s · %d opciones (%s)%s" % [GATILLOS[r.gatillo], r.opciones.size(), ", ".join(stats), arte], "", "", r.sprite_mapa]
 	if r is EnemigoData:
 		var pisos: String = "%d+" % r.piso_min if r.piso_max == 0 else "%d-%d" % [r.piso_min, r.piso_max]
 		var arma: String = r.arma.nombre if r.arma else "sin arma"
@@ -242,7 +259,16 @@ func crear(indice: int, id: String) -> String:
 		return ""
 	var r: Resource = load(tipo[1]).new()
 	var nombre := id.replace("_", " ").capitalize()
-	if r is EnemigoData:
+	if r is EventoData:
+		# Arranca con una opción y el arte de placeholder (Assets/Eventos/_placeholder)
+		r.titulo = nombre
+		r.ilustracion = load("res://Assets/Eventos/_placeholder/escena.png")
+		r.sprite_mapa = load("res://Assets/Eventos/_placeholder/mapa.png")
+		r.imagen_exito = load("res://Assets/Eventos/_placeholder/exito.png")
+		r.imagen_fracaso = load("res://Assets/Eventos/_placeholder/fracaso.png")
+		var o := OpcionEvento.new()
+		r.opciones.append(o)
+	elif r is EnemigoData:
 		r.nombre = nombre
 	elif r is TablaBotin:
 		r.id = id

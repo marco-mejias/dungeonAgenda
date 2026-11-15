@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/zancada.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "zancada"
+nombre = "Zancada"
+clase = ""
+tipo = 1
+descripcion = "Al matar, +1 PA por pila. Encadena muertes."
+disparador = 3
+reaccion = 5
+probabilidad = 100
+valor = 1

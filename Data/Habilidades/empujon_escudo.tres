@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/empujon_escudo.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "empujon_escudo"
+nombre = "Empujón de escudo"
+clase = "Tanque"
+tipo = 0
+descripcion = "Golpeas con el escudo a un enemigo pegado y lo empujas 2 casillas. Contra una pared o contra otro, se hacen daño."
+coste_pa = 2
+usos = 2
+enfriamiento = 1
+objetivo = 1
+alcance_min = 1
+alcance_max = 1
+dano_base = 1
+stat_dano = "fuerza"
+mult_stat = 0.8
+empuje = 2

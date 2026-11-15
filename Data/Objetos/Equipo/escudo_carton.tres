@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="EquipoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/equipo_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/escudo_carton.png" id="2_ico"]
+[ext_resource type="Texture2D" path="res://Assets/Sprites/Puesto/escudo_carton.png" id="3_pue"]
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "Escudo de cartón mojado"
+descripcion = "Protección de primera... hasta que empieza a lloviznar. +5 de defensa el primer turno de combate; pierde 1 por turno hasta deshacerse y dejarte en -1."
+ranura = 1
+tipo = 1
+peso = 1.5
+valor = 4
+icono = ExtResource("2_ico")
+sprite_puesto = ExtResource("3_pue")
+clases_permitidas = PackedStringArray()

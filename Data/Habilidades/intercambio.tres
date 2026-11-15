@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/intercambio.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "intercambio"
+nombre = "Intercambio"
+clase = ""
+tipo = 0
+descripcion = "Cambias de sitio con un aliado a 3 casillas o menos. Para sacar a alguien de un apuro."
+coste_pa = 1
+usos = 2
+enfriamiento = 1
+objetivo = 2
+alcance_min = 1
+alcance_max = 3
+requiere_vision = false
+tirada = false
+movimiento = "intercambio"

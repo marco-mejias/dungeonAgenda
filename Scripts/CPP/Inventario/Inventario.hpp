@@ -54,6 +54,23 @@ inline bool EsMochila(const Ref<Resource>& def) { return def.is_valid() && def->
 inline Dictionary Equipo(Node* h) { return h ? Dictionary(h->get_meta("equipo", Dictionary())) : Dictionary(); }
 inline Array Inventario(Node* h) { return h ? Array(h->get_meta("inventario", Array())) : Array(); }
 
+// ¿Lleva puesto el objeto con este id (en cualquier ranura)?
+inline bool Lleva(Node* h, const char* id) {
+	if (!h) return false;
+	Array valores = Equipo(h).values();
+	for (int i = 0; i < valores.size(); i++)
+		if (String(valores[i]) == String(id)) return true;
+	return false;
+}
+
+// Escudo de cartón mojado: +5 de defensa el primer turno de combate, -1 por cada turno de combate
+// que pasa, y al deshacerse deja -1 (el peso del cartón empapado)
+inline int BonoCarton(Node* h) {
+	if (!Lleva(h, "escudo_carton")) return 0;
+	int t = h->get_meta("carton_turnos", 0);
+	return t <= 5 ? 5 - t : -1;
+}
+
 inline Ref<Resource> Equipado(Node* h, const String& ranura) {
 	Dictionary eq = Equipo(h);
 	return eq.has(ranura) ? Definicion(h, eq[ranura]) : Ref<Resource>();
@@ -123,6 +140,7 @@ inline void RecalcularStats(Node* h) {
 		String s = m["stat"];
 		plano[s] = (int)plano.get(s, 0) + (int)m["valor"];
 	}
+	plano["defensa"] = (int)plano.get("defensa", 0) + BonoCarton(h);
 
 	for (int i = 0; i < NUM_STATS; i++) {
 		String s = STATS[i];
@@ -142,6 +160,14 @@ inline void RecalcularStats(Node* h) {
 
 // Un día menos para los efectos temporales; devuelve true si alguno se ha acabado
 inline bool AvanzarDia(Node* h) {
+	// El cartón se empapa un poco más con cada turno de combate; el pollo vuelve a ser persona
+	bool cambio_extra = false;
+	if (Lleva(h, "escudo_carton") && h->has_meta("in_combat") && (bool)h->get_meta("in_combat")) {
+		h->set_meta("carton_turnos", (int)h->get_meta("carton_turnos", 0) + 1);
+		cambio_extra = true;
+	}
+	if (h->has_meta("es_pollo")) { h->remove_meta("es_pollo"); cambio_extra = true; }
+	if (cambio_extra) RecalcularStats(h);
 	Array temporales = h->get_meta("mods_temporales", Array());
 	Array quedan;
 	for (int i = 0; i < temporales.size(); i++) {

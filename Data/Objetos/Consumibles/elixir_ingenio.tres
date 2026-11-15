@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ObjetoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="1_ef"]
+[ext_resource type="Texture2D" path="res://Assets/2D Pixel Dungeon Asset Pack/character and tileset/Dungeon_Tileset.png" id="2_tile"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="3_obj"]
+
+[sub_resource type="Resource" id="Efecto_cordura"]
+script = ExtResource("1_ef")
+tipo = 2
+valor = 5
+
+[sub_resource type="AtlasTexture" id="Icono_elixir"]
+atlas = ExtResource("2_tile")
+region = Rect2(128, 128, 16, 16)
+
+[resource]
+script = ExtResource("3_obj")
+id = "elixir_ingenio"
+nombre = "Elixir de ingenio"
+descripcion = "Sabe a cobre y a ideas. Recarga todos los usos y enfriamientos de tus habilidades."
+icono = SubResource("Icono_elixir")
+tipo = 5
+peso = 0.5
+valor = 30
+apilable = true
+max_pila = 5
+usos = 1
+efectos_al_usar = Array[ExtResource("1_ef")]([SubResource("Efecto_cordura")])

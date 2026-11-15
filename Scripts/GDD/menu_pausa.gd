@@ -16,6 +16,7 @@ var opt_sacudida: OptionButton
 var slider_jitter: HSlider
 var chk_tramado: CheckBox
 var chk_crt: CheckBox
+var chk_pantalla: CheckBox
 
 var ajustes := {"resolucion": 2, "jitter": 1.5, "tramado": true, "crt": false, "sacudida": 1}
 
@@ -102,6 +103,19 @@ func _crear_opciones_visuales() -> void:
 	elementos.append(chk_tramado)
 	chk_crt = _casilla("SCANLINES CRT", "crt")
 	elementos.append(chk_crt)
+	# Pantalla completa a la resolución del monitor (la lleva el autoload Ventana; también F11)
+	chk_pantalla = CheckBox.new()
+	chk_pantalla.text = "PANTALLA COMPLETA  (F11)"
+	chk_pantalla.focus_mode = Control.FOCUS_NONE
+	chk_pantalla.add_theme_font_size_override("font_size", 12)
+	chk_pantalla.set_pressed_no_signal(Ventana.es_completa())
+	if Ventana.incrustada():
+		chk_pantalla.disabled = true
+		chk_pantalla.tooltip_text = "Dentro del editor (Embed Game) el juego solo puede ir en ventana.
+Juega en una ventana aparte o con el juego exportado."
+	chk_pantalla.toggled.connect(func(v): Ventana.fijar(v))
+	Ventana.cambiada.connect(func(v): chk_pantalla.set_pressed_no_signal(v))
+	elementos.append(chk_pantalla)
 
 	elementos.append(_estilo_etiqueta(Label.new(), "SACUDIDA DE PANTALLA"))
 	opt_sacudida = _opciones(SACUDIDAS, "sacudida")
@@ -151,6 +165,7 @@ func _cargar_ajustes() -> void:
 
 func _guardar_ajustes() -> void:
 	var cfg := ConfigFile.new()
+	cfg.load(RUTA_AJUSTES) # sin perder otras secciones ([video] de la ventana)
 	for k in ajustes.keys():
 		cfg.set_value("graficos", k, ajustes[k])
 	cfg.save(RUTA_AJUSTES)

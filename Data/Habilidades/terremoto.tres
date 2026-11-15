@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/terremoto.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "terremoto"
+nombre = "Terremoto"
+clase = "Tanque"
+tipo = 0
+descripcion = "Das un pisotón: todos los enemigos a 2 casillas reciben daño y caen al suelo. No falla."
+coste_pa = 3
+usos = 1
+enfriamiento = 3
+objetivo = 0
+area = 2
+tirada = false
+dano_base = 2
+stat_dano = "fuerza"
+mult_stat = 0.7
+estado = "derribado"
+estado_dias = 1

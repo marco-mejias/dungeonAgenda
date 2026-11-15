@@ -11,6 +11,15 @@
 [ext_resource type="Resource" path="res://Data/Objetos/Armas/maza.tres" id="9_jo8au"]
 [ext_resource type="Resource" path="res://Data/Objetos/Mochilas/mochila_grande.tres" id="10_qx58e"]
 [ext_resource type="Script" path="res://Scripts/GDD/Datos/tabla_botin.gd" id="11_fbeor"]
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/chancleta_inquisicion.tres" id="broma_chancleta_inquisicion"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/escudo_carton.tres" id="broma_escudo_carton"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/pocion_malir_sal.tres" id="broma_pocion_malir_sal"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/elixir_ingenio.tres" id="hab_elixir_ingenio"]
+[ext_resource type="Resource" path="res://Data/Objetos/Armas/espada_multiusos.tres" id="broma_espada_multiusos"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/casco_cubo_basura.tres" id="broma_casco_cubo_basura"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/boton_panico.tres" id="broma_boton_panico"]
+[ext_resource type="Resource" path="res://Data/Objetos/Equipo/mascara_no_estoy.tres" id="broma_mascara_no_estoy"]
+[ext_resource type="Resource" path="res://Data/Objetos/Consumibles/grano_oro.tres" id="broma_grano_oro"]
 
 [sub_resource type="Resource" id="Resource_afjeq"]
 script = ExtResource("1_v7n5p")
@@ -72,7 +81,52 @@ objeto = ExtResource("10_qx58e")
 peso = 2
 piso_min = 2
 
+[sub_resource type="Resource" id="Entrada_broma_chancleta_inquisicion"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_chancleta_inquisicion")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_escudo_carton"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_escudo_carton")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_elixir_ingenio"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("hab_elixir_ingenio")
+peso = 10
+
+[sub_resource type="Resource" id="Entrada_broma_pocion_malir_sal"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_pocion_malir_sal")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_espada_multiusos"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_espada_multiusos")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_casco_cubo_basura"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_casco_cubo_basura")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_boton_panico"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_boton_panico")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_mascara_no_estoy"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_mascara_no_estoy")
+peso = 6
+
+[sub_resource type="Resource" id="Entrada_broma_grano_oro"]
+script = ExtResource("1_v7n5p")
+objeto = ExtResource("broma_grano_oro")
+peso = 10
+
 [resource]
 script = ExtResource("11_fbeor")
 id = "cofre"
-entradas = Array[ExtResource("1_v7n5p")]([SubResource("Resource_afjeq"), SubResource("Resource_6d6uj"), SubResource("Resource_p0ywj"), SubResource("Resource_g85qs"), SubResource("Resource_real2"), SubResource("Resource_bjyh0"), SubResource("Resource_au3ai"), SubResource("Resource_me8r8"), SubResource("Resource_0drj8"), SubResource("Resource_f2fr6"), SubResource("Resource_uv0mv")])
+entradas = Array[ExtResource("1_v7n5p")]([SubResource("Resource_afjeq"), SubResource("Resource_6d6uj"), SubResource("Resource_p0ywj"), SubResource("Resource_g85qs"), SubResource("Resource_real2"), SubResource("Resource_bjyh0"), SubResource("Resource_au3ai"), SubResource("Resource_me8r8"), SubResource("Resource_0drj8"), SubResource("Resource_f2fr6"), SubResource("Resource_uv0mv"), SubResource("Entrada_broma_chancleta_inquisicion"), SubResource("Entrada_broma_escudo_carton"), SubResource("Entrada_broma_pocion_malir_sal"), SubResource("Entrada_broma_espada_multiusos"), SubResource("Entrada_broma_casco_cubo_basura"), SubResource("Entrada_broma_boton_panico"), SubResource("Entrada_broma_mascara_no_estoy"), SubResource("Entrada_broma_grano_oro"), SubResource("Entrada_elixir_ingenio")])

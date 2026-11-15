@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/gancho.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "gancho"
+nombre = "Gancho"
+clase = "Tanque"
+tipo = 0
+descripcion = "Lanzas una cadena a un enemigo a 2-4 casillas y lo traes hasta ti."
+coste_pa = 2
+usos = 2
+enfriamiento = 2
+objetivo = 1
+alcance_min = 2
+alcance_max = 4
+dano_base = 1
+stat_dano = "fuerza"
+mult_stat = 0.5
+movimiento = "atraer"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ObjetoData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/objeto_data.gd" id="1_cls"]
+[ext_resource type="Texture2D" path="res://Assets/Iconos/Objetos/pocion_malir_sal.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_cls")
+nombre = "Poción de \"¿Qué podría malir sal?\""
+descripcion = "La etiqueta está borrada, pero brilla en la oscuridad. Tira un d6: 1-2 te vuelves pollo y pierdes el turno; 3-4 vida al máximo y +3 de fuerza; 5-6 explotas y dañas a todos los que estén cerca (tú incluido)."
+tipo = 5
+peso = 0.5
+valor = 20
+usos = 1
+icono = ExtResource("2_ico")

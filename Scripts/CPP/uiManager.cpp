@@ -70,7 +70,6 @@ void ActualizarStatsUI(Caller* instance);
 void ActualizarMarcadorTurno(Caller* instance);
 void UpdateWarriorUI(Caller* instance);
 void InicializarTodaLaUI(Caller* instance);
-void MostrarNumeroDado(Caller* instance, int roll, bool success);
 void AplicarResultadoEvento(Caller* instance, int option_index, bool success);
 
 // ==========================================
@@ -364,264 +363,50 @@ void OcultarStats(Caller* instance, String nombre) {
 // EVENT SCREEN FUNCTIONS
 // ==========================================
 
+// La pantalla de evento la lleva Scripts/GDD/pantalla_evento.gd (tirada d20, imágenes de victoria
+// y derrota, efectos). Aquí solo quedan las entradas de siempre, que la delegan.
+Control* PantallaEvento() {
+	if (!self) return nullptr;
+	Node* main_node = self->get_parent();
+	if (main_node) {
+		CanvasLayer* capa = Object::cast_to<CanvasLayer>(main_node->get_node_or_null("CanvasLayer2"));
+		if (capa) capa->set_visible(true);
+		m_event_screen = Object::cast_to<Control>(main_node->get_node_or_null("CanvasLayer2/PantallaEvento"));
+	}
+	return m_event_screen;
+}
+
 void CerrarEvento(Caller* instance) {
-	if (!self || !m_event_screen) return;
-	
-	float screen_height = self->get_viewport()->get_visible_rect().size.y;
-	
-	Ref<Tween> tween = m_event_screen->create_tween();
-	tween->tween_property(m_event_screen, "position", Vector2(628, screen_height), 0.4)->set_trans(Tween::TRANS_CUBIC)->set_ease(Tween::EASE_IN);
-	tween->connect("finished", Callable(m_event_screen, StringName("hide")));
-	
-	// Fusión del MODO DIOS con el truco Anti-Errores de C++
-	Node* root_node = self->get_node_or_null(NodePath("/root"));
-	if (root_node) {
-		Node* dungeon = root_node->find_child("DungeonManager", true, false);
-		if (dungeon) {
-			dungeon->call("BajarMapa");
-			dungeon->call("FinalizarEvento");
-		} else {
-			godot::UtilityFunctions::print("[ERROR] No se encontró el DungeonManager al cerrar.");
-		}
-	}
+	Control* p = PantallaEvento();
+	if (p) p->call("cerrar");
 }
 
-// ¡AQUÍ ESTÁ EL Caller* instance QUE FALTABA!
-void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {
-	if (!self) return;
-
-	Ref<Resource> event_res = self->get_meta("evento_actual");
-	Node* hero = Object::cast_to<Node>(self->get_meta("heroe_en_peligro"));
-	if (event_res.is_null() || !hero) return;
-
-	Array options = event_res->get("opciones");
-	Ref<Resource> option = options[option_index];
-
-	if (m_event_screen) {
-		RichTextLabel* story_text = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
-		if (story_text) story_text->set_text(success ? option->get("texto_exito") : option->get("texto_fracaso"));
-
-		Node* btn_box = m_event_screen->get_node_or_null("CajaBotones");
-		if (btn_box) {
-			TypedArray<Node> children = btn_box->get_children();
-			for (int i = 0; i < children.size(); i++) {
-				Control* child = Object::cast_to<Control>(children[i]); 
-				if (child) child->set_visible(child->get_name() == StringName("BtnContinuar"));
-			}
-		}
-	}
-
-	String fn_call = success ? option->get("funcion_exito")   : option->get("funcion_fracaso");
-	int param      = success ? (int)option->get("parametro_exito") : (int)option->get("parametro_fracaso");
-	
-	if (!success && hero) {
-		int sanity = hero->has_meta("sanidad_actual") ? (int)hero->get_meta("sanidad_actual") : 100;
-		hero->set_meta("sanidad_actual", UtilityFunctions::max(0, sanity - 10)); 
-		ActualizarStatsUI(instance); // LLAMADA C++ DIRECTA
-	}
-
-	// Efectos del nuevo sistema (Efecto.tres en la opción)
-	Array efectos = success ? option->get("efectos_exito") : option->get("efectos_fracaso");
-	if (hero && !efectos.is_empty()) {
-		String texto = inventario::AplicarEfectos(efectos, hero);
-		UtilityFunctions::print("[UI] Efectos del evento: ", texto);
-		ActualizarStatsUI(instance);
-	}
-
-	if (!fn_call.is_empty()) {
-		Node* pm = GetPartyManager();
-		if (pm && pm->has_method(fn_call)) pm->call(fn_call, param, hero);
-		else UtilityFunctions::printerr("[UI] El evento pide una función que no existe en PartyManager: '", fn_call, "'");
-	}
-}
+// Se mantiene por compatibilidad: ahora lo hace la pantalla al acabar la tirada
+void AplicarResultadoEvento(Caller* instance, int option_index, bool success) {}
 
 // Cierra la pantalla de evento al instante (al cambiar de piso o desde debug)
 void CerrarEventoPorDebug(Caller* instance) {
-	if (!self) return;
-	anim_dados = false;
-	wait_resultado = false;
-	if (m_event_screen) m_event_screen->set_visible(false);
-	Node* dungeon = self->get_parent()->get_node_or_null("ContenedorMapa/SubViewport/DungeonManager");
-	if (dungeon) dungeon->call("BajarMapa");
-}
-
-// ¡AQUÍ ESTÁ EL Caller* instance QUE FALTABA!
-void MostrarNumeroDado(Caller* instance, int roll, bool success) { 
-	if (!self || !m_event_screen) return;
-	
-	// Justo antes de cambiar el texto de success
-	Node* audio = self->get_node_or_null(NodePath("/root/AudioManager"));
-	if (audio) audio->call("play_sfx", success ? "success" : "fail");
-		
-	RichTextLabel* story_text = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
-	if (story_text) {
-		
-		String color = success ? "[color=green]" : "[color=red]";
-		String result_txt = String("[center]Resultado:\n\n") + color + "[b][font_size=50]" + String::num_int64(roll) + "[/font_size][/b][/color][/center]";
-
-		story_text->set_text(result_txt);
-	}
+	Control* p = PantallaEvento();
+	if (p) p->call("cerrar_ya");
 }
 
 void ResolverOpcion(Caller* instance, int option_index) {
-	if (!self) return;
-
-	Ref<Resource> event_res = self->get_meta("evento_actual");
-	Node* hero = Object::cast_to<Node>(self->get_meta("heroe_en_peligro"));
-	if (event_res.is_null() || !hero) return;
-
-	Array options = event_res->get("opciones");
-	Ref<Resource> option = options[option_index];
-
-	String stat_req = option->get("stat_usada");
-	float mult = option->get("multiplicador_dificultad");
-	int hero_stat = hero->has_meta(stat_req) ? (int)hero->get_meta(stat_req) : 0;
-	
-	int sanity = hero->has_meta("sanidad_actual") ? (int)hero->get_meta("sanidad_actual") : 100;
-	if (sanity < 20) {
-		hero_stat = hero_stat / 2; 
-	}
-	
-	int prob_success = (stat_req == "ninguna") ? 100 : (hero_stat * mult * 10);
-	if (prob_success > 100) prob_success = 100;
-
-	int roll = UtilityFunctions::randi_range(1, 100);
-	bool success = (roll <= prob_success);
-	
-	if (m_event_screen) {
-		Node* btn_box = m_event_screen->get_node_or_null("CajaBotones");
-		if (btn_box) {
-			TypedArray<Node> children = btn_box->get_children();
-			for (int i = 0; i < children.size(); i++) {
-				Control* child = Object::cast_to<Control>(children[i]); 
-				if (child) child->set_visible(false);
-			}
-		}
-
-		save_prob = prob_success;
-		save_tirada = roll;
-		save_exito = success;
-		save_index = option_index;
-		
-		anim_dados = true;
-		tiempo_dados = 1.5f;
-		tick_view = 0.0f;
-
-		// Dado 3D low poly en el hueco de la ilustración
-		Node* dado = m_event_screen->get_node_or_null("Dado");
-		Control* foto = Object::cast_to<Control>(m_event_screen->get_node_or_null("Foto"));
-		if (dado) {
-			if (foto) foto->set_visible(false);
-			dado->call("tirar", roll, success, 1.5);
-		}
-	}
+	Control* p = PantallaEvento();
+	if (p) p->call("resolver", option_index);
 }
 
 // OJO: Jenova revienta si una función llamada con call()/Callable recibe un Variant por valor
 void MostrarEventoVisual(Caller* instance, Resource* event_data) {
-	if (!self) return;
-
-	// === SALVAVIDAS ANTI-PANTALLAS INVISIBLES ===
-	Node* main_node = self->get_parent();
-	if (main_node) {
-		// Forzamos que la capa 2 esté visible (por si la ocultaste en el editor)
-		CanvasLayer* capa_eventos = Object::cast_to<CanvasLayer>(main_node->get_node_or_null("CanvasLayer2"));
-		if (capa_eventos) capa_eventos->set_visible(true);
-		
-		// Obligamos a buscar la pantalla ahora, no en el Awake
-		m_event_screen = Object::cast_to<Control>(main_node->get_node_or_null("CanvasLayer2/PantallaEvento"));
-	}
-
-	if (!m_event_screen) {
-		godot::UtilityFunctions::print("[ERROR GRAVE] ¡El código no encuentra CanvasLayer2/PantallaEvento! Revisa los nombres en el árbol.");
+	Control* p = PantallaEvento();
+	if (!p) {
+		UtilityFunctions::print("[ERROR GRAVE] No encuentro CanvasLayer2/PantallaEvento.");
 		return;
 	}
-	// ============================================
-
 	Ref<Resource> res = event_data;
 	if (res.is_null()) return;
-
 	self->set_meta("evento_actual", res);
-	
-	String title = res->get("titulo");
-	String desc  = res->get("descripcion");
-	Array options = res->get("opciones");
-	Ref<Texture2D> img = res->get("ilustracion"); 
-
-	// ... [EL RESTO DE TU FUNCIÓN SIGUE IGUAL DESDE AQUÍ] ...
-
-	Label* l_title           = Object::cast_to<Label>(m_event_screen->get_node_or_null("Titulo"));
-	RichTextLabel* l_story   = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
-	TextureRect* r_photo     = Object::cast_to<TextureRect>(m_event_screen->get_node_or_null("Foto"));
-
-	if (l_title) l_title->set_text(title);
-	Node* dado = m_event_screen->get_node_or_null("Dado");
-	if (dado) dado->call("ocultar");
-	Control* foto_visible = Object::cast_to<Control>(m_event_screen->get_node_or_null("Foto"));
-	if (foto_visible) foto_visible->set_visible(true);
-	if (l_story) l_story->set_text(desc);
-	if (r_photo && img.is_valid()) r_photo->set_texture(img);
-
-	Control* btn_box = Object::cast_to<Control>(m_event_screen->get_node_or_null("CajaBotones"));
-	Button* btn_cont = Object::cast_to<Button>(m_event_screen->get_node_or_null("CajaBotones/BtnContinuar"));
-
-	if (btn_box) {
-		TypedArray<Node> children = btn_box->get_children();
-		for (int i = 0; i < children.size(); i++) {
-			Node* h = Object::cast_to<Node>(children[i]);
-			if (h != btn_cont) h->queue_free();
-		}
-
-		if (options.size() > 0) {
-			if (btn_cont) btn_cont->set_visible(false); 
-			
-			for (int i = 0; i < options.size(); i++) {
-				Button* b = memnew(Button);
-				
-				String btn_text = "Error";
-				Variant opt_var = options[i];
-
-				if (opt_var.get_type() == Variant::OBJECT) {
-					Ref<Resource> sub_res = opt_var;
-					if (sub_res.is_valid()) {
-						btn_text = sub_res->get("texto_boton"); 
-					}
-				}
-
-				b->set_text(btn_text);
-				b->set_custom_minimum_size(Vector2(0, 50));
-				btn_box->add_child(b);
-
-				Callable click_fn = Callable(self, StringName("ResolverOpcion")).bind(i);
-				b->connect("pressed", click_fn);
-			}
-		} else {
-			if (btn_cont) btn_cont->set_visible(true); 
-		}
-	}
-
-	float screen_height = self->get_viewport()->get_visible_rect().size.y;
-	
-	m_event_screen->set_modulate(Color(1, 1, 1, 1));
-	m_event_screen->set_scale(Vector2(1, 1));
-	m_event_screen->set_position(Vector2(628, screen_height)); 
-	m_event_screen->set_visible(true);
-
-	// Fusión del MODO DIOS con el truco Anti-Errores de C++
-	Node* root_node = self->get_node_or_null(NodePath("/root"));
-	if (root_node) {
-		Node* dungeon = root_node->find_child("DungeonManager", true, false);
-		if (dungeon) {
-			dungeon->call("SubirMapa");
-		} else {
-			godot::UtilityFunctions::print("[ERROR] No se encontró el DungeonManager al abrir.");
-		}
-	}
-	
-	Ref<Tween> tween = m_event_screen->create_tween();
-	tween->tween_property(m_event_screen, "position", Vector2(628, 0), 0.5)
-		 ->set_trans(Tween::TRANS_CUBIC)
-		 ->set_ease(Tween::EASE_OUT);
+	Node* heroe = self->has_meta("heroe_en_peligro") ? Object::cast_to<Node>(self->get_meta("heroe_en_peligro")) : nullptr;
+	p->call("mostrar", res, heroe);
 }
 
 
@@ -639,16 +424,6 @@ void OnAwake(Caller* instance) {
 void OnReady(Caller* instance) {
 	InicializarTodaLaUI(instance); // LLAMADA C++ DIRECTA
 	ActualizarMarcadorTurno(instance); // LLAMADA C++ DIRECTA
-	
-	if (m_event_screen) {
-		Button* btn_cont = Object::cast_to<Button>(m_event_screen->get_node_or_null("CajaBotones/BtnContinuar"));
-		if (btn_cont) {
-			Callable close_fn = Callable(self, StringName("CerrarEvento"));
-			if (!btn_cont->is_connected("pressed", close_fn)) {
-				btn_cont->connect("pressed", close_fn);
-			}
-		}
-	}
 	
 	Button* btn_fichas = Object::cast_to<Button>(self->get_node_or_null("BtnFichas"));
 	if (btn_fichas) {
@@ -690,42 +465,6 @@ void OnProcess(Caller* instance, double delta) {
 		ActualizarVisibilidadFichas();
 	}
 
-	if (anim_dados) {
-		tiempo_dados -= delta;
-		tick_view -= delta;
-
-		if (tick_view <= 0.0f) {
-			tick_view = 0.05f; 
-			
-			if (m_event_screen) {
-				RichTextLabel* story_text = Object::cast_to<RichTextLabel>(m_event_screen->get_node_or_null("TextoHistoria"));
-				if (story_text) {
-					int fake_num = UtilityFunctions::randi_range(1, 100);
-					String txt = String::utf8("[center]Probabilidad de \xC3\xA9xito: [b]") + String::num_int64(save_prob) + "%[/b]\n\n";
-					txt += "[shake rate=20.0 level=5 connected=1]Tirando el dado...[/shake]\n\n";
-					txt += "[font_size=60][color=gray]" + String::num_int64(fake_num) + "[/color][/font_size][/center]";
-					story_text->set_text(txt);
-				}
-			}
-		}
-
-		if (tiempo_dados <= 0.0f) {
-			anim_dados = false;
-			MostrarNumeroDado(instance, save_tirada, save_exito);
-			
-			wait_resultado = true;
-			tiempo_espera = 1.5f;
-		}
-	}
-
-	if (wait_resultado) {
-		tiempo_espera -= delta;
-		
-		if (tiempo_espera <= 0.0f) {
-			wait_resultado = false;
-			AplicarResultadoEvento(instance, save_index, save_exito);
-		}
-	}
 }
 
 void OnDestroy(Caller* instance) {

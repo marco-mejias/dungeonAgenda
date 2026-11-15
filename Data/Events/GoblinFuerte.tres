@@ -1,34 +1,74 @@
-[gd_resource type="Resource" script_class="EventoData" format=3 uid="uid://dnhp3tijk5dmq"]
+[gd_resource type="Resource" script_class="EventoData" format=3]
 
-[ext_resource type="Texture2D" uid="uid://dvrneoj6icvt4" path="res://Assets/icon.svg" id="1_2t4xr"]
-[ext_resource type="Script" uid="uid://bphprpqb73iny" path="res://Scripts/GDD/OpcionEvento.gd" id="2_bv76d"]
-[ext_resource type="Script" uid="uid://bov68belyjx5p" path="res://Scripts/GDD/EventoData.gd" id="3_46ncy"]
+[ext_resource type="Script" path="res://Scripts/GDD/OpcionEvento.gd" id="s_op"]
+[ext_resource type="Script" path="res://Scripts/GDD/EventoData.gd" id="s_ev"]
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/efecto.gd" id="s_ef"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/opcion1_exito.png" id="t0"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/opcion1_fracaso.png" id="t1"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/opcion2_exito.png" id="t2"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/opcion2_fracaso.png" id="t3"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/escena.png" id="t4"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/mapa.png" id="t5"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/exito.png" id="t6"]
+[ext_resource type="Texture2D" path="res://Assets/Eventos/goblin_fortachon/fracaso.png" id="t7"]
 
-[sub_resource type="Resource" id="Resource_2t4xr"]
-script = ExtResource("2_bv76d")
+[sub_resource type="Resource" id="Ef_1"]
+script = ExtResource("s_ef")
+tipo = 5
+valor = 25
+
+[sub_resource type="Resource" id="Ef_2"]
+script = ExtResource("s_ef")
+tipo = 7
+valor = 2
+stat = "fuerza"
+duracion_turnos = 3
+
+[sub_resource type="Resource" id="Ef_3"]
+script = ExtResource("s_ef")
+tipo = 1
+valor = 5
+
+[sub_resource type="Resource" id="Op_1"]
+script = ExtResource("s_op")
 texto_boton = "Hagamos el pulso!"
+stat_usada = "fuerza"
 multiplicador_dificultad = 1.4
+imagen_exito = ExtResource("t0")
+imagen_fracaso = ExtResource("t1")
 texto_exito = "3,2,1....PAM! Al que parecía ser un fortachón resulto ser un....Es igual, le ganaste, ahora de vuelta al ruedo!"
 texto_fracaso = "3,2,1....PAM! Al que parecía ser un fortachón resulto ser un....realmente fuerte....Creo que te has roto algo...."
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 5
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_exito = Array[ExtResource("s_ef")]([SubResource("Ef_1")])
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_2")])
+efectos_pifia = Array[ExtResource("s_ef")]([SubResource("Ef_3")])
 
-[sub_resource type="Resource" id="Resource_bv76d"]
-script = ExtResource("2_bv76d")
+[sub_resource type="Resource" id="Ef_4"]
+script = ExtResource("s_ef")
+tipo = 4
+valor = 2
+
+[sub_resource type="Resource" id="Op_2"]
+script = ExtResource("s_op")
 texto_boton = "Salir corriendo"
 stat_usada = "velocidad"
-multiplicador_dificultad = 1.2000000000000002
+multiplicador_dificultad = 1.2
+imagen_exito = ExtResource("t2")
+imagen_fracaso = ExtResource("t3")
 texto_exito = "Mas vale fuerza que maña....O es al revés? Mmmm...Lo importante es que por suerte parecia que el goblin se saltaba el dia de piernas, bien hecho!"
 texto_fracaso = "A DONDE VAS? Esuchas mientras intentas salir corriendo. Miras para atrás y ves al Goblin volando apunto de hacerte un Súplex. Oh oh."
 funcion_fracaso = "RecibirDano"
 parametro_fracaso = 10
-metadata/_custom_type_script = "uid://bphprpqb73iny"
+efectos_critico = Array[ExtResource("s_ef")]([SubResource("Ef_4")])
 
 [resource]
-script = ExtResource("3_46ncy")
+script = ExtResource("s_ev")
 titulo = "Goblin Fortachon"
 descripcion = "En una esquina ves un stand de 'El Goblin Fortachon TM'. Te mira con una mirada pícara y te llama: No te dejaré pasar por mi barrio a menos que demuestres que eres un verdadero fortachón..."
-ilustracion = ExtResource("1_2t4xr")
-opciones = Array[ExtResource("2_bv76d")]([SubResource("Resource_2t4xr"), SubResource("Resource_bv76d")])
-metadata/_custom_type_script = "uid://bov68belyjx5p"
+ilustracion = ExtResource("t4")
+sprite_mapa = ExtResource("t5")
+imagen_exito = ExtResource("t6")
+imagen_fracaso = ExtResource("t7")
+opciones = Array[ExtResource("s_op")]([SubResource("Op_1"), SubResource("Op_2")])
+gatillo = 0

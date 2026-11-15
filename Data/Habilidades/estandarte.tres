@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="HabilidadData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/GDD/Datos/habilidad_data.gd" id="1_hab"]
+[ext_resource type="Texture2D" path="res://Assets/Habilidades/estandarte.png" id="2_ico"]
+
+[resource]
+script = ExtResource("1_hab")
+icono = ExtResource("2_ico")
+id = "estandarte"
+nombre = "Estandarte"
+clase = "Caballero"
+tipo = 1
+descripcion = "Llevas el estandarte: los aliados a 2 casillas de ti tienen +1 en sus tiradas de ataque."
+reaccion = 11
+etiquetas = PackedStringArray("estandarte")
+max_pilas = 1
